@@ -1,0 +1,45 @@
+# Trajectory — local development.
+# `docker compose up` brings up the dev server with hot reload.
+# Source is bind-mounted; node_modules lives in a named volume to avoid
+# host/container OS mismatches and to keep host directory clean.
+# Persistent state (SQLite, uploads) lives in ./data on the host so it
+# survives container rebuilds.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    container_name: trajectory
+    image: trajectory:dev
+    ports:
+      - "5173:5173"
+    environment:
+      NODE_ENV: development
+      TRAJECTORY_DATA_DIR: /app/data
+    volumes:
+      # Source tree — edits on host trigger HMR in container.
+      - ./src:/app/src
+      - ./static:/app/static
+      - ./drizzle:/app/drizzle
+      - ./svelte.config.js:/app/svelte.config.js
+      - ./vite.config.ts:/app/vite.config.ts
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./package.json:/app/package.json
+      - ./eslint.config.js:/app/eslint.config.js
+      - ./.prettierrc:/app/.prettierrc
+      - ./.prettierignore:/app/.prettierignore
+      # Persistent state — survives `docker compose down`.
+      - ./data:/app/data
+      # Anonymous volume for node_modules so host doesn't shadow container.
+      - trajectory_node_modules:/app/node_modules
+      # Anonymous volume for SvelteKit's generated files.
+      - trajectory_svelte_kit:/app/.svelte-kit
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
+volumes:
+  trajectory_node_modules:
+  trajectory_svelte_kit:
