@@ -1,3 +1,4 @@
+/// <reference types="@vite-pwa/sveltekit" />
 import type { Session } from '$lib/server/auth';
 
 declare global {
