@@ -6,12 +6,15 @@ import {
 	equipment,
 	exercise,
 	set as setTable,
+	workoutSession,
 	type Equipment,
 	type Gym
 } from '$lib/server/db/schema';
-import { isNull, eq, and, desc, asc, sql } from 'drizzle-orm';
+import { isNull, eq, and, desc, asc } from 'drizzle-orm';
 import { resolveActiveGym } from '$lib/server/active-gym';
 import pkg from '../../package.json' with { type: 'json' };
+
+const SAFETY_MS = 6 * 60 * 60 * 1000;
 
 export interface EquipmentTileMeta {
 	equipment: Equipment;
@@ -92,12 +95,62 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
 		};
 	});
 
+	// Active session for the SessionBar. We accept any open session (across
+	// gyms) for this user; the bar links back to the equipment of the
+	// last-logged set. If the last set is older than 6h we treat the
+	// session as effectively over and hide the bar (the row stays open in
+	// the DB; resolveSession() will close it on the next set.create).
+	const open = (
+		await db
+			.select()
+			.from(workoutSession)
+			.where(and(eq(workoutSession.userId, locals.user.id), isNull(workoutSession.endedAt)))
+			.orderBy(desc(workoutSession.startedAt))
+			.limit(1)
+	)[0];
+
+	let activeSession: {
+		startedAt: number;
+		setCount: number;
+		lastSetTs: number | null;
+		lastEquipmentName: string | null;
+		lastEquipmentId: string | null;
+	} | null = null;
+
+	if (open) {
+		const sessionSets = (await db
+			.select({
+				ts: setTable.ts,
+				equipmentId: exercise.equipmentId
+			})
+			.from(setTable)
+			.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
+			.where(and(eq(setTable.workoutSessionId, open.id), isNull(setTable.deletedAt)))
+			.orderBy(desc(setTable.ts))) as { ts: Date; equipmentId: string }[];
+
+		const lastSetTs = sessionSets[0]?.ts.getTime() ?? null;
+		const isStale = lastSetTs != null && Date.now() - lastSetTs > SAFETY_MS;
+
+		if (!isStale && sessionSets.length > 0) {
+			const lastEquipmentId = sessionSets[0].equipmentId;
+			const lastEquipment = equipments.find((e) => e.id === lastEquipmentId);
+			activeSession = {
+				startedAt: open.startedAt.getTime(),
+				setCount: sessionSets.length,
+				lastSetTs,
+				lastEquipmentName: lastEquipment?.name ?? null,
+				lastEquipmentId
+			};
+		}
+	}
+
 	return {
 		userName: locals.user.name,
 		userId: locals.user.id,
 		version: pkg.version,
 		gyms: gyms as Gym[],
 		activeGym,
-		tiles
+		tiles,
+		activeSession
 	};
 };

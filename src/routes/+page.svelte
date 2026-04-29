@@ -2,6 +2,8 @@
 	import EquipmentTile from '$lib/components/EquipmentTile.svelte';
 	import GymChip from '$lib/components/GymChip.svelte';
 	import GymSheet from '$lib/components/GymSheet.svelte';
+	import SessionBar from '$lib/components/SessionBar.svelte';
+	import TabBar from '$lib/components/TabBar.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -34,7 +36,7 @@
 </svelte:head>
 
 <main
-	class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pt-12"
+	class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pb-32 pt-12"
 	style="background-image: radial-gradient(1200px 600px at 50% 0%, rgba(255,140,66,0.06), transparent 70%);"
 >
 	<header class="flex flex-col gap-3">
@@ -147,9 +149,21 @@
 		class="mt-auto pt-6 text-center text-[11px] tabular-nums"
 		style="color: var(--color-text-dim-2);"
 	>
-		Trajectory v{data.version} · M7
+		Trajectory v{data.version} · M8
 	</div>
 </main>
+
+{#if data.activeSession}
+	<SessionBar
+		startedAt={data.activeSession.startedAt}
+		setCount={data.activeSession.setCount}
+		lastSetTs={data.activeSession.lastSetTs}
+		lastEquipmentName={data.activeSession.lastEquipmentName}
+		lastEquipmentId={data.activeSession.lastEquipmentId}
+	/>
+{/if}
+
+<TabBar active="home" />
 
 {#if gymSheetOpen}
 	<GymSheet

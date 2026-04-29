@@ -6,6 +6,7 @@
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import AddEquipmentSheet from '$lib/components/AddEquipmentSheet.svelte';
 	import ManageExercisesSheet from '$lib/components/ManageExercisesSheet.svelte';
+	import TabBar from '$lib/components/TabBar.svelte';
 	import type { PageData } from './$types';
 	import type { Equipment, Exercise, Gym } from '$lib/server/db/schema';
 
@@ -149,7 +150,7 @@
 	<title>Setup · Trajectory</title>
 </svelte:head>
 
-<main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-6 pt-14">
+<main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-6 pb-28 pt-14">
 	<header class="flex items-start gap-3">
 		<div class="flex flex-1 flex-col">
 			<div
@@ -174,17 +175,6 @@
 			{data.userName.charAt(0).toUpperCase()}
 		</a>
 	</header>
-
-	<a
-		href="/"
-		class="mt-2 flex w-fit items-center gap-1 text-[12px]"
-		style="color: var(--color-text-dim);"
-	>
-		<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-			<path d="M15 6l-6 6 6 6"/>
-		</svg>
-		Back to Today
-	</a>
 
 	<section
 		class="mt-5 flex items-center gap-3 rounded-2xl border p-4"
@@ -465,3 +455,5 @@
 		onCancel={() => (pendingGymDelete = null)}
 	/>
 {/if}
+
+<TabBar active="setup" />
