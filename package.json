@@ -11,7 +11,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
-		"format": "prettier --write ."
+		"format": "prettier --write .",
+		"gen:icons": "node scripts/gen-icons.mjs"
 	},
 	"devDependencies": {
 		"@eslint/compat": "^2.0.4",
@@ -22,6 +23,7 @@
 		"@tailwindcss/vite": "^4.2.2",
 		"@types/better-sqlite3": "^7.6.13",
 		"@types/node": "^24",
+		"@vite-pwa/sveltekit": "^1.1.0",
 		"drizzle-kit": "^0.31.10",
 		"eslint": "^10.2.0",
 		"eslint-config-prettier": "^10.1.8",
@@ -35,7 +37,8 @@
 		"tailwindcss": "^4.2.2",
 		"typescript": "^6.0.2",
 		"typescript-eslint": "^8.58.1",
-		"vite": "^8.0.7"
+		"vite": "^8.0.7",
+		"workbox-window": "^7.4.0"
 	},
 	"dependencies": {
 		"better-auth": "^1.6.9",

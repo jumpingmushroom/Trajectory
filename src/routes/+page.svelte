@@ -4,6 +4,7 @@
 	import GymSheet from '$lib/components/GymSheet.svelte';
 	import SessionBar from '$lib/components/SessionBar.svelte';
 	import TabBar from '$lib/components/TabBar.svelte';
+	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -87,6 +88,10 @@
 		</div>
 	</header>
 
+	<div class="mt-3">
+		<InstallPrompt />
+	</div>
+
 	{#if data.tiles.length === 0}
 		<section
 			class="mt-8 flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed p-8 text-center"
@@ -149,7 +154,7 @@
 		class="mt-auto pt-6 text-center text-[11px] tabular-nums"
 		style="color: var(--color-text-dim-2);"
 	>
-		Trajectory v{data.version} · M10
+		Trajectory v{data.version} · M11
 	</div>
 </main>
 

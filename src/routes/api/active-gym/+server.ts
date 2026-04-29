@@ -11,8 +11,7 @@ import { isUlid } from '$lib/server/ulid';
 import { db } from '$lib/server/db';
 import { gym } from '$lib/server/db/schema';
 import { eq, isNull, and } from 'drizzle-orm';
-
-export const COOKIE_NAME = 'trajectory_active_gym';
+import { ACTIVE_GYM_COOKIE } from '$lib/server/active-gym';
 
 export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 	if (!locals.user) throw error(401, 'unauthenticated');
@@ -28,7 +27,7 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 	)[0];
 	if (!exists) throw error(404, 'gym not found');
 
-	cookies.set(COOKIE_NAME, body.gymId, {
+	cookies.set(ACTIVE_GYM_COOKIE, body.gymId, {
 		path: '/',
 		httpOnly: true,
 		sameSite: 'lax',

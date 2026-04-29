@@ -5,9 +5,8 @@
 import { eq, isNull, and, desc } from 'drizzle-orm';
 import { db } from './db';
 import { gym, type Gym } from './db/schema';
-import { COOKIE_NAME as ACTIVE_GYM_COOKIE } from '../../routes/api/active-gym/+server';
 
-export { ACTIVE_GYM_COOKIE };
+export const ACTIVE_GYM_COOKIE = 'trajectory_active_gym';
 
 export async function resolveActiveGym(
 	cookies: { get: (name: string) => string | undefined }
