@@ -1,0 +1,31 @@
+@import 'tailwindcss';
+@import '$lib/theme.css';
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+	background: var(--color-bg);
+	color: var(--color-text);
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+	font-feature-settings: 'ss01', 'cv11';
+	min-height: 100vh;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+	display: none;
+}
+
+button {
+	font-family: inherit;
+}
+
+input,
+textarea {
+	font-family: inherit;
+}

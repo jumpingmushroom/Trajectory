@@ -1,0 +1,29 @@
+/* Trajectory design tokens — locked palette for v0.1.
+   Source of truth: handoff/trajectory/project/components.jsx (T object).
+   Mood = focus, density = standard, accent hue = amber 32°.
+   Tweaks panel (mood/density/hue switching) is FUTURE.md. */
+
+@theme {
+	--color-bg: #0d0f12;
+	--color-surface: #15181d;
+	--color-surface-2: #1c2026;
+	--color-surface-3: #242932;
+
+	--color-line: rgb(255 255 255 / 0.06);
+	--color-line-2: rgb(255 255 255 / 0.09);
+
+	--color-text: #f4ede2;
+	--color-text-dim: rgb(244 237 226 / 0.62);
+	--color-text-dim-2: rgb(244 237 226 / 0.38);
+
+	--color-amber: #ff8c42;
+	--color-amber-dim: rgb(255 140 66 / 0.14);
+	--color-amber-line: rgb(255 140 66 / 0.28);
+	--color-amber-glow: rgb(255 140 66 / 0.3);
+
+	--color-teal: #66c7c2;
+	--color-teal-dim: rgb(102 199 194 / 0.18);
+
+	--font-sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+	--font-feature-settings: 'ss01', 'cv11';
+}

@@ -21,6 +21,13 @@ Thumbs.db
 *.swp
 *.swo
 
+# Local Claude settings
+.claude/settings.local.json
+
+# Vite temp files
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
 # Runtime data (host bind-mount target)
 data/
 
