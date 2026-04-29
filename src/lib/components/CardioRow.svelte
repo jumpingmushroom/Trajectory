@@ -9,12 +9,14 @@
 		durationMin,
 		extras,
 		isLatest,
+		pending = false,
 		onDelete
 	}: {
 		index: number;
 		durationMin: number;
 		extras: Record<string, number> | null;
 		isLatest: boolean;
+		pending?: boolean;
 		onDelete: () => void;
 	} = $props();
 
@@ -52,8 +54,8 @@
 			? 'var(--color-amber-dim)'
 			: 'var(--color-surface-2)'}; border-color: {isLatest
 			? 'var(--color-amber-line)'
-			: 'var(--color-line)'};"
-		use:swipeable={{ onLeft: onDelete, threshold: 90 }}
+			: 'var(--color-line)'}; opacity: {pending ? 0.7 : 1};"
+		use:swipeable={{ onLeft: onDelete, threshold: 90, enabled: !pending }}
 	>
 		<div
 			class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-bold"
@@ -65,7 +67,14 @@
 			<span class="font-semibold">{Number.isInteger(durationMin) ? durationMin : durationMin.toFixed(1)}</span>
 			<span class="text-[11px]" style="color: var(--color-text-dim-2);">min</span>
 		</div>
-		{#if summaryBits.length > 0}
+		{#if pending}
+			<span
+				class="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em]"
+				style="background: rgba(244,237,226,0.06); color: var(--color-text-dim);"
+			>
+				queued
+			</span>
+		{:else if summaryBits.length > 0}
 			<div class="text-[11px]" style="color: var(--color-text-dim-2);">
 				{summaryBits.join(' · ')}
 			</div>

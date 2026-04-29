@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { mutate, ulid } from '$lib/mutate';
-	import { invalidateAll } from '$app/navigation';
 	import EquipmentGlyph from '$lib/components/EquipmentGlyph.svelte';
 	import InlineEdit from '$lib/components/InlineEdit.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
@@ -73,7 +72,6 @@
 			newGymName = '';
 			newGymCity = '';
 			addingGym = false;
-			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not add gym.';
 		} finally {
@@ -84,7 +82,6 @@
 	async function renameGym(g: Gym, next: string) {
 		try {
 			await mutate('gym.update', { id: g.id, name: next });
-			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not rename gym.';
 		}
@@ -93,7 +90,6 @@
 	async function renameEquipment(eq: Equipment, next: string) {
 		try {
 			await mutate('equipment.update', { id: eq.id, name: next });
-			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not rename equipment.';
 		}
@@ -104,7 +100,6 @@
 		try {
 			await mutate('equipment.delete', { id: pendingEqDelete.id });
 			pendingEqDelete = null;
-			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not delete equipment.';
 		}
@@ -115,7 +110,6 @@
 		try {
 			await mutate('gym.delete', { id: pendingGymDelete.id });
 			pendingGymDelete = null;
-			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not delete gym.';
 		}

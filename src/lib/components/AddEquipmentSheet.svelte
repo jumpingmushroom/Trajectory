@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { mutate, ulid } from '$lib/mutate';
-	import { invalidateAll } from '$app/navigation';
 	import EquipmentGlyph from './EquipmentGlyph.svelte';
 	import { GLYPH_KINDS, type GlyphKind } from './glyph-kinds';
 
@@ -77,7 +76,8 @@
 					console.error('photo upload failed:', await res.text());
 				}
 			}
-			await invalidateAll();
+			// mutate() handles invalidation when the queue drains; no need
+			// to invalidate explicitly here.
 			onClose();
 		} catch (err) {
 			console.error('add equipment failed:', err);

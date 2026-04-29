@@ -1,43 +1,37 @@
 // Client-side helper for posting mutations through /api/mutate.
-// Mints a per-device clientId (persisted in localStorage) and a fresh
-// mutationId (ULID) for each call. The IndexedDB sync layer (M10) will
-// later wrap this with a queue + retry; for v0.1 every call is online.
+// All writes flow through the IndexedDB queue (M10) so a network blip
+// at the gym doesn't drop a logged set. The API contract is idempotent
+// on (clientId, mutationId) so replays are safe.
 
 import { ulid } from 'ulid';
-
-const CLIENT_ID_KEY = 'trajectory.clientId';
-
-function clientId(): string {
-	if (typeof localStorage === 'undefined') return 'server';
-	let id = localStorage.getItem(CLIENT_ID_KEY);
-	if (!id) {
-		id = ulid();
-		localStorage.setItem(CLIENT_ID_KEY, id);
-	}
-	return id;
-}
+import { enqueue } from './sync/queue';
+import { drainNow } from './sync/sync';
+import { refreshPendingCount } from './sync/status';
 
 export interface MutationResult<T = unknown> {
 	replayed: boolean;
 	result: T;
+	queued: boolean;
 }
 
+/**
+ * Mint a mutationId, enqueue it locally, and immediately try to flush
+ * the queue. Returns `{ queued: true }` when the network is down (or the
+ * server returns a transient error); the queued mutation will retry on
+ * its own with exponential backoff and eventually drain.
+ *
+ * Callers should treat the return as best-effort: by the time it
+ * resolves, either the mutation made it to the server (queued: false)
+ * or it's safely sitting in IndexedDB waiting to retry (queued: true).
+ */
 export async function mutate<T = unknown>(op: string, payload: unknown): Promise<MutationResult<T>> {
-	const res = await fetch('/api/mutate', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({
-			clientId: clientId(),
-			mutationId: ulid(),
-			op,
-			payload
-		})
-	});
-	if (!res.ok) {
-		const text = await res.text();
-		throw new Error(`mutation failed (${res.status}): ${text}`);
+	const entry = await enqueue(op, payload);
+	await refreshPendingCount();
+	const drainResult = await drainNow();
+	if (drainResult.drained === 0 && drainResult.remaining > 0) {
+		return { replayed: false, result: null as T, queued: true };
 	}
-	return (await res.json()) as MutationResult<T>;
+	return { replayed: false, result: null as T, queued: false };
 }
 
 export { ulid };

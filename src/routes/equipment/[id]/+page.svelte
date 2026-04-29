@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { mutate } from '$lib/mutate';
-	import { invalidateAll } from '$app/navigation';
 	import EquipmentGlyph from '$lib/components/EquipmentGlyph.svelte';
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import LineChart from '$lib/components/LineChart.svelte';
@@ -37,7 +36,6 @@
 				id: eq.id,
 				notes: notesDraft.length === 0 ? null : notesDraft
 			});
-			await invalidateAll();
 		} catch (err) {
 			notesError = err instanceof Error ? err.message : 'Could not save note.';
 		} finally {

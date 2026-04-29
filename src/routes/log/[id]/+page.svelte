@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { mutate, ulid } from '$lib/mutate';
-	import { invalidateAll } from '$app/navigation';
 	import EquipmentGlyph from '$lib/components/EquipmentGlyph.svelte';
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import Stepper from '$lib/components/Stepper.svelte';
@@ -10,6 +9,7 @@
 	import CardioRow from '$lib/components/CardioRow.svelte';
 	import type { GlyphKind } from '$lib/components/glyph-kinds';
 	import { fieldsFor, type CardioField } from '$lib/cardio-templates';
+	import { syncStatus } from '$lib/sync/status';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -75,8 +75,52 @@
 		lastLogAt == null ? null : Math.max(0, REST_SECS - Math.floor((now - lastLogAt) / 1000))
 	);
 
+	const status = $derived($syncStatus);
+
+	// Optimistic display: include set.create mutations still in the local
+	// queue for this exercise. Each pending row has the same shape as a
+	// server set so the rendering doesn't branch.
+	const pendingSetsForExercise = $derived(
+		status.pendingMutations
+			.filter(
+				(m) =>
+					m.op === 'set.create' &&
+					typeof m.payload === 'object' &&
+					m.payload !== null &&
+					(m.payload as { exerciseId?: string }).exerciseId === selectedExerciseId
+			)
+			.map((m) => {
+				const p = m.payload as {
+					id: string;
+					weight?: number | null;
+					reps?: number | null;
+					durationMin?: number | null;
+					extras?: Record<string, number> | null;
+					ts?: number;
+				};
+				return {
+					id: p.id,
+					exerciseId: selectedExerciseId,
+					weight: p.weight ?? null,
+					reps: p.reps ?? null,
+					durationMin: p.durationMin ?? null,
+					extras: p.extras ?? null,
+					ts: p.ts ?? m.enqueuedAt,
+					pending: true as const
+				};
+			})
+	);
+
+	const serverSetIds = $derived(new Set(data.sessionSets.map((s) => s.id)));
+	const visiblePending = $derived(pendingSetsForExercise.filter((p) => !serverSetIds.has(p.id)));
+
 	const sessionSetsForExercise = $derived(
-		data.sessionSets.filter((s) => s.exerciseId === selectedExerciseId)
+		[
+			...data.sessionSets
+				.filter((s) => s.exerciseId === selectedExerciseId)
+				.map((s) => ({ ...s, pending: false as const })),
+			...visiblePending
+		].sort((a, b) => a.ts - b.ts)
 	);
 	const setsDone = $derived(sessionSetsForExercise.length);
 	const allDone = $derived(setsDone >= targetSets && targetSets > 0);
@@ -153,7 +197,11 @@
 			justSaved = true;
 			lastLogAt = Date.now();
 			setTimeout(() => (justSaved = false), 700);
-			await invalidateAll();
+			// mutate() handles invalidation when the queue successfully drains;
+			// when offline it queues silently and the optimistic overlay
+			// covers the UI until reconnect — we explicitly don't call
+			// invalidateAll here because that would 500 against an offline
+			// network.
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not log set.';
 		} finally {
@@ -172,7 +220,6 @@
 				ts: Date.now()
 			});
 			lastLogAt = Date.now();
-			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not clone set.';
 		}
@@ -181,7 +228,6 @@
 	async function handleDelete(setId: string) {
 		try {
 			await mutate('set.delete', { id: setId });
-			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not delete set.';
 		}
@@ -612,6 +658,7 @@
 							durationMin={s.durationMin ?? 0}
 							extras={s.extras}
 							isLatest={i === sessionSetsForExercise.length - 1}
+							pending={s.pending}
 							onDelete={() => handleDelete(s.id)}
 						/>
 					{:else}
@@ -620,6 +667,7 @@
 							weight={s.weight ?? 0}
 							reps={s.reps ?? 0}
 							isLatest={i === sessionSetsForExercise.length - 1}
+							pending={s.pending}
 							onClone={() => handleClone(s)}
 							onDelete={() => handleDelete(s.id)}
 						/>

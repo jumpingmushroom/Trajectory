@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
+	import { syncStatus } from '$lib/sync/status';
 	import type { Gym } from '$lib/server/db/schema';
 
 	let {
@@ -30,7 +31,7 @@
 				console.error('switch gym failed:', await res.text());
 				return;
 			}
-			await invalidateAll();
+			if ($syncStatus.online) await invalidateAll();
 			onClose();
 		} finally {
 			switching = false;

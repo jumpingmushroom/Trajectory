@@ -149,7 +149,7 @@
 		class="mt-auto pt-6 text-center text-[11px] tabular-nums"
 		style="color: var(--color-text-dim-2);"
 	>
-		Trajectory v{data.version} · M9
+		Trajectory v{data.version} · M10
 	</div>
 </main>
 

@@ -5,7 +5,6 @@
 	// fallback) for adding new ones.
 
 	import { mutate, ulid } from '$lib/mutate';
-	import { invalidateAll } from '$app/navigation';
 	import { exerciseSuggestionsFor } from '$lib/exercises';
 	import InlineEdit from './InlineEdit.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
@@ -49,7 +48,6 @@
 				isHidden: false
 			});
 			customName = '';
-			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not add exercise.';
 		} finally {
@@ -60,7 +58,6 @@
 	async function rename(ex: Exercise, next: string) {
 		try {
 			await mutate('exercise.update', { id: ex.id, name: next });
-			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not rename.';
 		}
@@ -71,7 +68,6 @@
 		try {
 			await mutate('exercise.delete', { id: pendingDelete.id });
 			pendingDelete = null;
-			await invalidateAll();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not delete.';
 		}
