@@ -18,6 +18,10 @@ services:
     environment:
       NODE_ENV: development
       TRAJECTORY_DATA_DIR: /app/data
+      TRAJECTORY_DB_FILE: /app/data/db.sqlite
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
+      SEED_USERS: ${SEED_USERS:-johnny:changeme,alina:changeme}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-only-insecure-secret-please-set-BETTER_AUTH_SECRET-in-prod}
     volumes:
       # Source tree — edits on host trigger HMR in container.
       - ./src:/app/src
@@ -25,6 +29,7 @@ services:
       - ./drizzle:/app/drizzle
       - ./svelte.config.js:/app/svelte.config.js
       - ./vite.config.ts:/app/vite.config.ts
+      - ./drizzle.config.ts:/app/drizzle.config.ts
       - ./tsconfig.json:/app/tsconfig.json
       - ./package.json:/app/package.json
       - ./eslint.config.js:/app/eslint.config.js

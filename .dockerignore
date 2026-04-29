@@ -1,0 +1,53 @@
+# Build context exclusions — keep host artifacts out of the image so the
+# container's deps stage is the only source of /app/node_modules.
+
+# Dependencies (the deps stage installs these inside the container)
+node_modules
+.pnpm-store
+
+# Build outputs (regenerated inside the container)
+.svelte-kit
+build
+dist
+.output
+
+# Local persistent state (bind-mounted at runtime, not baked in)
+data
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+*.swp
+*.swo
+
+# Local Claude
+.claude/settings.local.json
+
+# Docs that aren't needed inside the image (still on disk for git)
+handoff
+Trajectory-handoff.zip
+BRAINSTORM.md
+DECISIONS.md
+ROADMAP.md
+FUTURE.md
+CLAUDE.md
+README.md
+
+# Vite temp files
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Logs
+*.log

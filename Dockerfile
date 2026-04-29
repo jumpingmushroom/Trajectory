@@ -11,9 +11,31 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 RUN apk add --no-cache tini
 
 # ─── deps (cached install layer) ───────────────────────────────────────
+# better-sqlite3 ships glibc + musl prebuilt binaries but `prebuild-install`
+# keeps fetching the glibc one in this build pipeline (the libc detector
+# picks the wrong target), and `pnpm rebuild` re-runs the same install
+# script (`prebuild-install || node-gyp rebuild`) which short-circuits to
+# prebuild. So we go around pnpm: after the install, drop into the
+# better-sqlite3 dir and run node-gyp directly to compile against alpine's
+# musl headers. Result: a musl-linked .node binary that loads inside the
+# container.
 FROM base AS deps
+RUN apk add --no-cache python3 make g++ file \
+    && npm install -g node-gyp
 COPY package.json pnpm-lock.yaml* .npmrc ./
-RUN pnpm install --frozen-lockfile=false
+# Install everything WITHOUT running install scripts, then rebuild
+# better-sqlite3 from source so we get a musl-linked binary instead of
+# the glibc prebuild that prebuild-install otherwise downloads. node-gyp's
+# internal COPY step misbehaves with pnpm's hardlinked layout, so we
+# overwrite Release/.node manually after the link step.
+RUN pnpm install --frozen-lockfile=false --ignore-scripts \
+    && BS3_DIR="$(pnpm -s exec node -p "require.resolve('better-sqlite3/package.json')" | xargs dirname)" \
+    && echo "Rebuilding better-sqlite3 in: $BS3_DIR" \
+    && cd "$BS3_DIR" \
+    && rm -rf build \
+    && node-gyp rebuild --release \
+    && file build/Release/better_sqlite3.node | grep -q SYSV \
+    && echo "verified: musl-linked better_sqlite3.node"
 
 # ─── dev ───────────────────────────────────────────────────────────────
 # Used by docker-compose for local development.
