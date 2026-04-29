@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { authClient } from '$lib/auth-client';
-	import { goto, invalidateAll } from '$app/navigation';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -40,8 +39,12 @@
 				error = 'Password changed but flag clear failed. Sign in again.';
 				return;
 			}
-			await invalidateAll();
-			await goto('/', { invalidateAll: true });
+			// Force a full navigation so hooks.server.ts re-resolves the
+			// session (mustChangePassword is now false) and routes the user
+			// to first-run or Home as appropriate. A client-side goto here
+			// races the page's own load function and sometimes lands back
+			// on this screen.
+			window.location.href = '/';
 		} catch (err) {
 			console.error('change-password failed:', err);
 			error = 'Something went wrong. Try again.';

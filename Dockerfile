@@ -7,7 +7,14 @@ ARG NODE_VERSION=22-alpine
 # ─── base ──────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION} AS base
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Share corepack's cache system-wide so the non-root `node` user in the
+# dev target doesn't re-download pnpm. Disable the interactive prompt so
+# corepack doesn't hang at first run.
+ENV COREPACK_HOME=/usr/local/share/corepack \
+    COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable \
+    && corepack prepare pnpm@latest --activate \
+    && chmod -R a+rX /usr/local/share/corepack
 RUN apk add --no-cache tini
 
 # ─── deps (cached install layer) ───────────────────────────────────────
@@ -50,6 +57,15 @@ ENV NODE_ENV=development \
     CHOKIDAR_INTERVAL=200
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Run as the pre-existing `node` user (uid 1000) so files written to the
+# bind-mounted /app/data are owned by uid 1000 on the host (typical first
+# user uid on Linux). Override at compose-time with `user: "<uid>:<gid>"`
+# if your host uid differs. Pre-create dirs that named volumes mount onto
+# (.svelte-kit, data) so the volumes inherit node:node ownership rather
+# than ending up root-owned and read-only to our runtime user.
+RUN mkdir -p /app/.svelte-kit /app/data \
+    && chown -R node:node /app /home/node
+USER node
 EXPOSE 5173
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["pnpm", "run", "dev"]
