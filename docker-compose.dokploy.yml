@@ -1,0 +1,41 @@
+# Trajectory — production compose for Dokploy.
+#
+# Differs from the dev compose in three ways that all matter:
+#  1. Builds the `prod` Dockerfile target (node build, no Vite HMR).
+#  2. Persists data/ in a named Docker volume (Dokploy + named volumes
+#     handle ownership cleanly; bind-mounts collide with the dev
+#     image's `node` user UID 1000 vs the host's root-owned path).
+#  3. No source bind-mounts — the image is the deployable.
+#
+# Dokploy's reverse proxy (Traefik) routes the configured domain to
+# this service's port 5173. Port 5173 is hardcoded in the prod
+# Dockerfile target so the existing domain config (serviceName=app,
+# port=5173) works without changes.
+#
+# Required env (set in Dokploy's Environment panel for the compose):
+#   PUBLIC_BASE_URL=https://trajectory.apps.jumpingmushroom.com
+#   BETTER_AUTH_SECRET=<random 32+ char string>
+#   SEED_USERS=johnny:initialpw,alina:initialpw
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: prod
+    image: trajectory:prod
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 5173
+      TRAJECTORY_DATA_DIR: /app/data
+      TRAJECTORY_DB_FILE: /app/data/db.sqlite
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://trajectory.apps.jumpingmushroom.com}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      SEED_USERS: ${SEED_USERS:-johnny:changeme,alina:changeme}
+    volumes:
+      - trajectory_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  trajectory_data:

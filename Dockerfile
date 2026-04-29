@@ -77,15 +77,23 @@ COPY . .
 RUN pnpm run build
 
 # ─── prod ──────────────────────────────────────────────────────────────
+# Runs as root inside a named-volume-backed /app/data so there's no
+# host-uid mismatch (Dokploy + named volumes handle ownership cleanly
+# without the dev target's chown dance). The drizzle/ migrations dir
+# has to ship in the runtime image because the migration runner reads
+# the .sql files from disk on first request (per D9).
 FROM node:${NODE_VERSION} AS prod
 WORKDIR /app
 RUN apk add --no-cache tini
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=3000
+    PORT=5173 \
+    TRAJECTORY_DATA_DIR=/app/data \
+    TRAJECTORY_DB_FILE=/app/data/db.sqlite
 COPY --from=build /app/build ./build
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/node_modules ./node_modules
-EXPOSE 3000
+COPY --from=build /app/drizzle ./drizzle
+EXPOSE 5173
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["node", "build"]
