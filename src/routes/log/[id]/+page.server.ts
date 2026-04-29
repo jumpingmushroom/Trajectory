@@ -52,6 +52,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			weight: setTable.weight,
 			reps: setTable.reps,
 			durationMin: setTable.durationMin,
+			extras: setTable.extras,
 			ts: setTable.ts
 		})
 		.from(setTable)
@@ -69,6 +70,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		weight: number | null;
 		reps: number | null;
 		durationMin: number | null;
+		extras: Record<string, number> | null;
 		ts: Date;
 	}[]);
 
@@ -154,6 +156,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			weight: s.weight,
 			reps: s.reps,
 			durationMin: s.durationMin,
+			extras: s.extras,
 			ts: s.ts.getTime()
 		}))
 	};
