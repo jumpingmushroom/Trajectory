@@ -7,18 +7,21 @@
 // ULIDs in payloads are minted client-side (per DECISIONS D4). The
 // server validates their format on every call.
 
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull, desc } from 'drizzle-orm';
 import { db } from './db';
 import {
 	gym,
 	equipment,
 	exercise,
-	mutationLog,
+	workoutSession,
+	set as setTable,
 	type Gym,
 	type Equipment,
-	type Exercise
+	type Exercise,
+	type Set as SetRow,
+	type WorkoutSession
 } from './db/schema';
-import { assertUlid, isUlid } from './ulid';
+import { newUlid, assertUlid, isUlid } from './ulid';
 
 export type MutationOp =
 	| { op: 'gym.create'; payload: GymCreate }
@@ -29,7 +32,10 @@ export type MutationOp =
 	| { op: 'equipment.delete'; payload: { id: string } }
 	| { op: 'exercise.create'; payload: ExerciseCreate }
 	| { op: 'exercise.update'; payload: ExerciseUpdate }
-	| { op: 'exercise.delete'; payload: { id: string } };
+	| { op: 'exercise.delete'; payload: { id: string } }
+	| { op: 'set.create'; payload: SetCreate }
+	| { op: 'set.update'; payload: SetUpdate }
+	| { op: 'set.delete'; payload: { id: string } };
 
 export interface MutationEnvelope {
 	clientId: string;
@@ -87,6 +93,23 @@ interface ExerciseUpdate {
 	id: string;
 	name?: string;
 	sortOrder?: number;
+}
+
+interface SetCreate {
+	id: string;
+	exerciseId: string;
+	weight?: number | null;
+	reps?: number | null;
+	durationMin?: number | null;
+	extras?: Record<string, number> | null;
+	ts?: number;
+}
+interface SetUpdate {
+	id: string;
+	weight?: number | null;
+	reps?: number | null;
+	durationMin?: number | null;
+	extras?: Record<string, number> | null;
 }
 
 const EQUIPMENT_TYPES = new Set(['barbell', 'machine', 'cable', 'freeweight', 'cardio']);
@@ -359,6 +382,237 @@ async function exerciseDelete(payload: {
 	return { id: payload.id, deletedAt: now };
 }
 
+// ─── set handlers (with implicit session boundary) ─────────────────────
+
+const SESSION_EXTEND_MS = 90 * 60 * 1000;
+const SESSION_SAFETY_MS = 6 * 60 * 60 * 1000;
+
+async function resolveSession(
+	userId: string,
+	gymId: string,
+	tsMs: number
+): Promise<{ sessionId: string; isNew: boolean }> {
+	// Look at the user's most recent open session.
+	const open = (
+		await db
+			.select()
+			.from(workoutSession)
+			.where(and(eq(workoutSession.userId, userId), isNull(workoutSession.endedAt)))
+			.orderBy(desc(workoutSession.startedAt))
+			.limit(1)
+	)[0] as WorkoutSession | undefined;
+
+	let lastTs: number | null = null;
+	if (open) {
+		const lastSet = (
+			await db
+				.select({ ts: setTable.ts })
+				.from(setTable)
+				.where(
+					and(eq(setTable.workoutSessionId, open.id), isNull(setTable.deletedAt))
+				)
+				.orderBy(desc(setTable.ts))
+				.limit(1)
+		)[0] as { ts: Date } | undefined;
+		lastTs = lastSet?.ts.getTime() ?? open.startedAt.getTime();
+	}
+
+	const shouldExtend =
+		open && lastTs != null && tsMs - lastTs <= SESSION_EXTEND_MS && tsMs - lastTs >= 0;
+
+	if (shouldExtend && open) {
+		return { sessionId: open.id, isNew: false };
+	}
+
+	// Close the stale open session, if any. Cap endedAt at lastTs (the
+	// real last activity) when the gap exceeds the safety window so the
+	// session's duration isn't bloated by user inactivity.
+	if (open && lastTs != null) {
+		const gap = tsMs - lastTs;
+		const endedAt = gap > SESSION_SAFETY_MS ? new Date(lastTs) : new Date(lastTs);
+		await db
+			.update(workoutSession)
+			.set({ endedAt, updatedAt: new Date() })
+			.where(eq(workoutSession.id, open.id));
+	} else if (open) {
+		await db
+			.update(workoutSession)
+			.set({ endedAt: open.startedAt, updatedAt: new Date() })
+			.where(eq(workoutSession.id, open.id));
+	}
+
+	const sessionId = newUlid();
+	await db.insert(workoutSession).values({
+		id: sessionId,
+		userId,
+		gymId,
+		startedAt: new Date(tsMs)
+	});
+	return { sessionId, isNew: true };
+}
+
+async function setCreate(
+	payload: SetCreate,
+	userId: string
+): Promise<{ set: SetRow; sessionId: string; sessionIsNew: boolean }> {
+	assertUlid(payload.id, 'id');
+	assertUlid(payload.exerciseId, 'exerciseId');
+
+	// Resolve exercise → equipment → gym so the session attaches to the
+	// right gym (per D4 trade-off #3 — session.gymId is captured on the
+	// first set, immutable after).
+	const ex = (
+		await db
+			.select({
+				id: exercise.id,
+				equipmentId: exercise.equipmentId
+			})
+			.from(exercise)
+			.where(and(eq(exercise.id, payload.exerciseId), isNull(exercise.deletedAt)))
+			.limit(1)
+	)[0];
+	if (!ex) notFound(`exercise ${payload.exerciseId} not found`);
+
+	const eqRow = (
+		await db
+			.select({ id: equipment.id, gymId: equipment.gymId, type: equipment.type })
+			.from(equipment)
+			.where(and(eq(equipment.id, ex.equipmentId), isNull(equipment.deletedAt)))
+			.limit(1)
+	)[0];
+	if (!eqRow) notFound(`equipment ${ex.equipmentId} not found`);
+
+	const isCardio = eqRow.type === 'cardio';
+	const ts =
+		typeof payload.ts === 'number' && Number.isFinite(payload.ts) && payload.ts > 0
+			? payload.ts
+			: Date.now();
+
+	let weight: number | null = null;
+	let reps: number | null = null;
+	let durationMin: number | null = null;
+	let extras: Record<string, number> | null = null;
+
+	if (isCardio) {
+		if (typeof payload.durationMin !== 'number' || payload.durationMin <= 0) {
+			badRequest('cardio set requires positive durationMin');
+		}
+		durationMin = payload.durationMin;
+		if (payload.extras != null) {
+			if (typeof payload.extras !== 'object' || Array.isArray(payload.extras)) {
+				badRequest('extras must be an object of numbers');
+			}
+			const cleaned: Record<string, number> = {};
+			for (const [k, v] of Object.entries(payload.extras)) {
+				if (typeof v === 'number' && Number.isFinite(v)) cleaned[k] = v;
+			}
+			extras = Object.keys(cleaned).length > 0 ? cleaned : null;
+		}
+	} else {
+		if (typeof payload.weight !== 'number' || payload.weight < 0) {
+			badRequest('strength set requires non-negative weight');
+		}
+		if (typeof payload.reps !== 'number' || !Number.isInteger(payload.reps) || payload.reps < 0) {
+			badRequest('strength set requires non-negative integer reps');
+		}
+		weight = payload.weight;
+		reps = payload.reps;
+	}
+
+	const session = await resolveSession(userId, eqRow.gymId, ts);
+
+	await db
+		.insert(setTable)
+		.values({
+			id: payload.id,
+			userId,
+			workoutSessionId: session.sessionId,
+			exerciseId: payload.exerciseId,
+			weight,
+			reps,
+			durationMin,
+			extras,
+			ts: new Date(ts)
+		})
+		.onConflictDoNothing();
+
+	const row = (
+		await db.select().from(setTable).where(eq(setTable.id, payload.id)).limit(1)
+	)[0];
+	if (!row) notFound(`set ${payload.id} not found after insert`);
+
+	return { set: row, sessionId: session.sessionId, sessionIsNew: session.isNew };
+}
+
+async function setUpdate(payload: SetUpdate, userId: string): Promise<SetRow> {
+	assertUlid(payload.id, 'id');
+
+	const updates: Partial<SetRow> = { updatedAt: new Date() };
+	if (payload.weight !== undefined) {
+		if (payload.weight !== null && (typeof payload.weight !== 'number' || payload.weight < 0)) {
+			badRequest('weight must be a non-negative number or null');
+		}
+		updates.weight = payload.weight;
+	}
+	if (payload.reps !== undefined) {
+		if (
+			payload.reps !== null &&
+			(typeof payload.reps !== 'number' || !Number.isInteger(payload.reps) || payload.reps < 0)
+		) {
+			badRequest('reps must be a non-negative integer or null');
+		}
+		updates.reps = payload.reps;
+	}
+	if (payload.durationMin !== undefined) {
+		if (
+			payload.durationMin !== null &&
+			(typeof payload.durationMin !== 'number' || payload.durationMin < 0)
+		) {
+			badRequest('durationMin must be a non-negative number or null');
+		}
+		updates.durationMin = payload.durationMin;
+	}
+	if (payload.extras !== undefined) {
+		if (payload.extras === null) {
+			updates.extras = null;
+		} else if (typeof payload.extras === 'object' && !Array.isArray(payload.extras)) {
+			const cleaned: Record<string, number> = {};
+			for (const [k, v] of Object.entries(payload.extras)) {
+				if (typeof v === 'number' && Number.isFinite(v)) cleaned[k] = v;
+			}
+			updates.extras = Object.keys(cleaned).length > 0 ? cleaned : null;
+		} else {
+			badRequest('extras must be an object or null');
+		}
+	}
+
+	if (Object.keys(updates).length === 1) badRequest('set.update needs at least one field');
+
+	await db
+		.update(setTable)
+		.set(updates)
+		.where(and(eq(setTable.id, payload.id), eq(setTable.userId, userId)));
+
+	const row = (
+		await db.select().from(setTable).where(eq(setTable.id, payload.id)).limit(1)
+	)[0];
+	if (!row) notFound(`set ${payload.id} not found`);
+	return row;
+}
+
+async function setDelete(
+	payload: { id: string },
+	userId: string
+): Promise<{ id: string; deletedAt: number }> {
+	assertUlid(payload.id, 'id');
+	const now = Date.now();
+	await db
+		.update(setTable)
+		.set({ deletedAt: new Date(now), updatedAt: new Date(now) })
+		.where(and(eq(setTable.id, payload.id), eq(setTable.userId, userId)));
+	return { id: payload.id, deletedAt: now };
+}
+
 // Derived ID for the auto-hidden exercise on machines/cables/cardio.
 // Encodes the equipment ID so the hidden exercise has a deterministic
 // PK (still ULID-shaped) and rename cascades stay simple.
@@ -409,6 +663,12 @@ export async function applyMutation(
 			return { replayed: false, result: await exerciseUpdate(payload) };
 		case 'exercise.delete':
 			return { replayed: false, result: await exerciseDelete(payload) };
+		case 'set.create':
+			return { replayed: false, result: await setCreate(payload, userId) };
+		case 'set.update':
+			return { replayed: false, result: await setUpdate(payload, userId) };
+		case 'set.delete':
+			return { replayed: false, result: await setDelete(payload, userId) };
 		default:
 			badRequest(`unknown op: ${op}`);
 	}
