@@ -26,7 +26,11 @@
 				return;
 			}
 			await invalidateAll();
-			await goto(data.next, { invalidateAll: true });
+			// Coalesce against undefined: a PWA service-worker cache hit or a
+			// hydration race can leave data.next missing, and goto(undefined)
+			// stringifies to "/undefined". Always have a real target.
+			const target = typeof data?.next === 'string' && data.next.startsWith('/') ? data.next : '/';
+			await goto(target, { invalidateAll: true });
 		} catch (err) {
 			console.error('sign-in failed:', err);
 			error = 'Something went wrong. Try again.';
