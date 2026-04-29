@@ -20,7 +20,9 @@
 		"@sveltejs/kit": "^2.57.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@tailwindcss/vite": "^4.2.2",
+		"@types/better-sqlite3": "^7.6.13",
 		"@types/node": "^24",
+		"drizzle-kit": "^0.31.10",
 		"eslint": "^10.2.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.17.0",
@@ -34,5 +36,14 @@
 		"typescript": "^6.0.2",
 		"typescript-eslint": "^8.58.1",
 		"vite": "^8.0.7"
+	},
+	"dependencies": {
+		"better-auth": "^1.6.9",
+		"better-sqlite3": "^12.9.0",
+		"drizzle-orm": "^0.45.2",
+		"ulid": "^3.0.2"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": ["better-sqlite3", "esbuild"]
 	}
 }
