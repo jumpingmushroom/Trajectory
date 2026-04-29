@@ -53,7 +53,7 @@
 	<div
 		class="relative flex items-center gap-3 rounded-xl border px-4 py-2.5 tabular-nums"
 		style="background: {isLatest
-			? 'var(--color-amber-dim)'
+			? 'linear-gradient(var(--color-amber-dim), var(--color-amber-dim)), var(--color-surface-2)'
 			: 'var(--color-surface-2)'}; border-color: {isLatest
 			? 'var(--color-amber-line)'
 			: 'var(--color-line)'}; opacity: {pending ? 0.7 : 1};"

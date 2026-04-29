@@ -1,6 +1,8 @@
 <script lang="ts">
-	// Compact stepper for reps + target sets. No hold-to-scroll — these
-	// are small integer counts that don't need it.
+	// Compact stepper for reps + target sets. Tap +/- for one step;
+	// holding repeats via the shared holdRepeat action.
+
+	import { holdRepeat } from '$lib/actions/holdRepeat';
 
 	let {
 		value,
@@ -38,7 +40,7 @@
 			type="button"
 			class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border active:scale-95"
 			style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
-			onclick={() => nudge(-1)}
+			use:holdRepeat={{ onTick: () => nudge(-1) }}
 			aria-label="Decrease {label.toLowerCase()}"
 		>
 			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -55,7 +57,7 @@
 			type="button"
 			class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border active:scale-95"
 			style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
-			onclick={() => nudge(1)}
+			use:holdRepeat={{ onTick: () => nudge(1) }}
 			aria-label="Increase {label.toLowerCase()}"
 		>
 			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">

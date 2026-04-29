@@ -63,14 +63,14 @@
 				<path d="M12 7v5l3 2"/>
 			</svg>
 		</div>
-		<div class="flex flex-1 flex-col">
+		<div class="flex min-w-0 flex-1 flex-col">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="truncate text-[10px] font-bold uppercase tracking-[0.14em]"
 				style="color: var(--color-amber);"
 			>
 				Active session · {elapsedLabel}
 			</div>
-			<div class="text-[13px] font-semibold tracking-[-0.01em]" style="color: var(--color-text);">
+			<div class="truncate text-[13px] font-semibold tracking-[-0.01em]" style="color: var(--color-text);">
 				{setCount} set{setCount === 1 ? '' : 's'} logged
 				{#if lastEquipmentName}
 					· last on {lastEquipmentName}

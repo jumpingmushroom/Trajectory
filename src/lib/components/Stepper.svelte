@@ -1,7 +1,9 @@
 <script lang="ts">
 	// Big weight stepper. Tap +/- for one step (default 2.5 kg).
-	// Hold either button to auto-increment at ~80ms intervals after a
-	// 350ms grace period.
+	// Hold either button to auto-increment via the shared holdRepeat
+	// action (350 ms grace, then ~80 ms ticks).
+
+	import { holdRepeat } from '$lib/actions/holdRepeat';
 
 	let {
 		value,
@@ -23,9 +25,6 @@
 		hint?: string;
 	} = $props();
 
-	let holdTimeout: ReturnType<typeof setTimeout> | null = null;
-	let holdInterval: ReturnType<typeof setInterval> | null = null;
-
 	function clamp(v: number): number {
 		return Math.max(min, Math.min(max, v));
 	}
@@ -38,24 +37,6 @@
 
 	function nudge(direction: 1 | -1) {
 		onChange(snap(value + direction * step));
-	}
-
-	function startHold(direction: 1 | -1) {
-		nudge(direction);
-		holdTimeout = setTimeout(() => {
-			holdInterval = setInterval(() => nudge(direction), 80);
-		}, 350);
-	}
-
-	function endHold() {
-		if (holdTimeout) {
-			clearTimeout(holdTimeout);
-			holdTimeout = null;
-		}
-		if (holdInterval) {
-			clearInterval(holdInterval);
-			holdInterval = null;
-		}
 	}
 
 	function fmt(v: number): string {
@@ -84,10 +65,7 @@
 			type="button"
 			class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border active:scale-95"
 			style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
-			onpointerdown={() => startHold(-1)}
-			onpointerup={endHold}
-			onpointerleave={endHold}
-			onpointercancel={endHold}
+			use:holdRepeat={{ onTick: () => nudge(-1) }}
 			aria-label="Decrease"
 		>
 			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -109,10 +87,7 @@
 			type="button"
 			class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border active:scale-95"
 			style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
-			onpointerdown={() => startHold(1)}
-			onpointerup={endHold}
-			onpointerleave={endHold}
-			onpointercancel={endHold}
+			use:holdRepeat={{ onTick: () => nudge(1) }}
 			aria-label="Increase"
 		>
 			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">

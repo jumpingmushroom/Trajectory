@@ -7,6 +7,7 @@
 	import SmallStepper from '$lib/components/SmallStepper.svelte';
 	import SetRow from '$lib/components/SetRow.svelte';
 	import CardioRow from '$lib/components/CardioRow.svelte';
+	import { holdRepeat } from '$lib/actions/holdRepeat';
 	import type { GlyphKind } from '$lib/components/glyph-kinds';
 	import { fieldsFor, type CardioField } from '$lib/cardio-templates';
 	import { syncStatus } from '$lib/sync/status';
@@ -439,7 +440,7 @@
 										type="button"
 										class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border active:scale-95"
 										style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
-										onclick={() => bumpExtra(f.id, -1)}
+										use:holdRepeat={{ onTick: () => bumpExtra(f.id, -1) }}
 										aria-label="Decrease {f.label.toLowerCase()}"
 									>
 										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -463,7 +464,7 @@
 										type="button"
 										class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border active:scale-95"
 										style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
-										onclick={() => bumpExtra(f.id, 1)}
+										use:holdRepeat={{ onTick: () => bumpExtra(f.id, 1) }}
 										aria-label="Increase {f.label.toLowerCase()}"
 									>
 										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
