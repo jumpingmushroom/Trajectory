@@ -217,11 +217,7 @@
 				class="flex flex-col rounded-2xl border"
 				style="background: var(--color-surface); border-color: var(--color-line);"
 			>
-				<button
-					type="button"
-					class="flex items-center gap-3 px-4 py-3 text-left"
-					onclick={() => toggle(g.id)}
-				>
+				<div class="flex items-center gap-3 px-4 py-3">
 					<div
 						class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border text-[15px] font-bold"
 						style="background: linear-gradient(135deg, {g.tint}, var(--color-bg)); border-color: var(--color-line-2); color: var(--color-text-dim);"
@@ -243,21 +239,28 @@
 							{equipments.length === 1 ? 'machine' : 'machines'}
 						</div>
 					</div>
-					<svg
-						width="16"
-						height="16"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="1.75"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						class="transition-transform"
-						style="color: var(--color-text-dim-2); transform: rotate({isOpen ? 180 : 0}deg);"
+					<button
+						type="button"
+						class="flex h-9 w-9 items-center justify-center rounded-full"
+						onclick={() => toggle(g.id)}
+						aria-label={isOpen ? 'Collapse gym' : 'Expand gym'}
 					>
-						<path d="M6 9l6 6 6-6"/>
-					</svg>
-				</button>
+						<svg
+							width="16"
+							height="16"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.75"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							class="transition-transform"
+							style="color: var(--color-text-dim-2); transform: rotate({isOpen ? 180 : 0}deg);"
+						>
+							<path d="M6 9l6 6 6-6"/>
+						</svg>
+					</button>
+				</div>
 
 				{#if isOpen}
 					<div

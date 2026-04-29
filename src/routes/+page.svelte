@@ -1,10 +1,32 @@
 <script lang="ts">
+	import EquipmentTile from '$lib/components/EquipmentTile.svelte';
+	import GymChip from '$lib/components/GymChip.svelte';
+	import GymSheet from '$lib/components/GymSheet.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
+	type Filter = 'all' | 'push' | 'pull' | 'legs' | 'cardio';
+	const filters: { id: Filter; label: string }[] = [
+		{ id: 'all', label: 'All' },
+		{ id: 'push', label: 'Push' },
+		{ id: 'pull', label: 'Pull' },
+		{ id: 'legs', label: 'Legs' },
+		{ id: 'cardio', label: 'Cardio' }
+	];
+
+	let filter = $state<Filter>('all');
+	let gymSheetOpen = $state(false);
+
+	const visibleTiles = $derived(
+		filter === 'all'
+			? [...data.tiles].sort((a, b) => (a.daysSince ?? 999) - (b.daysSince ?? 999))
+			: data.tiles
+					.filter((t) => t.equipment.group === filter)
+					.sort((a, b) => (a.daysSince ?? 999) - (b.daysSince ?? 999))
+	);
+
 	const initial = $derived(data.userName.charAt(0).toUpperCase());
-	const equipmentCount = $derived(data.equipmentCount ?? 0);
 </script>
 
 <svelte:head>
@@ -12,88 +34,127 @@
 </svelte:head>
 
 <main
-	class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-6 pt-14"
+	class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pt-12"
 	style="background-image: radial-gradient(1200px 600px at 50% 0%, rgba(255,140,66,0.06), transparent 70%);"
 >
-	<header class="flex items-start gap-3">
-		<div class="flex flex-1 flex-col">
-			<div
-				class="text-[10px] font-bold uppercase tracking-[0.16em]"
-				style="color: var(--color-text-dim-2);"
-			>
-				Trajectory
+	<header class="flex flex-col gap-3">
+		<div class="flex items-start gap-3">
+			<div class="flex flex-1 flex-col">
+				<div
+					class="text-[10px] font-bold uppercase tracking-[0.16em]"
+					style="color: var(--color-text-dim-2);"
+				>
+					Trajectory
+				</div>
+				<div
+					class="mt-0.5 text-[22px] font-bold tracking-[-0.02em]"
+					style="color: var(--color-text);"
+				>
+					Today
+				</div>
 			</div>
-			<div
-				class="mt-0.5 text-[22px] font-bold tracking-[-0.02em]"
-				style="color: var(--color-text);"
+			<GymChip gym={data.activeGym} onClick={() => (gymSheetOpen = true)} />
+			<a
+				href="/profile"
+				class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
+				style="background: var(--color-amber-dim); color: var(--color-amber);"
+				aria-label="Open profile"
 			>
-				Today
-			</div>
+				{initial}
+			</a>
 		</div>
-		<a
-			href="/profile"
-			class="flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-bold"
-			style="background: var(--color-amber-dim); color: var(--color-amber);"
-			aria-label="Open profile"
-		>
-			{initial}
-		</a>
+
+		<div class="flex gap-2 overflow-x-auto pb-1" style="scrollbar-width: none;">
+			{#each filters as f (f.id)}
+				<button
+					type="button"
+					class="flex-shrink-0 rounded-full border px-3 py-1.5 text-[12px] font-medium"
+					style="background: {filter === f.id
+						? 'var(--color-amber-dim)'
+						: 'transparent'}; border-color: {filter === f.id
+						? 'var(--color-amber-line)'
+						: 'var(--color-line-2)'}; color: {filter === f.id
+						? 'var(--color-amber)'
+						: 'var(--color-text-dim)'};"
+					onclick={() => (filter = f.id)}
+					aria-pressed={filter === f.id}
+				>
+					{f.label}
+				</button>
+			{/each}
+		</div>
 	</header>
 
-	<section
-		class="mt-6 flex flex-col gap-2 rounded-2xl border p-5"
-		style="background: var(--color-surface); border-color: var(--color-line);"
-	>
-		<div
-			class="text-[10px] font-bold uppercase tracking-[0.14em]"
-			style="color: var(--color-text-dim-2);"
+	{#if data.tiles.length === 0}
+		<section
+			class="mt-8 flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed p-8 text-center"
+			style="border-color: var(--color-line-2);"
 		>
-			Active gym
-		</div>
-		<div
-			class="text-[18px] font-semibold tracking-[-0.01em]"
-			style="color: var(--color-text);"
-		>
-			{data.gymName}
-		</div>
-		{#if data.gymCity}
-			<div class="text-[12px]" style="color: var(--color-text-dim);">
-				{data.gymCity}
-			</div>
-		{/if}
-		<div class="mt-3 text-[12px]" style="color: var(--color-text-dim);">
-			Equipment, sessions and stats land here as the milestones ship.
-		</div>
-	</section>
-
-	<a
-		href="/setup"
-		class="mt-3 flex items-center justify-between gap-3 rounded-2xl border p-5"
-		style="background: var(--color-surface); border-color: var(--color-line); color: var(--color-text);"
-	>
-		<div class="flex flex-col">
 			<div
 				class="text-[10px] font-bold uppercase tracking-[0.14em]"
 				style="color: var(--color-text-dim-2);"
 			>
-				Equipment
+				{data.activeGym.name}
 			</div>
-			<div class="text-[16px] font-semibold">
-				{equipmentCount === 0 ? 'Add your first machine' : `${equipmentCount} ${equipmentCount === 1 ? 'piece' : 'pieces'} set up`}
+			<div class="text-[16px] font-semibold" style="color: var(--color-text);">
+				No equipment yet
 			</div>
-			<div class="mt-1 text-[12px]" style="color: var(--color-text-dim);">
-				Open Setup to add equipment, photos and exercises.
+			<div class="max-w-[28ch] text-[13px]" style="color: var(--color-text-dim);">
+				Add your first machine in Setup so you have something to log against.
 			</div>
-		</div>
-		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-dim-2);">
-			<path d="M9 6l6 6-6 6"/>
+			<a
+				href="/setup"
+				class="mt-1 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-bold"
+				style="background: var(--color-amber); color: #1b0a00;"
+			>
+				Open Setup
+			</a>
+		</section>
+	{:else if visibleTiles.length === 0}
+		<section
+			class="mt-6 rounded-2xl border-2 border-dashed p-6 text-center text-[13px]"
+			style="border-color: var(--color-line-2); color: var(--color-text-dim);"
+		>
+			Nothing in this category yet.
+		</section>
+	{:else}
+		<section class="mt-3 grid grid-cols-2 gap-3">
+			{#each visibleTiles as tile (tile.equipment.id)}
+				<EquipmentTile
+					equipment={tile.equipment}
+					lastWeight={tile.lastWeight}
+					lastReps={tile.lastReps}
+					lastDurationMin={tile.lastDurationMin}
+					daysSince={tile.daysSince}
+					href={`/equipment/${tile.equipment.id}`}
+				/>
+			{/each}
+		</section>
+	{/if}
+
+	<a
+		href="/setup"
+		class="mt-4 flex items-center justify-center gap-2 rounded-full border-2 border-dashed py-3 text-[13px] font-semibold"
+		style="border-color: var(--color-line-2); color: var(--color-amber);"
+	>
+		<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+			<path d="M12 5v14M5 12h14"/>
 		</svg>
+		Add equipment
 	</a>
 
 	<div
 		class="mt-auto pt-6 text-center text-[11px] tabular-nums"
 		style="color: var(--color-text-dim-2);"
 	>
-		Trajectory v{data.version} · M4
+		Trajectory v{data.version} · M5
 	</div>
 </main>
+
+{#if gymSheetOpen}
+	<GymSheet
+		gyms={data.gyms}
+		activeGymId={data.activeGym.id}
+		onClose={() => (gymSheetOpen = false)}
+	/>
+{/if}
