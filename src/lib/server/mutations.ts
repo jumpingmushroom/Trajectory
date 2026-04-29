@@ -73,6 +73,7 @@ interface EquipmentUpdate {
 	tint?: string;
 	cardioKind?: string | null;
 	sortOrder?: number;
+	notes?: string | null;
 }
 
 interface ExerciseCreate {
@@ -265,6 +266,14 @@ async function equipmentUpdate(payload: EquipmentUpdate): Promise<Equipment> {
 	}
 	if (typeof payload.sortOrder === 'number' && Number.isInteger(payload.sortOrder)) {
 		updates.sortOrder = payload.sortOrder;
+	}
+	if (payload.notes !== undefined) {
+		updates.notes =
+			payload.notes == null
+				? null
+				: typeof payload.notes === 'string'
+					? payload.notes.slice(0, 4000)
+					: badRequest('notes must be a string or null');
 	}
 	if (Object.keys(updates).length === 1) badRequest('equipment.update needs at least one field');
 

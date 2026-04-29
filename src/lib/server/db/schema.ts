@@ -140,6 +140,9 @@ export const equipment = sqliteTable(
 		cardioKind: text('cardio_kind'),
 		// sortOrder: reserved for "Walk order" sort (FUTURE.md); default 0.
 		sortOrder: integer('sort_order').default(0).notNull(),
+		// notes: free text, shared across users (it's a fact about the
+		// machine, not the lifter). Surfaced on the Detail screen.
+		notes: text('notes'),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' })
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull(),
