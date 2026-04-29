@@ -6,14 +6,14 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { db } from './db/index';
 import { user, session, account, verification } from './db/schema';
 
+// Secret resolution is intentionally non-throwing here so SvelteKit's
+// build-time analyse step (which imports server modules with
+// NODE_ENV=production but no app env vars) can complete. The real
+// guard runs in hooks.server.ts on first request.
 const baseURL = process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173';
 const secret =
 	process.env.BETTER_AUTH_SECRET ??
-	(process.env.NODE_ENV === 'production'
-		? (() => {
-				throw new Error('BETTER_AUTH_SECRET must be set in production');
-			})()
-		: 'dev-only-insecure-secret-please-set-BETTER_AUTH_SECRET-in-prod');
+	'dev-only-insecure-secret-please-set-BETTER_AUTH_SECRET-in-prod';
 
 export const auth = betterAuth({
 	baseURL,

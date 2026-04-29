@@ -40,6 +40,9 @@ function ensurePlaceholder() {
 let bootDone = false;
 async function ensureBoot() {
 	if (bootDone) return;
+	if (process.env.NODE_ENV === 'production' && !process.env.BETTER_AUTH_SECRET) {
+		throw new Error('BETTER_AUTH_SECRET must be set in production');
+	}
 	ensurePlaceholder();
 	await ensureMigrations();
 	await seedUsersIfEmpty();
