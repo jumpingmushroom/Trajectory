@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { gym } from '$lib/server/db/schema';
+import { gym, equipment } from '$lib/server/db/schema';
 import { isNull, sql, desc } from 'drizzle-orm';
 import pkg from '../../package.json' with { type: 'json' };
 
@@ -30,10 +30,18 @@ export const load: PageServerLoad = async ({ locals }) => {
 			.limit(1)
 	)[0];
 
+	const equipmentCount = (
+		(await db
+			.select({ n: sql<number>`count(*)` })
+			.from(equipment)
+			.where(isNull(equipment.deletedAt))) as { n: number }[]
+	)[0]?.n ?? 0;
+
 	return {
 		userName: locals.user.name,
 		gymName: primary?.name ?? 'Your gym',
 		gymCity: primary?.city ?? null,
+		equipmentCount,
 		version: pkg.version
 	};
 };

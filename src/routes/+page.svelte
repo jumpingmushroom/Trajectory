@@ -4,6 +4,7 @@
 	let { data }: { data: PageData } = $props();
 
 	const initial = $derived(data.userName.charAt(0).toUpperCase());
+	const equipmentCount = $derived(data.equipmentCount ?? 0);
 </script>
 
 <svelte:head>
@@ -65,25 +66,34 @@
 		</div>
 	</section>
 
-	<section
-		class="mt-3 flex flex-col gap-1 rounded-2xl border p-5"
-		style="background: var(--color-surface); border-color: var(--color-line);"
+	<a
+		href="/setup"
+		class="mt-3 flex items-center justify-between gap-3 rounded-2xl border p-5"
+		style="background: var(--color-surface); border-color: var(--color-line); color: var(--color-text);"
 	>
-		<div
-			class="text-[10px] font-bold uppercase tracking-[0.14em]"
-			style="color: var(--color-text-dim-2);"
-		>
-			Signed in as
+		<div class="flex flex-col">
+			<div
+				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				style="color: var(--color-text-dim-2);"
+			>
+				Equipment
+			</div>
+			<div class="text-[16px] font-semibold">
+				{equipmentCount === 0 ? 'Add your first machine' : `${equipmentCount} ${equipmentCount === 1 ? 'piece' : 'pieces'} set up`}
+			</div>
+			<div class="mt-1 text-[12px]" style="color: var(--color-text-dim);">
+				Open Setup to add equipment, photos and exercises.
+			</div>
 		</div>
-		<div class="text-[16px] font-semibold" style="color: var(--color-text);">
-			{data.userName}
-		</div>
-	</section>
+		<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-dim-2);">
+			<path d="M9 6l6 6-6 6"/>
+		</svg>
+	</a>
 
 	<div
 		class="mt-auto pt-6 text-center text-[11px] tabular-nums"
 		style="color: var(--color-text-dim-2);"
 	>
-		Trajectory v{data.version} · M3
+		Trajectory v{data.version} · M4
 	</div>
 </main>
