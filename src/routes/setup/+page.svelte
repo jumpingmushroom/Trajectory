@@ -25,6 +25,7 @@
 	let newGymCity = $state('');
 	let addingEqForGym = $state<string | null>(null);
 	let managingExercisesFor = $state<Equipment | null>(null);
+	let editingEq = $state<Equipment | null>(null);
 	let pendingEqDelete = $state<Equipment | null>(null);
 	let pendingGymDelete = $state<Gym | null>(null);
 	let busy = $state(false);
@@ -256,12 +257,15 @@
 								class="flex items-center gap-3 rounded-xl border px-3 py-2"
 								style="background: var(--color-surface-2); border-color: var(--color-line);"
 							>
-								<div
-									class="h-9 w-9 flex-shrink-0 rounded-lg border p-1.5"
+								<button
+									type="button"
+									class="h-9 w-9 flex-shrink-0 rounded-lg border p-1.5 transition-transform active:scale-95"
 									style="background: linear-gradient(135deg, {eq.tint}, var(--color-bg)); border-color: var(--color-line-2);"
+									onclick={() => (editingEq = eq)}
+									aria-label="Edit equipment"
 								>
 									<EquipmentGlyph kind={eq.glyph as never} />
-								</div>
+								</button>
 								<div class="flex flex-1 flex-col">
 									<InlineEdit
 										value={eq.name}
@@ -415,6 +419,14 @@
 	<AddEquipmentSheet
 		gymId={addingEqForGym}
 		onClose={() => (addingEqForGym = null)}
+	/>
+{/if}
+
+{#if editingEq}
+	<AddEquipmentSheet
+		mode="edit"
+		equipment={editingEq}
+		onClose={() => (editingEq = null)}
 	/>
 {/if}
 

@@ -16,7 +16,9 @@
 	let { data }: { data: PageData } = $props();
 
 	const eq = $derived(data.equipment);
-	const photoSrc = $derived(eq.photoPath ? `/uploads/${eq.photoPath}` : null);
+	const photoSrc = $derived(
+		eq.photoPath ? `/uploads/${eq.photoPath}?v=${eq.updatedAt.getTime()}` : null
+	);
 	const isCardio = $derived(eq.type === 'cardio');
 	const cardioFields = $derived<CardioField[]>(isCardio ? fieldsFor(eq.cardioKind) : []);
 
