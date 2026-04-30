@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { mutate, ulid } from '$lib/mutate';
 	import EquipmentGlyph from './EquipmentGlyph.svelte';
-	import { GLYPH_KINDS, type GlyphKind } from './glyph-kinds';
+	import {
+		GLYPHS,
+		CATEGORY_ORDER,
+		CATEGORY_LABEL,
+		type GlyphKind,
+		type GlyphMeta
+	} from './glyph-kinds';
 
 	type EquipmentType = 'barbell' | 'machine' | 'cable' | 'freeweight' | 'cardio';
 	type MuscleGroup = 'push' | 'pull' | 'legs' | 'cardio';
@@ -22,6 +28,32 @@
 	let photoPreview = $state<string | null>(null);
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
+	let glyphSearch = $state('');
+
+	// When search is non-empty, render a flat filtered list. When empty,
+	// render category-grouped sections in CATEGORY_ORDER.
+	const filteredGlyphs = $derived.by<GlyphMeta[] | null>(() => {
+		const q = glyphSearch.trim().toLowerCase();
+		if (!q) return null;
+		return GLYPHS.filter(
+			(g) =>
+				g.label.toLowerCase().includes(q) ||
+				g.aliases.some((a) => a.toLowerCase().includes(q))
+		);
+	});
+
+	const groupedGlyphs = $derived.by(() =>
+		CATEGORY_ORDER.map((category) => ({
+			category,
+			label: CATEGORY_LABEL[category],
+			items: GLYPHS.filter((g) => g.category === category)
+		}))
+	);
+
+	function pickGeneric() {
+		glyph = 'generic';
+		glyphSearch = '';
+	}
 
 	const types: EquipmentType[] = ['machine', 'cable', 'barbell', 'freeweight', 'cardio'];
 	const groups: MuscleGroup[] = ['push', 'pull', 'legs', 'cardio'];
@@ -186,33 +218,109 @@
 					{/if}
 				</div>
 
-				<div class="mt-1">
+				<div class="mt-1 flex flex-col gap-2">
 					<div
 						class="text-[10px] font-bold uppercase tracking-[0.14em]"
 						style="color: var(--color-text-dim-2);"
 					>
 						Glyph
 					</div>
-					<div class="mt-2 grid grid-cols-4 gap-2">
-						{#each GLYPH_KINDS as g (g)}
-							<button
-								type="button"
-								class="flex aspect-square items-center justify-center rounded-xl border p-2"
-								style="background: {glyph === g
-									? 'var(--color-amber-dim)'
-									: 'var(--color-surface-2)'}; border-color: {glyph === g
-									? 'var(--color-amber-line)'
-									: 'var(--color-line-2)'};"
-								onclick={() => (glyph = g)}
-								aria-pressed={glyph === g}
-							>
-								<EquipmentGlyph
-									kind={g}
-									accent={glyph === g ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
-								/>
-							</button>
+
+					<input
+						bind:value={glyphSearch}
+						type="text"
+						placeholder="Search glyphs (e.g. lat pulldown, kettlebell)"
+						class="rounded-lg border px-3 py-2 text-[13px] outline-none"
+						style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
+						aria-label="Search glyphs"
+					/>
+
+					{#if filteredGlyphs === null}
+						{#each groupedGlyphs as section (section.category)}
+							<div class="mt-2 flex flex-col gap-2">
+								<div
+									class="text-[10px] font-bold uppercase tracking-[0.14em]"
+									style="color: var(--color-text-dim-2);"
+								>
+									{section.label}
+								</div>
+								<div class="grid grid-cols-4 gap-2">
+									{#each section.items as g (g.kind)}
+										<button
+											type="button"
+											class="flex aspect-square items-center justify-center rounded-xl border p-2"
+											style="background: {glyph === g.kind
+												? 'var(--color-amber-dim)'
+												: 'var(--color-surface-2)'}; border-color: {glyph === g.kind
+												? 'var(--color-amber-line)'
+												: 'var(--color-line-2)'};"
+											onclick={() => (glyph = g.kind)}
+											aria-pressed={glyph === g.kind}
+											aria-label={g.label}
+											title={g.label}
+										>
+											<EquipmentGlyph
+												kind={g.kind}
+												accent={glyph === g.kind ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
+											/>
+										</button>
+									{/each}
+								</div>
+							</div>
 						{/each}
-					</div>
+					{:else if filteredGlyphs.length === 0}
+						<div class="mt-2 flex flex-col gap-2">
+							<div
+								class="text-[12px]"
+								style="color: var(--color-text-dim);"
+							>
+								No glyph matches "{glyphSearch}". Pick <span style="color: var(--color-text);">Generic</span> and name it whatever you like.
+							</div>
+							<div class="grid grid-cols-4 gap-2">
+								<button
+									type="button"
+									class="flex aspect-square items-center justify-center rounded-xl border p-2"
+									style="background: {glyph === 'generic'
+										? 'var(--color-amber-dim)'
+										: 'var(--color-surface-2)'}; border-color: {glyph === 'generic'
+										? 'var(--color-amber-line)'
+										: 'var(--color-line-2)'};"
+									onclick={pickGeneric}
+									aria-pressed={glyph === 'generic'}
+									aria-label="Generic"
+									title="Generic"
+								>
+									<EquipmentGlyph
+										kind="generic"
+										accent={glyph === 'generic' ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
+									/>
+								</button>
+							</div>
+						</div>
+					{:else}
+						<div class="mt-2 grid grid-cols-4 gap-2">
+							{#each filteredGlyphs as g (g.kind)}
+								<button
+									type="button"
+									class="flex aspect-square items-center justify-center rounded-xl border p-2"
+									style="background: {glyph === g.kind
+										? 'var(--color-amber-dim)'
+										: 'var(--color-surface-2)'}; border-color: {glyph === g.kind
+										? 'var(--color-amber-line)'
+										: 'var(--color-line-2)'};"
+									onclick={() => (glyph = g.kind)}
+									aria-pressed={glyph === g.kind}
+									aria-label={g.label}
+									title={g.label}
+								>
+									<EquipmentGlyph
+										kind={g.kind}
+										accent={glyph === g.kind ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
+									/>
+								</button>
+							{/each}
+						</div>
+					{/if}
 				</div>
 			</div>
 		{:else if step === 1}
