@@ -135,6 +135,260 @@
 	}
 </script>
 
+{#snippet photoAndGlyphSection()}
+	<div class="flex flex-col gap-3">
+		<div
+			class="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl border"
+			style="background: linear-gradient(135deg, var(--color-surface-2), var(--color-bg)); border-color: var(--color-line-2);"
+		>
+			{#if photoPreview}
+				<img src={photoPreview} alt="preview" class="h-full w-full object-cover" />
+			{:else}
+				<div class="p-6">
+					<div class="h-24 w-24">
+						<EquipmentGlyph kind={glyph} />
+					</div>
+				</div>
+			{/if}
+		</div>
+
+		<div class="flex gap-2">
+			<label
+				class="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full border py-3 text-[13px] font-semibold"
+				style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
+			>
+				<input type="file" accept="image/*" class="hidden" onchange={pickPhoto} />
+				{photoFile ? 'Replace photo' : 'Add photo'}
+			</label>
+			{#if photoFile}
+				<button
+					type="button"
+					class="rounded-full border px-4 py-3 text-[13px] font-semibold"
+					style="background: transparent; border-color: var(--color-line-2); color: var(--color-text-dim);"
+					onclick={clearPhoto}
+				>
+					Clear
+				</button>
+			{/if}
+		</div>
+
+		<div class="mt-1 flex flex-col gap-2">
+			<div
+				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				style="color: var(--color-text-dim-2);"
+			>
+				Glyph
+			</div>
+
+			<input
+				bind:value={glyphSearch}
+				type="text"
+				placeholder="Search glyphs (e.g. lat pulldown, kettlebell)"
+				class="rounded-lg border px-3 py-2 text-[13px] outline-none"
+				style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
+				aria-label="Search glyphs"
+			/>
+
+			{#if filteredGlyphs === null}
+				{#each groupedGlyphs as section (section.category)}
+					<div class="mt-2 flex flex-col gap-2">
+						<div
+							class="text-[10px] font-bold uppercase tracking-[0.14em]"
+							style="color: var(--color-text-dim-2);"
+						>
+							{section.label}
+						</div>
+						<div class="grid grid-cols-4 gap-2">
+							{#each section.items as g (g.kind)}
+								<button
+									type="button"
+									class="flex aspect-square items-center justify-center rounded-xl border p-2"
+									style="background: {glyph === g.kind
+										? 'var(--color-amber-dim)'
+										: 'var(--color-surface-2)'}; border-color: {glyph === g.kind
+										? 'var(--color-amber-line)'
+										: 'var(--color-line-2)'};"
+									onclick={() => (glyph = g.kind)}
+									aria-pressed={glyph === g.kind}
+									aria-label={g.label}
+									title={g.label}
+								>
+									<EquipmentGlyph
+										kind={g.kind}
+										accent={glyph === g.kind ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
+									/>
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/each}
+			{:else if filteredGlyphs.length === 0}
+				<div class="mt-2 flex flex-col gap-2">
+					<div
+						class="text-[12px]"
+						style="color: var(--color-text-dim);"
+					>
+						No glyph matches "{glyphSearch}". Pick <span style="color: var(--color-text);">Generic</span> and name it whatever you like.
+					</div>
+					<div class="grid grid-cols-4 gap-2">
+						<button
+							type="button"
+							class="flex aspect-square items-center justify-center rounded-xl border p-2"
+							style="background: {glyph === 'generic'
+								? 'var(--color-amber-dim)'
+								: 'var(--color-surface-2)'}; border-color: {glyph === 'generic'
+								? 'var(--color-amber-line)'
+								: 'var(--color-line-2)'};"
+							onclick={pickGeneric}
+							aria-pressed={glyph === 'generic'}
+							aria-label="Generic"
+							title="Generic"
+						>
+							<EquipmentGlyph
+								kind="generic"
+								accent={glyph === 'generic' ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
+							/>
+						</button>
+					</div>
+				</div>
+			{:else}
+				<div class="mt-2 grid grid-cols-4 gap-2">
+					{#each filteredGlyphs as g (g.kind)}
+						<button
+							type="button"
+							class="flex aspect-square items-center justify-center rounded-xl border p-2"
+							style="background: {glyph === g.kind
+								? 'var(--color-amber-dim)'
+								: 'var(--color-surface-2)'}; border-color: {glyph === g.kind
+								? 'var(--color-amber-line)'
+								: 'var(--color-line-2)'};"
+							onclick={() => (glyph = g.kind)}
+							aria-pressed={glyph === g.kind}
+							aria-label={g.label}
+							title={g.label}
+						>
+							<EquipmentGlyph
+								kind={g.kind}
+								accent={glyph === g.kind ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
+							/>
+						</button>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	</div>
+{/snippet}
+
+{#snippet nameAndTypeSection()}
+	<div class="flex flex-col gap-4">
+		<label class="flex flex-col gap-1">
+			<span
+				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				style="color: var(--color-text-dim-2);"
+			>
+				Name
+			</span>
+			<input
+				bind:value={name}
+				name="equipment-name"
+				type="text"
+				placeholder="Cable Row by the mirror"
+				required
+				class="rounded-lg border px-3.5 py-3 text-[15px] outline-none"
+				style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
+			/>
+		</label>
+
+		<div class="flex flex-col gap-1">
+			<span
+				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				style="color: var(--color-text-dim-2);"
+			>
+				Type
+			</span>
+			<div class="flex flex-wrap gap-2">
+				{#each types as t (t)}
+					<button
+						type="button"
+						class="rounded-full border px-3 py-2 text-[13px] font-medium capitalize"
+						style="background: {type === t
+							? 'var(--color-amber-dim)'
+							: 'var(--color-surface-2)'}; border-color: {type === t
+							? 'var(--color-amber-line)'
+							: 'var(--color-line-2)'}; color: {type === t
+							? 'var(--color-amber)'
+							: 'var(--color-text)'};"
+						onclick={() => (type = t)}
+						aria-pressed={type === t}
+					>
+						{t}
+					</button>
+				{/each}
+			</div>
+		</div>
+
+		{#if type === 'cardio'}
+			<div class="flex flex-col gap-1">
+				<span
+					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					style="color: var(--color-text-dim-2);"
+				>
+					Cardio kind
+				</span>
+				<div class="flex flex-wrap gap-2">
+					{#each cardioKinds as k (k)}
+						<button
+							type="button"
+							class="rounded-full border px-3 py-2 text-[13px] font-medium capitalize"
+							style="background: {cardioKind === k
+								? 'var(--color-amber-dim)'
+								: 'var(--color-surface-2)'}; border-color: {cardioKind === k
+								? 'var(--color-amber-line)'
+								: 'var(--color-line-2)'}; color: {cardioKind === k
+								? 'var(--color-amber)'
+								: 'var(--color-text)'};"
+							onclick={() => (cardioKind = k)}
+							aria-pressed={cardioKind === k}
+						>
+							{k}
+						</button>
+					{/each}
+				</div>
+			</div>
+		{/if}
+	</div>
+{/snippet}
+
+{#snippet groupSection()}
+	<div class="flex flex-col gap-3">
+		<div
+			class="text-[12px]"
+			style="color: var(--color-text-dim);"
+		>
+			Used by Stats screen for the muscle-group distribution bars.
+		</div>
+		<div class="flex flex-wrap gap-2">
+			{#each groups as g (g)}
+				<button
+					type="button"
+					class="rounded-full border px-3.5 py-2.5 text-[14px] font-medium capitalize"
+					style="background: {group === g
+						? 'var(--color-amber-dim)'
+						: 'var(--color-surface-2)'}; border-color: {group === g
+						? 'var(--color-amber-line)'
+						: 'var(--color-line-2)'}; color: {group === g
+						? 'var(--color-amber)'
+						: 'var(--color-text)'};"
+					onclick={() => (group = g)}
+					aria-pressed={group === g}
+				>
+					{g}
+				</button>
+			{/each}
+		</div>
+	</div>
+{/snippet}
+
 <div
 	class="fixed inset-0 z-40 flex items-end bg-black/60 sm:items-center sm:justify-center"
 	role="dialog"
@@ -182,253 +436,11 @@
 		</div>
 
 		{#if step === 0}
-			<div class="flex flex-col gap-3">
-				<div
-					class="flex aspect-[4/3] items-center justify-center overflow-hidden rounded-2xl border"
-					style="background: linear-gradient(135deg, var(--color-surface-2), var(--color-bg)); border-color: var(--color-line-2);"
-				>
-					{#if photoPreview}
-						<img src={photoPreview} alt="preview" class="h-full w-full object-cover" />
-					{:else}
-						<div class="p-6">
-							<div class="h-24 w-24">
-								<EquipmentGlyph kind={glyph} />
-							</div>
-						</div>
-					{/if}
-				</div>
-
-				<div class="flex gap-2">
-					<label
-						class="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-full border py-3 text-[13px] font-semibold"
-						style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
-					>
-						<input type="file" accept="image/*" class="hidden" onchange={pickPhoto} />
-						{photoFile ? 'Replace photo' : 'Add photo'}
-					</label>
-					{#if photoFile}
-						<button
-							type="button"
-							class="rounded-full border px-4 py-3 text-[13px] font-semibold"
-							style="background: transparent; border-color: var(--color-line-2); color: var(--color-text-dim);"
-							onclick={clearPhoto}
-						>
-							Clear
-						</button>
-					{/if}
-				</div>
-
-				<div class="mt-1 flex flex-col gap-2">
-					<div
-						class="text-[10px] font-bold uppercase tracking-[0.14em]"
-						style="color: var(--color-text-dim-2);"
-					>
-						Glyph
-					</div>
-
-					<input
-						bind:value={glyphSearch}
-						type="text"
-						placeholder="Search glyphs (e.g. lat pulldown, kettlebell)"
-						class="rounded-lg border px-3 py-2 text-[13px] outline-none"
-						style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
-						aria-label="Search glyphs"
-					/>
-
-					{#if filteredGlyphs === null}
-						{#each groupedGlyphs as section (section.category)}
-							<div class="mt-2 flex flex-col gap-2">
-								<div
-									class="text-[10px] font-bold uppercase tracking-[0.14em]"
-									style="color: var(--color-text-dim-2);"
-								>
-									{section.label}
-								</div>
-								<div class="grid grid-cols-4 gap-2">
-									{#each section.items as g (g.kind)}
-										<button
-											type="button"
-											class="flex aspect-square items-center justify-center rounded-xl border p-2"
-											style="background: {glyph === g.kind
-												? 'var(--color-amber-dim)'
-												: 'var(--color-surface-2)'}; border-color: {glyph === g.kind
-												? 'var(--color-amber-line)'
-												: 'var(--color-line-2)'};"
-											onclick={() => (glyph = g.kind)}
-											aria-pressed={glyph === g.kind}
-											aria-label={g.label}
-											title={g.label}
-										>
-											<EquipmentGlyph
-												kind={g.kind}
-												accent={glyph === g.kind ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
-											/>
-										</button>
-									{/each}
-								</div>
-							</div>
-						{/each}
-					{:else if filteredGlyphs.length === 0}
-						<div class="mt-2 flex flex-col gap-2">
-							<div
-								class="text-[12px]"
-								style="color: var(--color-text-dim);"
-							>
-								No glyph matches "{glyphSearch}". Pick <span style="color: var(--color-text);">Generic</span> and name it whatever you like.
-							</div>
-							<div class="grid grid-cols-4 gap-2">
-								<button
-									type="button"
-									class="flex aspect-square items-center justify-center rounded-xl border p-2"
-									style="background: {glyph === 'generic'
-										? 'var(--color-amber-dim)'
-										: 'var(--color-surface-2)'}; border-color: {glyph === 'generic'
-										? 'var(--color-amber-line)'
-										: 'var(--color-line-2)'};"
-									onclick={pickGeneric}
-									aria-pressed={glyph === 'generic'}
-									aria-label="Generic"
-									title="Generic"
-								>
-									<EquipmentGlyph
-										kind="generic"
-										accent={glyph === 'generic' ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
-									/>
-								</button>
-							</div>
-						</div>
-					{:else}
-						<div class="mt-2 grid grid-cols-4 gap-2">
-							{#each filteredGlyphs as g (g.kind)}
-								<button
-									type="button"
-									class="flex aspect-square items-center justify-center rounded-xl border p-2"
-									style="background: {glyph === g.kind
-										? 'var(--color-amber-dim)'
-										: 'var(--color-surface-2)'}; border-color: {glyph === g.kind
-										? 'var(--color-amber-line)'
-										: 'var(--color-line-2)'};"
-									onclick={() => (glyph = g.kind)}
-									aria-pressed={glyph === g.kind}
-									aria-label={g.label}
-									title={g.label}
-								>
-									<EquipmentGlyph
-										kind={g.kind}
-										accent={glyph === g.kind ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
-									/>
-								</button>
-							{/each}
-						</div>
-					{/if}
-				</div>
-			</div>
+			{@render photoAndGlyphSection()}
 		{:else if step === 1}
-			<div class="flex flex-col gap-4">
-				<label class="flex flex-col gap-1">
-					<span
-						class="text-[10px] font-bold uppercase tracking-[0.14em]"
-						style="color: var(--color-text-dim-2);"
-					>
-						Name
-					</span>
-					<input
-						bind:value={name}
-						name="equipment-name"
-						type="text"
-						placeholder="Cable Row by the mirror"
-						required
-						class="rounded-lg border px-3.5 py-3 text-[15px] outline-none"
-						style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
-					/>
-				</label>
-
-				<div class="flex flex-col gap-1">
-					<span
-						class="text-[10px] font-bold uppercase tracking-[0.14em]"
-						style="color: var(--color-text-dim-2);"
-					>
-						Type
-					</span>
-					<div class="flex flex-wrap gap-2">
-						{#each types as t (t)}
-							<button
-								type="button"
-								class="rounded-full border px-3 py-2 text-[13px] font-medium capitalize"
-								style="background: {type === t
-									? 'var(--color-amber-dim)'
-									: 'var(--color-surface-2)'}; border-color: {type === t
-									? 'var(--color-amber-line)'
-									: 'var(--color-line-2)'}; color: {type === t
-									? 'var(--color-amber)'
-									: 'var(--color-text)'};"
-								onclick={() => (type = t)}
-								aria-pressed={type === t}
-							>
-								{t}
-							</button>
-						{/each}
-					</div>
-				</div>
-
-				{#if type === 'cardio'}
-					<div class="flex flex-col gap-1">
-						<span
-							class="text-[10px] font-bold uppercase tracking-[0.14em]"
-							style="color: var(--color-text-dim-2);"
-						>
-							Cardio kind
-						</span>
-						<div class="flex flex-wrap gap-2">
-							{#each cardioKinds as k (k)}
-								<button
-									type="button"
-									class="rounded-full border px-3 py-2 text-[13px] font-medium capitalize"
-									style="background: {cardioKind === k
-										? 'var(--color-amber-dim)'
-										: 'var(--color-surface-2)'}; border-color: {cardioKind === k
-										? 'var(--color-amber-line)'
-										: 'var(--color-line-2)'}; color: {cardioKind === k
-										? 'var(--color-amber)'
-										: 'var(--color-text)'};"
-									onclick={() => (cardioKind = k)}
-									aria-pressed={cardioKind === k}
-								>
-									{k}
-								</button>
-							{/each}
-						</div>
-					</div>
-				{/if}
-			</div>
+			{@render nameAndTypeSection()}
 		{:else}
-			<div class="flex flex-col gap-3">
-				<div
-					class="text-[12px]"
-					style="color: var(--color-text-dim);"
-				>
-					Used by Stats screen for the muscle-group distribution bars.
-				</div>
-				<div class="flex flex-wrap gap-2">
-					{#each groups as g (g)}
-						<button
-							type="button"
-							class="rounded-full border px-3.5 py-2.5 text-[14px] font-medium capitalize"
-							style="background: {group === g
-								? 'var(--color-amber-dim)'
-								: 'var(--color-surface-2)'}; border-color: {group === g
-								? 'var(--color-amber-line)'
-								: 'var(--color-line-2)'}; color: {group === g
-								? 'var(--color-amber)'
-								: 'var(--color-text)'};"
-							onclick={() => (group = g)}
-							aria-pressed={group === g}
-						>
-							{g}
-						</button>
-					{/each}
-				</div>
-			</div>
+			{@render groupSection()}
 		{/if}
 
 		{#if error}
