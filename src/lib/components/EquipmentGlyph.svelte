@@ -116,5 +116,77 @@
 		<path d="M50 46h6" stroke={stroke} stroke-width={sw}/>
 		<path d="M50 26v-12" stroke={stroke} stroke-width={sw}/>
 		<circle cx="50" cy="12" r="2" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'legcurl'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<rect x="12" y="32" width="36" height="6" rx="2" stroke={stroke} stroke-width={sw}/>
+		<path d="M16 38v12" stroke={stroke} stroke-width={sw}/>
+		<path d="M44 38v12" stroke={stroke} stroke-width={sw}/>
+		<path d="M48 32l14 -10" stroke={accent} stroke-width={aSw}/>
+		<circle cx="64" cy="22" r="3" stroke={accent} stroke-width={aSw}/>
+		<path d="M48 32l4 14" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'legextension'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<rect x="14" y="20" width="6" height="28" rx="2" stroke={stroke} stroke-width={sw}/>
+		<rect x="20" y="38" width="22" height="6" rx="2" stroke={stroke} stroke-width={sw}/>
+		<path d="M42 38l16 -16" stroke={accent} stroke-width={aSw}/>
+		<circle cx="60" cy="20" r="3" stroke={accent} stroke-width={aSw}/>
+		<rect x="50" y="44" width="10" height="6" rx="1.5" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'hyperextension'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<path d="M20 52l28 -32" stroke={accent} stroke-width={aSw}/>
+		<path d="M28 52l24 -28" stroke={accent} stroke-width={aSw}/>
+		<path d="M44 28l8 -2" stroke={stroke} stroke-width={sw}/>
+		<rect x="14" y="42" width="6" height="10" rx="1" stroke={stroke} stroke-width={sw}/>
+		<path d="M52 44h8v8" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'pullupbar'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<path d="M16 52v-44" stroke={stroke} stroke-width={sw}/>
+		<path d="M64 52v-44" stroke={stroke} stroke-width={sw}/>
+		<path d="M16 12h48" stroke={accent} stroke-width={aSw}/>
+		<path d="M22 16v6" stroke={stroke} stroke-width={sw}/>
+		<path d="M30 16v6" stroke={stroke} stroke-width={sw}/>
+		<path d="M50 16v6" stroke={stroke} stroke-width={sw}/>
+		<path d="M58 16v6" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'dipstation'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<path d="M14 52v-26" stroke={stroke} stroke-width={sw}/>
+		<path d="M50 36v16" stroke={stroke} stroke-width={sw}/>
+		<path d="M14 36h36" stroke={accent} stroke-width={aSw}/>
+		<path d="M22 52v-22" stroke={stroke} stroke-width={sw}/>
+		<path d="M58 30v22" stroke={stroke} stroke-width={sw}/>
+		<path d="M22 30h36" stroke={accent} stroke-width={aSw}/>
+	{:else if kind === 'cablecrossover'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<path d="M14 52v-44" stroke={stroke} stroke-width={sw}/>
+		<path d="M66 52v-44" stroke={stroke} stroke-width={sw}/>
+		<path d="M14 8h52" stroke={stroke} stroke-width={sw}/>
+		<path d="M14 14l26 24" stroke={accent} stroke-width={aSw}/>
+		<path d="M66 14l-26 24" stroke={accent} stroke-width={aSw}/>
+		<rect x="36" y="36" width="8" height="6" rx="1.5" stroke={accent} stroke-width={aSw}/>
+	{:else if kind === 'dumbbells'}
+		<rect x="14" y="18" width="28" height="6" rx="1.5" stroke={accent} stroke-width={aSw}/>
+		<rect x="10" y="14" width="6" height="14" rx="1.5" stroke={stroke} stroke-width={sw}/>
+		<rect x="40" y="14" width="6" height="14" rx="1.5" stroke={stroke} stroke-width={sw}/>
+		<rect x="36" y="38" width="28" height="6" rx="1.5" stroke={accent} stroke-width={aSw}/>
+		<rect x="32" y="34" width="6" height="14" rx="1.5" stroke={stroke} stroke-width={sw}/>
+		<rect x="62" y="34" width="6" height="14" rx="1.5" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'barbell'}
+		<path d="M8 30h64" stroke={accent} stroke-width={aSw}/>
+		<rect x="10" y="20" width="6" height="20" rx="1.5" stroke={stroke} stroke-width={sw}/>
+		<rect x="18" y="16" width="4" height="28" rx="1" stroke={stroke} stroke-width={sw}/>
+		<rect x="58" y="16" width="4" height="28" rx="1" stroke={stroke} stroke-width={sw}/>
+		<rect x="64" y="20" width="6" height="20" rx="1.5" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'kettlebell'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<path d="M30 18c0-6 4-10 10-10s10 4 10 10" stroke={stroke} stroke-width={sw}/>
+		<path d="M30 18v6" stroke={stroke} stroke-width={sw}/>
+		<path d="M50 18v6" stroke={stroke} stroke-width={sw}/>
+		<path d="M22 28c0-4 8-6 18-6s18 2 18 6" stroke={accent} stroke-width={aSw}/>
+		<path d="M22 28c0 16 6 22 18 22s18-6 18-22" stroke={accent} stroke-width={aSw}/>
+	{:else if kind === 'generic'}
+		<rect x="20" y="10" width="40" height="40" rx="6" stroke={stroke} stroke-width={sw}/>
+		<path d="M40 24v10" stroke={accent} stroke-width={aSw}/>
+		<path d="M34 22a6 6 0 0 1 12 0c0 4-6 6-6 8" stroke={accent} stroke-width={aSw}/>
+		<circle cx="40" cy="40" r="2" stroke={accent} stroke-width={aSw}/>
 	{/if}
 </svg>
