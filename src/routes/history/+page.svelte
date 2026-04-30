@@ -78,11 +78,6 @@
 		return cols;
 	});
 
-	// Kept for backwards compatibility with the still-unmodified markup until
-	// Task 4 wires up the new shape. Same `number[][]` layout, but now indexed
-	// by ISO-week column and weekday row.
-	const weeks = $derived(weekCells.map((col) => col.map((c) => c.value)));
-
 	const todayCol = 11; // rightmost column is always the current week
 	const todayRow = $derived.by(() => (today.getDay() + 6) % 7);
 
@@ -242,13 +237,22 @@
 				{/each}
 			</div>
 			<div class="flex gap-1">
-				{#each weeks as col, wi (wi)}
+				{#each weekCells as col, wi (wi)}
 					<div class="flex flex-col gap-1">
-						{#each col as v, di (di)}
+						{#each col as cell, di (di)}
 							<div
 								class="h-[18px] w-[18px] rounded-[4px]"
-								style="background: {colorFor(v)};"
-								title={v > 0 ? `${v} session${v === 1 ? '' : 's'}` : 'no sessions'}
+								style="background: {cell.isFuture
+									? 'rgba(244,237,226,0.025)'
+									: colorFor(cell.value)}; outline: {wi === todayCol &&
+								di === todayRow
+									? '1px solid var(--color-amber)'
+									: 'none'}; outline-offset: 1px;"
+								title={cell.isFuture
+									? cell.date.toDateString()
+									: cell.value > 0
+										? `${cell.value} session${cell.value === 1 ? '' : 's'} · ${cell.date.toDateString()}`
+										: `no sessions · ${cell.date.toDateString()}`}
 							></div>
 						{/each}
 					</div>
