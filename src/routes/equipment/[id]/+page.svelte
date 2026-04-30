@@ -58,10 +58,11 @@
 				: data.daysSinceLast === 1
 					? '1 day ago'
 					: `${data.daysSinceLast} days ago`;
-		if (isCardio) {
-			return data.lastDurationMin != null
-				? `${fmtNum(data.lastDurationMin)} min · ${ago}`
-				: ago;
+		// Read the last set's own shape rather than the equipment's current
+		// type. After a cardio↔strength type change, the last set might still
+		// have been cardio (or strength) and should display as it was logged.
+		if (data.lastDurationMin != null) {
+			return `${fmtNum(data.lastDurationMin)} min · ${ago}`;
 		}
 		if (data.lastWeight != null && data.lastReps != null) {
 			return `${fmtNum(data.lastWeight)} kg × ${data.lastReps} · ${ago}`;
