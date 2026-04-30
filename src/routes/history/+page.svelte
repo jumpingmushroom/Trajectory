@@ -225,7 +225,17 @@
 				{totalSessions} session{totalSessions === 1 ? '' : 's'}
 			</div>
 		</div>
-		<div class="mt-3 flex items-end gap-2 overflow-x-auto pb-1" style="scrollbar-width: none;">
+		<div class="relative mt-2 h-[14px]" style="padding-left: 32px;">
+			{#each monthLabels as ml (ml.col)}
+				<div
+					class="absolute top-0 text-[9px] font-bold uppercase tracking-[0.12em]"
+					style="left: calc(32px + {ml.col} * 22px); color: var(--color-text-dim-2);"
+				>
+					{ml.label}
+				</div>
+			{/each}
+		</div>
+		<div class="mt-1 flex items-end gap-2 overflow-x-auto pb-1" style="scrollbar-width: none;">
 			<div class="flex flex-col gap-1 pt-[4px]">
 				{#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as dow (dow)}
 					<div
