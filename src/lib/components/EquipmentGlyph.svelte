@@ -60,10 +60,14 @@
 		<path d="M58 18l8 4" stroke={accent} stroke-width={aSw}/>
 		<circle cx="68" cy="22" r="3" stroke={accent} stroke-width={aSw}/>
 	{:else if kind === 'chestpress'}
-		<rect x="18" y="14" width="16" height="32" rx="3" stroke={stroke} stroke-width={sw}/>
-		<path d="M34 22l14-4v20l-14-4" stroke={accent} stroke-width={aSw}/>
-		<circle cx="52" cy="28" r="3" stroke={stroke} stroke-width={sw}/>
-		<path d="M12 52h46" stroke={stroke} stroke-width={sw}/>
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<rect x="14" y="20" width="6" height="28" rx="2" stroke={stroke} stroke-width={sw}/>
+		<rect x="20" y="38" width="20" height="6" rx="2" stroke={stroke} stroke-width={sw}/>
+		<path d="M22 28h28" stroke={accent} stroke-width={aSw}/>
+		<path d="M22 36h28" stroke={accent} stroke-width={aSw}/>
+		<circle cx="52" cy="28" r="3" stroke={accent} stroke-width={aSw}/>
+		<circle cx="52" cy="36" r="3" stroke={accent} stroke-width={aSw}/>
+		<rect x="58" y="22" width="8" height="22" rx="1.5" stroke={stroke} stroke-width={sw}/>
 	{:else if kind === 'treadmill'}
 		<path d="M10 42l50-14" stroke={accent} stroke-width={aSw}/>
 		<path d="M10 42h50" stroke={stroke} stroke-width={sw}/>
