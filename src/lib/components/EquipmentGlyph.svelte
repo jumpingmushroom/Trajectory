@@ -188,5 +188,62 @@
 		<path d="M40 24v10" stroke={accent} stroke-width={aSw}/>
 		<path d="M34 22a6 6 0 0 1 12 0c0 4-6 6-6 8" stroke={accent} stroke-width={aSw}/>
 		<circle cx="40" cy="40" r="2" stroke={accent} stroke-width={aSw}/>
+	{:else if kind === 'hackquat'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<path d="M14 52l32 -36" stroke={accent} stroke-width={aSw}/>
+		<path d="M22 52l32 -36" stroke={accent} stroke-width={aSw}/>
+		<rect x="34" y="22" width="14" height="8" rx="1.5" stroke={stroke} stroke-width={sw}/>
+		<rect x="46" y="20" width="6" height="14" rx="1.5" stroke={stroke} stroke-width={sw}/>
+		<path d="M14 16l8 4" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'tbarrow'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<path d="M10 52l50 -28" stroke={accent} stroke-width={aSw}/>
+		<circle cx="14" cy="50" r="3" stroke={stroke} stroke-width={sw}/>
+		<rect x="56" y="20" width="6" height="10" rx="1" stroke={stroke} stroke-width={sw}/>
+		<rect x="62" y="22" width="4" height="6" rx="1" stroke={stroke} stroke-width={sw}/>
+		<rect x="34" y="34" width="10" height="6" rx="1.5" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'calfraise'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<rect x="20" y="44" width="40" height="6" rx="1.5" stroke={stroke} stroke-width={sw}/>
+		<path d="M30 44v-32" stroke={stroke} stroke-width={sw}/>
+		<path d="M50 44v-32" stroke={stroke} stroke-width={sw}/>
+		<path d="M30 16h20" stroke={accent} stroke-width={aSw}/>
+		<rect x="26" y="14" width="6" height="6" rx="1.5" stroke={accent} stroke-width={aSw}/>
+		<rect x="48" y="14" width="6" height="6" rx="1.5" stroke={accent} stroke-width={aSw}/>
+	{:else if kind === 'hipthrust'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<rect x="14" y="36" width="20" height="6" rx="1.5" stroke={stroke} stroke-width={sw}/>
+		<path d="M18 42v8" stroke={stroke} stroke-width={sw}/>
+		<path d="M30 42v8" stroke={stroke} stroke-width={sw}/>
+		<path d="M34 32l24 -4" stroke={accent} stroke-width={aSw}/>
+		<rect x="56" y="22" width="6" height="14" rx="1.5" stroke={stroke} stroke-width={sw}/>
+		<path d="M40 38l4 12 4-12" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'sled'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<rect x="14" y="38" width="36" height="10" rx="2" stroke={accent} stroke-width={aSw}/>
+		<path d="M22 38v-22" stroke={stroke} stroke-width={sw}/>
+		<path d="M42 38v-22" stroke={stroke} stroke-width={sw}/>
+		<rect x="18" y="14" width="8" height="4" rx="1" stroke={stroke} stroke-width={sw}/>
+		<rect x="38" y="14" width="8" height="4" rx="1" stroke={stroke} stroke-width={sw}/>
+		<path d="M50 44l16 6" stroke={accent} stroke-width={aSw}/>
+	{:else if kind === 'battleropes'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<rect x="62" y="38" width="6" height="14" rx="1.5" stroke={stroke} stroke-width={sw}/>
+		<path d="M62 42c-6 0 -8 6 -14 6s-8 -6 -14 -6s-8 6 -14 6s-8 -6 -12 -6" stroke={accent} stroke-width={aSw}/>
+		<path d="M62 48c-6 0 -8 -6 -14 -6s-8 6 -14 6s-8 -6 -14 -6s-8 6 -12 6" stroke={accent} stroke-width={aSw}/>
+	{:else if kind === 'abwheel'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<circle cx="40" cy="38" r="12" stroke={accent} stroke-width={aSw}/>
+		<path d="M22 38h-10" stroke={stroke} stroke-width={sw}/>
+		<path d="M58 38h10" stroke={stroke} stroke-width={sw}/>
+		<circle cx="40" cy="38" r="3" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'mobility'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<rect x="14" y="28" width="52" height="14" rx="7" stroke={accent} stroke-width={aSw}/>
+		<path d="M22 32v6" stroke={stroke} stroke-width={sw}/>
+		<path d="M30 32v6" stroke={stroke} stroke-width={sw}/>
+		<path d="M40 32v6" stroke={stroke} stroke-width={sw}/>
+		<path d="M50 32v6" stroke={stroke} stroke-width={sw}/>
+		<path d="M58 32v6" stroke={stroke} stroke-width={sw}/>
 	{/if}
 </svg>
