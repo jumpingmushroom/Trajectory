@@ -274,21 +274,45 @@ async function equipmentCreate(payload: EquipmentCreate): Promise<{ equipment: E
 
 async function equipmentUpdate(payload: EquipmentUpdate): Promise<Equipment> {
 	assertUlid(payload.id, 'id');
+
+	const existing = (
+		await db.select().from(equipment).where(eq(equipment.id, payload.id)).limit(1)
+	)[0];
+	if (!existing) notFound(`equipment ${payload.id} not found`);
+
 	const updates: Partial<Equipment> = { updatedAt: new Date() };
-	if (payload.name !== undefined) updates.name = assertString(payload.name, 'name', 80);
-	if (payload.type !== undefined) updates.type = assertEnum(payload.type, 'type', EQUIPMENT_TYPES);
-	if (payload.group !== undefined)
+	let hasUserField = false;
+
+	if (payload.name !== undefined) {
+		updates.name = assertString(payload.name, 'name', 80);
+		hasUserField = true;
+	}
+	if (payload.type !== undefined) {
+		updates.type = assertEnum(payload.type, 'type', EQUIPMENT_TYPES);
+		hasUserField = true;
+	}
+	if (payload.group !== undefined) {
 		updates.group = assertEnum(payload.group, 'group', MUSCLE_GROUPS);
-	if (payload.glyph !== undefined) updates.glyph = assertString(payload.glyph, 'glyph', 20);
-	if (payload.tint !== undefined) updates.tint = assertHex(payload.tint, 'tint');
+		hasUserField = true;
+	}
+	if (payload.glyph !== undefined) {
+		updates.glyph = assertString(payload.glyph, 'glyph', 20);
+		hasUserField = true;
+	}
+	if (payload.tint !== undefined) {
+		updates.tint = assertHex(payload.tint, 'tint');
+		hasUserField = true;
+	}
 	if (payload.cardioKind !== undefined) {
 		updates.cardioKind =
 			payload.cardioKind == null
 				? null
 				: assertEnum(payload.cardioKind, 'cardioKind', CARDIO_KINDS);
+		hasUserField = true;
 	}
 	if (typeof payload.sortOrder === 'number' && Number.isInteger(payload.sortOrder)) {
 		updates.sortOrder = payload.sortOrder;
+		hasUserField = true;
 	}
 	if (payload.notes !== undefined) {
 		updates.notes =
@@ -297,8 +321,26 @@ async function equipmentUpdate(payload: EquipmentUpdate): Promise<Equipment> {
 				: typeof payload.notes === 'string'
 					? payload.notes.slice(0, 4000)
 					: badRequest('notes must be a string or null');
+		hasUserField = true;
 	}
-	if (Object.keys(updates).length === 1) badRequest('equipment.update needs at least one field');
+
+	if (!hasUserField) badRequest('equipment.update needs at least one field');
+
+	// Invariant: cardioKind is non-null iff type === 'cardio'. Compute the
+	// post-update type and reconcile cardioKind regardless of whether the
+	// caller sent it. This protects every client (current UI, future UIs,
+	// hand-crafted curl) from creating an inconsistent row.
+	const finalType = updates.type ?? existing.type;
+	if (finalType === 'cardio') {
+		const finalCardioKind =
+			updates.cardioKind !== undefined ? updates.cardioKind : existing.cardioKind;
+		if (finalCardioKind == null) updates.cardioKind = 'generic';
+	} else {
+		// Non-cardio types must not carry a cardioKind. Force-clear it.
+		if (existing.cardioKind != null || updates.cardioKind != null) {
+			updates.cardioKind = null;
+		}
+	}
 
 	await db.update(equipment).set(updates).where(eq(equipment.id, payload.id));
 

@@ -184,6 +184,56 @@ async function main() {
 	const replayedHits = csv2.split('\n').filter((l) => l.startsWith(replayPayload.id)).length;
 	assert(replayedHits === 1, `replay produced exactly 1 row (got ${replayedHits})`);
 
+	// 8. cardioKind ↔ type invariant on equipment.update.
+	console.log('step 8 — cardioKind invariant on equipment.update');
+	const cardioEqId = ulid();
+	await mutate('equipment.create', {
+		id: cardioEqId,
+		gymId,
+		name: 'Smoke Treadmill',
+		type: 'cardio',
+		group: 'cardio',
+		glyph: 'treadmill',
+		cardioKind: 'treadmill'
+	});
+
+	const toMachine = await mutate('equipment.update', { id: cardioEqId, type: 'machine' });
+	const toMachineRow = toMachine?.result;
+	assert(toMachineRow?.type === 'machine', 'type changed to machine');
+	assert(toMachineRow?.cardioKind === null, 'cardioKind cleared when type is non-cardio');
+
+	const toCardio = await mutate('equipment.update', { id: cardioEqId, type: 'cardio' });
+	const toCardioRow = toCardio?.result;
+	assert(toCardioRow?.type === 'cardio', 'type changed back to cardio');
+	assert(
+		toCardioRow?.cardioKind === 'generic',
+		'cardioKind defaulted to generic when type set to cardio without explicit kind'
+	);
+
+	const strengthEqId = ulid();
+	await mutate('equipment.create', {
+		id: strengthEqId,
+		gymId,
+		name: 'Smoke Strength Bench',
+		type: 'machine',
+		group: 'push',
+		glyph: 'bench'
+	});
+	const emptyUpdate = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: ulid(),
+			op: 'equipment.update',
+			payload: { id: strengthEqId }
+		})
+	});
+	assert(!emptyUpdate.ok, 'empty equipment.update payload rejected');
+	assert(
+		emptyUpdate.status >= 400 && emptyUpdate.status < 500,
+		`empty payload rejected with 4xx (got ${emptyUpdate.status})`
+	);
+
 	console.log('\nall smoke checks passed');
 }
 
