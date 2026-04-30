@@ -26,7 +26,9 @@
 
 	const isCardio = $derived(equipment.type === 'cardio');
 	const photoSrc = $derived(
-		equipment.photoPath ? `/uploads/${equipment.photoPath}` : null
+		equipment.photoPath
+			? `/uploads/${equipment.photoPath}?v=${equipment.updatedAt.getTime()}`
+			: null
 	);
 
 	function formatLast(): { primary: string; secondary: string } {

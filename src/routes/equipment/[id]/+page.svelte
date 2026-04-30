@@ -10,7 +10,9 @@
 
 	const eq = $derived(data.equipment);
 	const isCardio = $derived(eq.type === 'cardio');
-	const photoSrc = $derived(eq.photoPath ? `/uploads/${eq.photoPath}` : null);
+	const photoSrc = $derived(
+		eq.photoPath ? `/uploads/${eq.photoPath}?v=${eq.updatedAt.getTime()}` : null
+	);
 	const lastSparkline = $derived(data.series.slice(-10));
 
 	let notesDraft = $state('');
