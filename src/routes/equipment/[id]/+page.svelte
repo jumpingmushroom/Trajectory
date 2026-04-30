@@ -119,16 +119,6 @@
 				{eq.name}
 			</div>
 		</div>
-		<a
-			href={`/log/${eq.id}`}
-			class="flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold"
-			style="background: var(--color-amber); color: #1b0a00; box-shadow: 0 6px 18px var(--color-amber-glow);"
-		>
-			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M12 5v14M5 12h14"/>
-			</svg>
-			Log
-		</a>
 	</header>
 
 	<section
@@ -158,6 +148,17 @@
 			</div>
 		{/if}
 	</section>
+
+	<a
+		href={`/log/${eq.id}`}
+		class="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[15px] font-bold"
+		style="background: var(--color-amber); color: #1b0a00; box-shadow: 0 6px 18px var(--color-amber-glow);"
+	>
+		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+			<path d="M12 5v14M5 12h14"/>
+		</svg>
+		Log a set
+	</a>
 
 	<div
 		class="mt-3 flex items-center gap-2 text-[12px]"
