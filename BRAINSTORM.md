@@ -118,7 +118,7 @@ Notes from discussion:
 
 Kept from handoff:
 - Per-machine cards with top-set sparkline + delta indicator.
-- Muscle-group distribution bars (push/pull/legs/cardio sets last 30 days).
+- Muscle-group distribution bars (push/pull/legs/core strength sets last 30 days; cardio gets its own summary section).
 - CSV export button.
 - History heatmap (it's a frequency view, not progression).
 

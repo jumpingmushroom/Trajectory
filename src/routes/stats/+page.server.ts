@@ -102,7 +102,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// Strength distribution by muscle group over last 30 days. Cardio gets
 	// its own dedicated section below; counting cardio "sets" alongside
 	// strength sets is misleading (1 cardio set ≈ 45 min, 1 leg set ≈ 30 s).
-	const groupCounts: Record<string, number> = { push: 0, pull: 0, legs: 0 };
+	const groupCounts: Record<string, number> = { push: 0, pull: 0, legs: 0, core: 0 };
 	for (const s of sets) {
 		if (s.ts.getTime() < cutoff30) continue;
 		if (s.equipmentType === 'cardio') continue;

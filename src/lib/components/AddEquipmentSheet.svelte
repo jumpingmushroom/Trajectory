@@ -6,12 +6,13 @@
 		GLYPHS,
 		CATEGORY_ORDER,
 		CATEGORY_LABEL,
+		defaultsForGlyph,
 		type GlyphKind,
-		type GlyphMeta
+		type GlyphMeta,
+		type EquipmentType,
+		type MuscleGroup
 	} from './glyph-kinds';
 
-	type EquipmentType = 'barbell' | 'machine' | 'cable' | 'freeweight' | 'cardio';
-	type MuscleGroup = 'push' | 'pull' | 'legs' | 'cardio';
 	type CardioKind = 'treadmill' | 'bike' | 'rower' | 'generic';
 
 	import type { Equipment } from '$lib/server/db/schema';
@@ -101,13 +102,26 @@
 		}))
 	);
 
+	function pickGlyph(kind: GlyphKind) {
+		glyph = kind;
+		if (mode === 'add') {
+			const d = defaultsForGlyph(kind);
+			type = d.type;
+			if (d.group) group = d.group;
+			if (step === 0) {
+				error = null;
+				step = 1;
+			}
+		}
+	}
+
 	function pickGeneric() {
-		glyph = 'generic';
 		glyphSearch = '';
+		pickGlyph('generic');
 	}
 
 	const types: EquipmentType[] = ['machine', 'cable', 'barbell', 'freeweight', 'cardio'];
-	const groups: MuscleGroup[] = ['push', 'pull', 'legs', 'cardio'];
+	const groups: MuscleGroup[] = ['push', 'pull', 'legs', 'core', 'cardio'];
 	const cardioKinds: CardioKind[] = ['treadmill', 'bike', 'rower', 'generic'];
 
 	function pickPhoto(e: Event) {
@@ -389,7 +403,7 @@
 										: 'var(--color-surface-2)'}; border-color: {glyph === g.kind
 										? 'var(--color-amber-line)'
 										: 'var(--color-line-2)'};"
-									onclick={() => (glyph = g.kind)}
+									onclick={() => pickGlyph(g.kind)}
 									aria-pressed={glyph === g.kind}
 									aria-label={g.label}
 									title={g.label}
@@ -443,7 +457,7 @@
 								: 'var(--color-surface-2)'}; border-color: {glyph === g.kind
 								? 'var(--color-amber-line)'
 								: 'var(--color-line-2)'};"
-							onclick={() => (glyph = g.kind)}
+							onclick={() => pickGlyph(g.kind)}
 							aria-pressed={glyph === g.kind}
 							aria-label={g.label}
 							title={g.label}

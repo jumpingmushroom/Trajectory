@@ -113,7 +113,7 @@ interface SetUpdate {
 }
 
 const EQUIPMENT_TYPES = new Set(['barbell', 'machine', 'cable', 'freeweight', 'cardio']);
-const MUSCLE_GROUPS = new Set(['push', 'pull', 'legs', 'cardio']);
+const MUSCLE_GROUPS = new Set(['push', 'pull', 'legs', 'core', 'cardio']);
 const CARDIO_KINDS = new Set(['treadmill', 'bike', 'rower', 'generic']);
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 

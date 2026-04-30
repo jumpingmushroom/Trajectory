@@ -126,7 +126,7 @@ export const equipment = sqliteTable(
 		name: text('name').notNull(),
 		// type: barbell | machine | cable | freeweight | cardio
 		type: text('type').notNull(),
-		// group: push | pull | legs | cardio
+		// group: push | pull | legs | core | cardio
 		group: text('group').notNull(),
 		// glyph: one of 11 schematic SVG keys (bench, cable, pulldown, smith,
 		// squat, legpress, preacher, chestpress, treadmill, bike, rower).

@@ -7,10 +7,11 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const groupOrder: { id: 'push' | 'pull' | 'legs'; label: string }[] = [
+	const groupOrder: { id: 'push' | 'pull' | 'legs' | 'core'; label: string }[] = [
 		{ id: 'push', label: 'Push' },
 		{ id: 'pull', label: 'Pull' },
-		{ id: 'legs', label: 'Legs' }
+		{ id: 'legs', label: 'Legs' },
+		{ id: 'core', label: 'Core' }
 	];
 
 	function fmtNum(n: number): string {

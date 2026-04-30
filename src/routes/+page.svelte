@@ -9,12 +9,13 @@
 
 	let { data }: { data: PageData } = $props();
 
-	type Filter = 'all' | 'push' | 'pull' | 'legs' | 'cardio';
+	type Filter = 'all' | 'push' | 'pull' | 'legs' | 'core' | 'cardio';
 	const filters: { id: Filter; label: string }[] = [
 		{ id: 'all', label: 'All' },
 		{ id: 'push', label: 'Push' },
 		{ id: 'pull', label: 'Pull' },
 		{ id: 'legs', label: 'Legs' },
+		{ id: 'core', label: 'Core' },
 		{ id: 'cardio', label: 'Cardio' }
 	];
 
