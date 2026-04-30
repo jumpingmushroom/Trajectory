@@ -2,6 +2,28 @@
 	import TabBar from '$lib/components/TabBar.svelte';
 	import type { PageData } from './$types';
 
+	function startOfDay(d: Date): Date {
+		const out = new Date(d);
+		out.setHours(0, 0, 0, 0);
+		return out;
+	}
+
+	function addDays(d: Date, n: number): Date {
+		const out = new Date(d);
+		out.setDate(out.getDate() + n);
+		return out;
+	}
+
+	// Monday-anchored start-of-week. JS getDay() is 0=Sun..6=Sat; we want
+	// 0=Mon..6=Sun, so the offset to subtract is (getDay()+6) % 7.
+	function startOfWeekMonday(d: Date): Date {
+		const sod = startOfDay(d);
+		const offset = (sod.getDay() + 6) % 7;
+		return addDays(sod, -offset);
+	}
+
+	const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'short' });
+
 	let { data }: { data: PageData } = $props();
 
 	let gymFilter = $state<'all' | string>('all');
@@ -20,16 +42,73 @@
 		return out;
 	});
 
-	const weeks = $derived.by(() => {
-		const cols: number[][] = [];
-		for (let w = 11; w >= 0; w--) {
-			const col: number[] = [];
-			for (let d = 0; d < 7; d++) {
-				col.push(heatmapDays[w * 7 + d] ?? 0);
+	const today = $derived.by(() => startOfDay(new Date()));
+	const thisMonday = $derived.by(() => startOfWeekMonday(today));
+
+	interface HeatmapCell {
+		value: number;
+		date: Date;
+		isFuture: boolean;
+	}
+
+	const weekCells = $derived.by<HeatmapCell[][]>(() => {
+		const cols: HeatmapCell[][] = [];
+		for (let c = 0; c < 12; c++) {
+			// Leftmost column (c=0) is the oldest week, rightmost (c=11) is the
+			// current in-progress week. Each column's anchor is its Monday.
+			const colMonday = addDays(thisMonday, (c - 11) * 7);
+			const col: HeatmapCell[] = [];
+			for (let r = 0; r < 7; r++) {
+				const cellDate = addDays(colMonday, r);
+				const offsetDays = Math.round(
+					(today.getTime() - cellDate.getTime()) / 86_400_000
+				);
+				const value =
+					offsetDays >= 0 && offsetDays < heatmapDays.length
+						? heatmapDays[offsetDays] ?? 0
+						: 0;
+				col.push({
+					value,
+					date: cellDate,
+					isFuture: offsetDays < 0
+				});
 			}
 			cols.push(col);
 		}
 		return cols;
+	});
+
+	// Kept for backwards compatibility with the still-unmodified markup until
+	// Task 4 wires up the new shape. Same `number[][]` layout, but now indexed
+	// by ISO-week column and weekday row.
+	const weeks = $derived(weekCells.map((col) => col.map((c) => c.value)));
+
+	const todayCol = 11; // rightmost column is always the current week
+	const todayRow = $derived.by(() => (today.getDay() + 6) % 7);
+
+	interface MonthLabel {
+		col: number;
+		label: string;
+	}
+
+	const monthLabels = $derived.by<MonthLabel[]>(() => {
+		const out: MonthLabel[] = [];
+		let prevMonth = -1;
+		for (let c = 0; c < 12; c++) {
+			const colMonday = addDays(thisMonday, (c - 11) * 7);
+			const m = colMonday.getMonth();
+			if (m !== prevMonth) {
+				out.push({ col: c, label: monthFmt.format(colMonday) });
+				prevMonth = m;
+			}
+		}
+		// Drop a label that lands on the very last column if there's already
+		// one earlier — prevents two month names crowding the right edge.
+		if (out.length >= 2 && out[out.length - 1].col === 11) {
+			const before = out[out.length - 2];
+			if (11 - before.col <= 1) out.pop();
+		}
+		return out;
 	});
 
 	const totalSessions = $derived(filteredSessions.length);
