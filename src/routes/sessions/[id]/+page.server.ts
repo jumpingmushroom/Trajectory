@@ -119,10 +119,9 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const lastTs = sets.length > 0 ? sets[sets.length - 1].ts.getTime() : null;
 	const startedAt = session.startedAt.getTime();
 	const endedAt = session.endedAt?.getTime() ?? null;
-	const durationMin = Math.max(
-		1,
-		Math.round(((lastTs ?? endedAt ?? Date.now()) - startedAt) / 60000)
-	);
+	const wallClockMin = Math.round(((lastTs ?? endedAt ?? Date.now()) - startedAt) / 60000);
+	const cardioMin = sets.reduce((a, s) => a + (s.durationMin ?? 0), 0);
+	const durationMin = Math.max(1, wallClockMin, cardioMin);
 
 	const todayStart = new Date();
 	todayStart.setHours(0, 0, 0, 0);

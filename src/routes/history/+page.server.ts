@@ -51,6 +51,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 					sessionId: setTable.workoutSessionId,
 					weight: setTable.weight,
 					reps: setTable.reps,
+					durationMin: setTable.durationMin,
 					ts: setTable.ts,
 					equipmentId: exercise.equipmentId,
 					equipmentName: equipment.name
@@ -63,6 +64,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 				sessionId: string;
 				weight: number | null;
 				reps: number | null;
+				durationMin: number | null;
 				ts: Date;
 				equipmentId: string;
 				equipmentName: string;
@@ -77,6 +79,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			machineNames: Map<string, string>;
 			setCount: number;
 			totalVolume: number;
+			cardioDurationMin: number;
 			lastSetTs: number | null;
 		}
 	>();
@@ -86,6 +89,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			machineNames: new Map<string, string>(),
 			setCount: 0,
 			totalVolume: 0,
+			cardioDurationMin: 0,
 			lastSetTs: null as number | null
 		};
 		if (!cur.machineNames.has(s.equipmentId)) {
@@ -95,6 +99,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 		cur.setCount += 1;
 		if (s.weight != null && s.reps != null) {
 			cur.totalVolume += s.weight * s.reps;
+		}
+		if (s.durationMin != null) {
+			cur.cardioDurationMin += s.durationMin;
 		}
 		const tsMs = s.ts.getTime();
 		if (cur.lastSetTs == null || tsMs > cur.lastSetTs) cur.lastSetTs = tsMs;
@@ -112,7 +119,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 			const startedAt = session.startedAt.getTime();
 			const endedAt = session.endedAt?.getTime() ?? null;
 			const lastTs = sum?.lastSetTs ?? endedAt ?? startedAt;
-			const durationMin = Math.max(1, Math.round((lastTs - startedAt) / 60000));
+			const wallClockMin = Math.round((lastTs - startedAt) / 60000);
+			const cardioMin = sum?.cardioDurationMin ?? 0;
+			const durationMin = Math.max(1, wallClockMin, cardioMin);
 			const sessionDay = new Date(startedAt);
 			sessionDay.setHours(0, 0, 0, 0);
 			const dayOffset = Math.max(
