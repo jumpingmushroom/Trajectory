@@ -48,7 +48,7 @@
 <a
 	{href}
 	class="fixed inset-x-0 z-10 mx-auto block w-full max-w-[480px] px-4"
-	style="bottom: calc(env(safe-area-inset-bottom, 0px) + 56px);"
+	style="bottom: calc(max(env(safe-area-inset-bottom, 0px), 12px) + 65px);"
 >
 	<div
 		class="flex items-center gap-3 rounded-2xl border px-4 py-2.5"
