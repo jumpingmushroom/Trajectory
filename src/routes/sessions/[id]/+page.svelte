@@ -1,10 +1,141 @@
 <script lang="ts">
 	import EquipmentGlyph from '$lib/components/EquipmentGlyph.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import type { GlyphKind } from '$lib/components/glyph-kinds';
 	import type { PageData } from './$types';
+	import { mutate } from '$lib/mutate';
+	import { goto, invalidateAll } from '$app/navigation';
+	import { onDestroy } from 'svelte';
 
 	let { data }: { data: PageData } = $props();
 	const s = $derived(data.session);
+
+	const UNDO_WINDOW_MS = 10_000;
+	// Survives a SvelteKit invalidateAll that may remount this component
+	// (which would otherwise reset local $state). The key encodes the
+	// session id so two simultaneous tabs on different sessions don't
+	// collide. Stored as the timestamp at which the undo window expires.
+	const UNDO_KEY_PREFIX = 'trajectory.undoUntil.';
+
+	let ending = $state(false);
+	let endError = $state<string | null>(null);
+	let undoUntil = $state<number | null>(null);
+	let undoNow = $state(Date.now());
+	let undoTimer: ReturnType<typeof setInterval> | null = null;
+
+	let deleting = $state(false);
+	let deleteError = $state<string | null>(null);
+	let pendingDelete = $state(false);
+
+	function readUndoFromStorage(id: string): number | null {
+		if (typeof sessionStorage === 'undefined') return null;
+		const raw = sessionStorage.getItem(UNDO_KEY_PREFIX + id);
+		if (!raw) return null;
+		const ts = Number(raw);
+		if (!Number.isFinite(ts) || ts <= Date.now()) {
+			sessionStorage.removeItem(UNDO_KEY_PREFIX + id);
+			return null;
+		}
+		return ts;
+	}
+
+	function clearUndoStorage(id: string) {
+		if (typeof sessionStorage === 'undefined') return;
+		sessionStorage.removeItem(UNDO_KEY_PREFIX + id);
+	}
+
+	$effect(() => {
+		// On (re)mount, hydrate undoUntil from sessionStorage so a remount
+		// triggered by invalidateAll() doesn't lose the toast state.
+		const stored = readUndoFromStorage(s.id);
+		if (stored != null) {
+			undoUntil = stored;
+			undoNow = Date.now();
+			startUndoTicker();
+		}
+	});
+
+	onDestroy(() => {
+		if (undoTimer != null) clearInterval(undoTimer);
+	});
+
+	function startUndoTicker() {
+		if (undoTimer != null) clearInterval(undoTimer);
+		undoTimer = setInterval(() => {
+			undoNow = Date.now();
+			if (undoUntil != null && undoNow >= undoUntil) {
+				undoUntil = null;
+				clearUndoStorage(s.id);
+				if (undoTimer != null) {
+					clearInterval(undoTimer);
+					undoTimer = null;
+				}
+			}
+		}, 250);
+	}
+
+	function armUndo() {
+		const until = Date.now() + UNDO_WINDOW_MS;
+		undoUntil = until;
+		undoNow = Date.now();
+		if (typeof sessionStorage !== 'undefined') {
+			sessionStorage.setItem(UNDO_KEY_PREFIX + s.id, String(until));
+		}
+		startUndoTicker();
+	}
+
+	const undoRemainingMs = $derived(
+		undoUntil == null ? 0 : Math.max(0, undoUntil - undoNow)
+	);
+
+	async function handleEnd() {
+		if (ending || !s.isOpen) return;
+		ending = true;
+		endError = null;
+		armUndo();
+		try {
+			await mutate('session.end', { id: s.id });
+		} catch (err) {
+			endError = err instanceof Error ? err.message : 'Could not end session.';
+			undoUntil = null;
+			clearUndoStorage(s.id);
+			if (undoTimer != null) {
+				clearInterval(undoTimer);
+				undoTimer = null;
+			}
+		} finally {
+			ending = false;
+		}
+	}
+
+	async function handleUndo() {
+		if (!undoUntil) return;
+		undoUntil = null;
+		clearUndoStorage(s.id);
+		if (undoTimer != null) {
+			clearInterval(undoTimer);
+			undoTimer = null;
+		}
+		try {
+			await mutate('session.endUndo', { id: s.id });
+		} catch (err) {
+			endError = err instanceof Error ? err.message : 'Could not undo.';
+		}
+	}
+
+	async function handleDelete() {
+		pendingDelete = false;
+		if (deleting) return;
+		deleting = true;
+		deleteError = null;
+		try {
+			await mutate('session.delete', { id: s.id });
+			await goto('/history');
+		} catch (err) {
+			deleteError = err instanceof Error ? err.message : 'Could not delete session.';
+			deleting = false;
+		}
+	}
 
 	function fmtNum(n: number | null): string {
 		if (n == null) return '—';
@@ -221,4 +352,82 @@
 			No sets in this session yet.
 		</div>
 	{/if}
+
+	{#if s.isOpen}
+		<div class="mt-8 flex flex-col gap-2">
+			<button
+				type="button"
+				class="flex items-center justify-center gap-2 rounded-full px-4 py-3 text-[14px] font-bold disabled:opacity-60"
+				style="background: var(--color-amber); color: #1b0a00;"
+				disabled={ending}
+				onclick={handleEnd}
+			>
+				{ending ? 'Ending…' : 'End session'}
+			</button>
+			{#if endError}
+				<div class="text-center text-[12px]" style="color: var(--color-text-dim);">
+					{endError}
+				</div>
+			{/if}
+		</div>
+	{/if}
+
+	{#if s.setCount === 0}
+		<div class="mt-3 flex flex-col gap-2">
+			<button
+				type="button"
+				class="flex items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-[13px] font-semibold disabled:opacity-60"
+				style="border-color: var(--color-line-2); color: var(--color-text-dim);"
+				disabled={deleting}
+				onclick={() => (pendingDelete = true)}
+			>
+				{deleting ? 'Deleting…' : 'Delete session'}
+			</button>
+			{#if deleteError}
+				<div class="text-center text-[12px]" style="color: var(--color-text-dim);">
+					{deleteError}
+				</div>
+			{/if}
+		</div>
+	{/if}
 </main>
+
+{#if undoUntil != null && undoRemainingMs > 0}
+	<div
+		class="fixed inset-x-0 z-20 mx-auto flex w-full max-w-[480px] items-center gap-3 px-4"
+		style="bottom: calc(max(env(safe-area-inset-bottom, 0px), 12px) + 16px);"
+	>
+		<div
+			class="flex flex-1 items-center gap-3 rounded-2xl border px-4 py-3"
+			style="background: var(--color-surface); border-color: var(--color-line-2); backdrop-filter: blur(8px);"
+		>
+			<div class="flex flex-1 flex-col">
+				<div class="text-[13px] font-semibold" style="color: var(--color-text);">
+					Session ended
+				</div>
+				<div class="text-[11px]" style="color: var(--color-text-dim-2);">
+					{Math.ceil(undoRemainingMs / 1000)}s to undo
+				</div>
+			</div>
+			<button
+				type="button"
+				class="rounded-full px-3 py-1.5 text-[12px] font-bold"
+				style="background: var(--color-amber-dim); color: var(--color-amber);"
+				onclick={handleUndo}
+			>
+				Undo
+			</button>
+		</div>
+	</div>
+{/if}
+
+{#if pendingDelete}
+	<ConfirmDialog
+		title="Delete this session?"
+		description="It has no sets logged. Deleting removes the row entirely."
+		confirmLabel="Delete"
+		danger
+		onConfirm={handleDelete}
+		onCancel={() => (pendingDelete = false)}
+	/>
+{/if}

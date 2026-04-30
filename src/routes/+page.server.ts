@@ -106,6 +106,7 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 	});
 
 	let activeSession: {
+		id: string;
 		startedAt: number;
 		setCount: number;
 		lastSetTs: number | null;
@@ -121,9 +122,7 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 	} | null = null;
 
 	if (asOfTs == null) {
-		// Live mode: the existing SessionBar lookup. Most recent open session
-		// for this user across gyms; hide if last activity is older than 6h
-		// (auto-close window).
+		// Live mode: most-recent open session for this user.
 		const open = (
 			await db
 				.select()
@@ -145,13 +144,32 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 				.orderBy(desc(setTable.ts))) as { ts: Date; equipmentId: string }[];
 
 			const lastSetTs = sessionSets[0]?.ts.getTime() ?? null;
-			const isStale = lastSetTs != null && Date.now() - lastSetTs > SAFETY_MS;
+			const startedAtMs = open.startedAt.getTime();
+			// Auto-close stale sessions on read. Non-empty: pin endedAt to last
+			// set's ts (gap is downtime, not workout time). Empty (manual start
+			// with no sets): pin to startedAt as a 0-duration row. Past this
+			// window the session is no longer "active" — the user walked away.
+			const isStaleNonEmpty = lastSetTs != null && Date.now() - lastSetTs > SAFETY_MS;
+			const isStaleEmpty = lastSetTs == null && Date.now() - startedAtMs > SAFETY_MS;
 
-			if (!isStale && sessionSets.length > 0) {
-				const lastEquipmentId = sessionSets[0].equipmentId;
-				const lastEquipment = equipments.find((e) => e.id === lastEquipmentId);
+			if (isStaleNonEmpty) {
+				await db
+					.update(workoutSession)
+					.set({ endedAt: new Date(lastSetTs!), updatedAt: new Date() })
+					.where(eq(workoutSession.id, open.id));
+			} else if (isStaleEmpty) {
+				await db
+					.update(workoutSession)
+					.set({ endedAt: open.startedAt, updatedAt: new Date() })
+					.where(eq(workoutSession.id, open.id));
+			} else {
+				const lastEquipmentId = sessionSets[0]?.equipmentId ?? null;
+				const lastEquipment = lastEquipmentId
+					? equipments.find((e) => e.id === lastEquipmentId)
+					: undefined;
 				activeSession = {
-					startedAt: open.startedAt.getTime(),
+					id: open.id,
+					startedAt: startedAtMs,
 					setCount: sessionSets.length,
 					lastSetTs,
 					lastEquipmentName: lastEquipment?.name ?? null,

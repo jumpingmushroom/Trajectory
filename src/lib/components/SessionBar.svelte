@@ -6,12 +6,14 @@
 	import { onDestroy } from 'svelte';
 
 	let {
+		id,
 		startedAt,
 		setCount,
 		lastSetTs,
 		lastEquipmentName,
 		lastEquipmentId
 	}: {
+		id: string;
 		startedAt: number;
 		setCount: number;
 		lastSetTs: number | null;
@@ -42,7 +44,10 @@
 		return `${m}:${String(r).padStart(2, '0')}`;
 	}
 
-	const href = $derived(lastEquipmentId ? `/log/${lastEquipmentId}` : '/');
+	// With sets: jump back to the last-equipment Log screen. Without sets
+	// (manual start, no sets logged yet): land on SessionDetail so the user
+	// can End or Delete an empty session without round-tripping via History.
+	const href = $derived(lastEquipmentId ? `/log/${lastEquipmentId}` : `/sessions/${id}`);
 </script>
 
 <a
@@ -71,9 +76,13 @@
 				Active session · {elapsedLabel}
 			</div>
 			<div class="truncate text-[13px] font-semibold tracking-[-0.01em]" style="color: var(--color-text);">
-				{setCount} set{setCount === 1 ? '' : 's'} logged
-				{#if lastEquipmentName}
-					· last on {lastEquipmentName}
+				{#if setCount === 0}
+					No sets logged yet · tap to manage
+				{:else}
+					{setCount} set{setCount === 1 ? '' : 's'} logged
+					{#if lastEquipmentName}
+						· last on {lastEquipmentName}
+					{/if}
 				{/if}
 			</div>
 		</div>

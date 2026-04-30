@@ -90,7 +90,9 @@ async function main() {
 	assert(/trajectory.session_token/.test(cookies), 'session cookie set');
 
 	// 2. Create a gym + equipment + exercise via /api/mutate.
-	const clientId = `smoke-${ulid()}`;
+	// Server validates clientId as a ULID (per security fix in 0468990),
+	// so we can't prefix with "smoke-" anymore — just use a fresh ULID.
+	const clientId = ulid();
 	const gymId = ulid();
 	const equipmentId = ulid();
 
@@ -232,6 +234,81 @@ async function main() {
 	assert(
 		emptyUpdate.status >= 400 && emptyUpdate.status < 500,
 		`empty payload rejected with 4xx (got ${emptyUpdate.status})`
+	);
+
+	// 9. Manual session start/end/undo/delete contract.
+	// At this point the user has one open session (from the 3 sets above).
+	// session.start should be idempotent against that existing session.
+	console.log('step 9 — manual session start (idempotent against open)');
+	const startAttempt = await mutate('session.start', {
+		id: ulid(),
+		gymId
+	});
+	const openId = startAttempt?.result?.id;
+	assert(typeof openId === 'string', 'session.start returns the open session id');
+	assert(startAttempt?.result?.endedAt == null, 'returned session is open');
+
+	console.log('step 10 — session.end closes the session');
+	const endResult = await mutate('session.end', { id: openId });
+	assert(endResult?.result?.endedAt != null, 'endedAt is set after session.end');
+
+	console.log('step 11 — session.endUndo reopens (no newer session)');
+	const undoResult = await mutate('session.endUndo', { id: openId });
+	assert(undoResult?.result?.endedAt == null, 'endedAt cleared after undo');
+
+	console.log('step 12 — session.end is idempotent');
+	await mutate('session.end', { id: openId });
+	const endAgain = await mutate('session.end', { id: openId });
+	assert(endAgain?.result?.endedAt != null, 'second end keeps endedAt set');
+
+	console.log('step 13 — session.delete refuses non-empty session');
+	const badDelete = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: ulid(),
+			op: 'session.delete',
+			payload: { id: openId }
+		})
+	});
+	assert(!badDelete.ok, 'delete on non-empty session rejected');
+	assert(
+		badDelete.status >= 400 && badDelete.status < 500,
+		`reject is 4xx (got ${badDelete.status})`
+	);
+
+	console.log('step 14 — manual start of a fresh session, then delete (empty)');
+	const freshId = ulid();
+	const freshResult = await mutate('session.start', { id: freshId, gymId });
+	assert(freshResult?.result?.id === freshId, 'fresh session.start uses provided id');
+	assert(freshResult?.result?.endedAt == null, 'fresh session is open');
+
+	const deleteResult = await mutate('session.delete', { id: freshId });
+	assert(deleteResult?.result?.deleted === true, 'session.delete on empty session succeeds');
+
+	console.log('step 15 — endUndo blocked when a newer session exists');
+	// Need a closed older session and a newer open session.
+	// freshId was deleted in step 14 → start two sessions back-to-back.
+	const olderId = ulid();
+	await mutate('session.start', { id: olderId, gymId });
+	await mutate('session.end', { id: olderId });
+	// Wait briefly so the newer session's startedAt is strictly greater.
+	await new Promise((r) => setTimeout(r, 5));
+	const newerId = ulid();
+	await mutate('session.start', { id: newerId, gymId });
+	const blockedUndo = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: ulid(),
+			op: 'session.endUndo',
+			payload: { id: olderId }
+		})
+	});
+	assert(!blockedUndo.ok, 'endUndo blocked by newer session');
+	assert(
+		blockedUndo.status >= 400 && blockedUndo.status < 500,
+		`blocked with 4xx (got ${blockedUndo.status})`
 	);
 
 	console.log('\nall smoke checks passed');

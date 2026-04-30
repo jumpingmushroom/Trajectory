@@ -9,9 +9,28 @@
 	import TabBar from '$lib/components/TabBar.svelte';
 	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 	import { withDateMode } from '$lib/dateMode';
+	import { mutate, ulid } from '$lib/mutate';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+	let starting = $state(false);
+	let startError = $state<string | null>(null);
+
+	async function handleStartSession() {
+		if (starting) return;
+		starting = true;
+		startError = null;
+		try {
+			await mutate('session.start', {
+				id: ulid(),
+				gymId: data.activeGym.id
+			});
+		} catch (err) {
+			startError = err instanceof Error ? err.message : 'Could not start session.';
+		} finally {
+			starting = false;
+		}
+	}
 
 	type Filter = 'all' | 'push' | 'pull' | 'legs' | 'core' | 'cardio';
 	const filters: { id: Filter; label: string }[] = [
@@ -97,6 +116,26 @@
 		<InstallPrompt />
 	</div>
 
+	{#if asOfTs == null && data.activeSession == null && data.tiles.length > 0}
+		<button
+			type="button"
+			class="mt-3 flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-bold disabled:opacity-60"
+			style="background: var(--color-amber-dim); color: var(--color-amber); border: 1px solid var(--color-amber-line);"
+			disabled={starting}
+			onclick={handleStartSession}
+		>
+			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<polygon points="6 4 20 12 6 20 6 4"/>
+			</svg>
+			{starting ? 'Starting…' : 'Start session'}
+		</button>
+		{#if startError}
+			<div class="mt-2 text-center text-[12px]" style="color: var(--color-text-dim);">
+				{startError}
+			</div>
+		{/if}
+	{/if}
+
 	{#if data.tiles.length === 0}
 		<section
 			class="mt-8 flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed p-8 text-center"
@@ -160,6 +199,7 @@
 	<BackdatedSessionPreview {asOfTs} session={data.backdatedSession} />
 {:else if data.activeSession}
 	<SessionBar
+		id={data.activeSession.id}
 		startedAt={data.activeSession.startedAt}
 		setCount={data.activeSession.setCount}
 		lastSetTs={data.activeSession.lastSetTs}

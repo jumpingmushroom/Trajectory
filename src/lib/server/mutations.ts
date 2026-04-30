@@ -7,7 +7,7 @@
 // ULIDs in payloads are minted client-side (per DECISIONS D4). The
 // server validates their format on every call.
 
-import { eq, and, isNull, desc, asc, gte, lt } from 'drizzle-orm';
+import { eq, and, isNull, desc, asc, gte, gt, lt } from 'drizzle-orm';
 import { db } from './db';
 import { startOfUtcDay } from '../dateMode';
 import {
@@ -36,7 +36,11 @@ export type MutationOp =
 	| { op: 'exercise.delete'; payload: { id: string } }
 	| { op: 'set.create'; payload: SetCreate }
 	| { op: 'set.update'; payload: SetUpdate }
-	| { op: 'set.delete'; payload: { id: string } };
+	| { op: 'set.delete'; payload: { id: string } }
+	| { op: 'session.start'; payload: SessionStart }
+	| { op: 'session.end'; payload: { id: string } }
+	| { op: 'session.endUndo'; payload: { id: string } }
+	| { op: 'session.delete'; payload: { id: string } };
 
 export interface MutationEnvelope {
 	clientId: string;
@@ -104,6 +108,12 @@ interface SetCreate {
 	durationMin?: number | null;
 	extras?: Record<string, number> | null;
 	ts?: number;
+}
+
+interface SessionStart {
+	id: string;
+	gymId: string;
+	startedAt?: number;
 }
 interface SetUpdate {
 	id: string;
@@ -437,6 +447,11 @@ async function exerciseDelete(payload: {
 // ─── set handlers (with implicit session boundary) ─────────────────────
 
 const SESSION_EXTEND_MS = 90 * 60 * 1000;
+// Outer bound for an empty (zero-set) manually started session to attach
+// the next live set. Beyond this, the empty session is closed as a
+// 0-duration row and a fresh implicit session is created. Mirrors the
+// home-loader auto-close window for non-empty sessions.
+const EMPTY_SESSION_ATTACH_MS = 6 * 60 * 60 * 1000;
 
 // Type of the callback parameter that `db.transaction()` provides. Lets us
 // pass either the top-level db or an inflight transaction to resolveSession,
@@ -466,7 +481,6 @@ async function resolveSession(
 				.limit(1)
 		)[0] as WorkoutSession | undefined;
 
-		let lastTs: number | null = null;
 		if (open) {
 			const lastSet = (
 				await tx
@@ -476,29 +490,36 @@ async function resolveSession(
 					.orderBy(desc(setTable.ts))
 					.limit(1)
 			)[0] as { ts: Date } | undefined;
-			lastTs = lastSet?.ts.getTime() ?? open.startedAt.getTime();
-		}
 
-		const shouldExtend =
-			open && lastTs != null && tsMs - lastTs <= SESSION_EXTEND_MS && tsMs - lastTs >= 0;
-
-		if (shouldExtend && open) {
-			return { sessionId: open.id, isNew: false, isBackdated: false };
-		}
-
-		// Close the stale open session, if any. endedAt is always pinned to
-		// the last real activity (lastTs) — never to the new set's tsMs —
-		// because the gap between sessions is downtime, not workout time.
-		if (open && lastTs != null) {
-			await tx
-				.update(workoutSession)
-				.set({ endedAt: new Date(lastTs), updatedAt: new Date() })
-				.where(eq(workoutSession.id, open.id));
-		} else if (open) {
-			await tx
-				.update(workoutSession)
-				.set({ endedAt: open.startedAt, updatedAt: new Date() })
-				.where(eq(workoutSession.id, open.id));
+			if (!lastSet) {
+				// Empty open session — typically a manual start before any sets,
+				// or one whose sets were all soft-deleted. Attach unconditionally
+				// when the new set's ts is within EMPTY_SESSION_ATTACH_MS of the
+				// session's startedAt. Past that window, the empty session is
+				// stale (user walked away and never logged); close as 0-duration
+				// and fall through to a fresh session.
+				const startedAtMs = open.startedAt.getTime();
+				const delta = tsMs - startedAtMs;
+				if (delta >= 0 && delta <= EMPTY_SESSION_ATTACH_MS) {
+					return { sessionId: open.id, isNew: false, isBackdated: false };
+				}
+				await tx
+					.update(workoutSession)
+					.set({ endedAt: open.startedAt, updatedAt: new Date() })
+					.where(eq(workoutSession.id, open.id));
+			} else {
+				const lastTs = lastSet.ts.getTime();
+				const shouldExtend = tsMs - lastTs <= SESSION_EXTEND_MS && tsMs - lastTs >= 0;
+				if (shouldExtend) {
+					return { sessionId: open.id, isNew: false, isBackdated: false };
+				}
+				// Close the stale open session. endedAt pinned to last activity
+				// (not the new set's tsMs) — gap is downtime, not workout time.
+				await tx
+					.update(workoutSession)
+					.set({ endedAt: new Date(lastTs), updatedAt: new Date() })
+					.where(eq(workoutSession.id, open.id));
+			}
 		}
 
 		const sessionId = newUlid();
@@ -764,6 +785,160 @@ async function setDelete(
 	return { id: payload.id, deletedAt: now };
 }
 
+// ─── session handlers (manual start/end) ──────────────────────────────
+
+async function sessionStart(
+	payload: SessionStart,
+	userId: string
+): Promise<WorkoutSession> {
+	assertUlid(payload.id, 'id');
+	assertUlid(payload.gymId, 'gymId');
+
+	const g = (
+		await db
+			.select({ id: gym.id })
+			.from(gym)
+			.where(and(eq(gym.id, payload.gymId), isNull(gym.deletedAt)))
+			.limit(1)
+	)[0];
+	if (!g) notFound(`gym ${payload.gymId} not found`);
+
+	const startedAt =
+		typeof payload.startedAt === 'number' &&
+		Number.isFinite(payload.startedAt) &&
+		payload.startedAt > 0
+			? payload.startedAt
+			: Date.now();
+	if (startedAt > Date.now() + 60_000) badRequest('startedAt must not be in the future');
+
+	// Idempotent posture: if the user already has an open session, return
+	// it and do not create a duplicate. The Start pill is gated on "no
+	// active session" client-side; this is the server-side belt-and-braces.
+	const existing = (
+		await db
+			.select()
+			.from(workoutSession)
+			.where(and(eq(workoutSession.userId, userId), isNull(workoutSession.endedAt)))
+			.orderBy(desc(workoutSession.startedAt))
+			.limit(1)
+	)[0] as WorkoutSession | undefined;
+	if (existing) return existing;
+
+	await db
+		.insert(workoutSession)
+		.values({
+			id: payload.id,
+			userId,
+			gymId: payload.gymId,
+			startedAt: new Date(startedAt)
+		})
+		.onConflictDoNothing();
+	const row = (
+		await db.select().from(workoutSession).where(eq(workoutSession.id, payload.id)).limit(1)
+	)[0];
+	if (!row) notFound(`session ${payload.id} not found after insert`);
+	return row;
+}
+
+async function sessionEnd(
+	payload: { id: string },
+	userId: string
+): Promise<WorkoutSession> {
+	assertUlid(payload.id, 'id');
+	const target = (
+		await db
+			.select()
+			.from(workoutSession)
+			.where(and(eq(workoutSession.id, payload.id), eq(workoutSession.userId, userId)))
+			.limit(1)
+	)[0] as WorkoutSession | undefined;
+	if (!target) notFound(`session ${payload.id} not found`);
+	if (target.endedAt != null) return target;
+
+	const now = new Date();
+	await db
+		.update(workoutSession)
+		.set({ endedAt: now, updatedAt: now })
+		.where(eq(workoutSession.id, payload.id));
+	const row = (
+		await db.select().from(workoutSession).where(eq(workoutSession.id, payload.id)).limit(1)
+	)[0];
+	if (!row) notFound(`session ${payload.id} not found after end`);
+	return row;
+}
+
+async function sessionEndUndo(
+	payload: { id: string },
+	userId: string
+): Promise<WorkoutSession> {
+	assertUlid(payload.id, 'id');
+	const target = (
+		await db
+			.select()
+			.from(workoutSession)
+			.where(and(eq(workoutSession.id, payload.id), eq(workoutSession.userId, userId)))
+			.limit(1)
+	)[0] as WorkoutSession | undefined;
+	if (!target) notFound(`session ${payload.id} not found`);
+	if (target.endedAt == null) return target;
+
+	// Refuse if a newer session has been created on top of this one — the
+	// 10 s undo toast prevents this client-side, but a stale replay could
+	// otherwise reopen a session while another is already open.
+	const newer = (
+		await db
+			.select({ id: workoutSession.id })
+			.from(workoutSession)
+			.where(
+				and(
+					eq(workoutSession.userId, userId),
+					gt(workoutSession.startedAt, target.startedAt)
+				)
+			)
+			.limit(1)
+	)[0];
+	if (newer) badRequest('cannot undo: a newer session exists');
+
+	await db
+		.update(workoutSession)
+		.set({ endedAt: null, updatedAt: new Date() })
+		.where(eq(workoutSession.id, payload.id));
+	const row = (
+		await db.select().from(workoutSession).where(eq(workoutSession.id, payload.id)).limit(1)
+	)[0];
+	if (!row) notFound(`session ${payload.id} not found after undo`);
+	return row;
+}
+
+async function sessionDelete(
+	payload: { id: string },
+	userId: string
+): Promise<{ id: string; deleted: true }> {
+	assertUlid(payload.id, 'id');
+	const target = (
+		await db
+			.select({ id: workoutSession.id })
+			.from(workoutSession)
+			.where(and(eq(workoutSession.id, payload.id), eq(workoutSession.userId, userId)))
+			.limit(1)
+	)[0];
+	if (!target) notFound(`session ${payload.id} not found`);
+
+	const anySet = (
+		await db
+			.select({ id: setTable.id })
+			.from(setTable)
+			.where(
+				and(eq(setTable.workoutSessionId, payload.id), isNull(setTable.deletedAt))
+			)
+			.limit(1)
+	)[0];
+	if (anySet) badRequest('cannot delete a session with sets');
+
+	await db.delete(workoutSession).where(eq(workoutSession.id, payload.id));
+	return { id: payload.id, deleted: true };
+}
+
 // Derived ID for the auto-hidden exercise on machines/cables/cardio.
 // Encodes the equipment ID so the hidden exercise has a deterministic
 // PK (still ULID-shaped) and rename cascades stay simple.
@@ -819,6 +994,14 @@ export async function applyMutation(
 			return { replayed: false, result: await setUpdate(payload, userId) };
 		case 'set.delete':
 			return { replayed: false, result: await setDelete(payload, userId) };
+		case 'session.start':
+			return { replayed: false, result: await sessionStart(payload, userId) };
+		case 'session.end':
+			return { replayed: false, result: await sessionEnd(payload, userId) };
+		case 'session.endUndo':
+			return { replayed: false, result: await sessionEndUndo(payload, userId) };
+		case 'session.delete':
+			return { replayed: false, result: await sessionDelete(payload, userId) };
 		default:
 			badRequest(`unknown op: ${op}`);
 	}
