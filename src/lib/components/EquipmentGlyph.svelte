@@ -15,11 +15,11 @@
 
 <svg viewBox="0 0 80 60" style="width:100%;height:100%;display:block" stroke-linecap="round" stroke-linejoin="round" fill="none">
 	{#if kind === 'legpress'}
-		<path d="M8 48h44" stroke={stroke} stroke-width={sw}/>
-		<path d="M12 48v-8h36v8" stroke={stroke} stroke-width={sw}/>
-		<path d="M50 20l18-6v20l-18-6z" stroke={accent} stroke-width={aSw}/>
-		<path d="M52 26l-6 4v8" stroke={stroke} stroke-width={sw}/>
-		<circle cx="52" cy="14" r="3" stroke={stroke} stroke-width={sw}/>
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<rect x="10" y="38" width="20" height="12" rx="2" stroke={stroke} stroke-width={sw}/>
+		<path d="M28 44l32 -28" stroke={accent} stroke-width={aSw}/>
+		<path d="M58 16l8 8" stroke={accent} stroke-width={aSw}/>
+		<circle cx="62" cy="20" r="4" stroke={stroke} stroke-width={sw}/>
 	{:else if kind === 'cable'}
 		<path d="M12 6v46" stroke={stroke} stroke-width={sw}/>
 		<path d="M12 6h28" stroke={stroke} stroke-width={sw}/>
