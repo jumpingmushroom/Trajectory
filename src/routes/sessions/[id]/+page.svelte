@@ -181,7 +181,7 @@
 							>
 								{i + 1}
 							</div>
-							{#if block.equipment.type === 'cardio'}
+							{#if set.durationMin != null}
 								<div class="flex flex-1 items-baseline gap-2 text-[13px]" style="color: var(--color-text);">
 									<span class="font-semibold">{fmtNum(set.durationMin)}</span>
 									<span class="text-[10px]" style="color: var(--color-text-dim-2);">min</span>
