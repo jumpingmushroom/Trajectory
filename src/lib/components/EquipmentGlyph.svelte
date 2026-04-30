@@ -86,5 +86,35 @@
 		<circle cx="66" cy="36" r="3" stroke={stroke} stroke-width={sw}/>
 		<path d="M22 36l18-10h6l10 10" stroke={stroke} stroke-width={sw}/>
 		<path d="M46 26l14-14" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'shoulderpress'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<rect x="22" y="20" width="6" height="28" rx="2" stroke={stroke} stroke-width={sw}/>
+		<rect x="28" y="38" width="20" height="6" rx="2" stroke={stroke} stroke-width={sw}/>
+		<path d="M30 28v-12" stroke={accent} stroke-width={aSw}/>
+		<path d="M46 28v-12" stroke={accent} stroke-width={aSw}/>
+		<circle cx="30" cy="14" r="3" stroke={accent} stroke-width={aSw}/>
+		<circle cx="46" cy="14" r="3" stroke={accent} stroke-width={aSw}/>
+		<rect x="58" y="20" width="8" height="24" rx="1.5" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'captainschair'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<path d="M40 52v-40" stroke={stroke} stroke-width={sw}/>
+		<rect x="32" y="14" width="16" height="20" rx="2" stroke={stroke} stroke-width={sw}/>
+		<path d="M32 24h-12" stroke={accent} stroke-width={aSw}/>
+		<path d="M48 24h12" stroke={accent} stroke-width={aSw}/>
+		<path d="M40 34v10" stroke={accent} stroke-width={aSw}/>
+		<path d="M36 44l4 6 4-6" stroke={accent} stroke-width={aSw}/>
+	{:else if kind === 'stairmaster'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<path d="M14 52v-6h8v-6h8v-6h8v-6h8v-6h8" stroke={accent} stroke-width={aSw}/>
+		<path d="M62 22v-12" stroke={stroke} stroke-width={sw}/>
+		<rect x="56" y="6" width="12" height="6" rx="1.5" stroke={stroke} stroke-width={sw}/>
+	{:else if kind === 'elliptical'}
+		<path d="M8 52h64" stroke={stroke} stroke-width={sw}/>
+		<circle cx="22" cy="34" r="8" stroke={accent} stroke-width={aSw}/>
+		<path d="M22 34l28 12" stroke={accent} stroke-width={aSw}/>
+		<path d="M22 34l28 -8" stroke={accent} stroke-width={aSw}/>
+		<path d="M50 46h6" stroke={stroke} stroke-width={sw}/>
+		<path d="M50 26v-12" stroke={stroke} stroke-width={sw}/>
+		<circle cx="50" cy="12" r="2" stroke={stroke} stroke-width={sw}/>
 	{/if}
 </svg>
