@@ -2,6 +2,28 @@
 	import TabBar from '$lib/components/TabBar.svelte';
 	import type { PageData } from './$types';
 
+	function startOfDay(d: Date): Date {
+		const out = new Date(d);
+		out.setHours(0, 0, 0, 0);
+		return out;
+	}
+
+	function addDays(d: Date, n: number): Date {
+		const out = new Date(d);
+		out.setDate(out.getDate() + n);
+		return out;
+	}
+
+	// Monday-anchored start-of-week. JS getDay() is 0=Sun..6=Sat; we want
+	// 0=Mon..6=Sun, so the offset to subtract is (getDay()+6) % 7.
+	function startOfWeekMonday(d: Date): Date {
+		const sod = startOfDay(d);
+		const offset = (sod.getDay() + 6) % 7;
+		return addDays(sod, -offset);
+	}
+
+	const monthFmt = new Intl.DateTimeFormat(undefined, { month: 'short' });
+
 	let { data }: { data: PageData } = $props();
 
 	let gymFilter = $state<'all' | string>('all');
@@ -20,16 +42,68 @@
 		return out;
 	});
 
-	const weeks = $derived.by(() => {
-		const cols: number[][] = [];
-		for (let w = 11; w >= 0; w--) {
-			const col: number[] = [];
-			for (let d = 0; d < 7; d++) {
-				col.push(heatmapDays[w * 7 + d] ?? 0);
+	const today = $derived.by(() => startOfDay(new Date()));
+	const thisMonday = $derived.by(() => startOfWeekMonday(today));
+
+	interface HeatmapCell {
+		value: number;
+		date: Date;
+		isFuture: boolean;
+	}
+
+	const weekCells = $derived.by<HeatmapCell[][]>(() => {
+		const cols: HeatmapCell[][] = [];
+		for (let c = 0; c < 12; c++) {
+			// Leftmost column (c=0) is the oldest week, rightmost (c=11) is the
+			// current in-progress week. Each column's anchor is its Monday.
+			const colMonday = addDays(thisMonday, (c - 11) * 7);
+			const col: HeatmapCell[] = [];
+			for (let r = 0; r < 7; r++) {
+				const cellDate = addDays(colMonday, r);
+				const offsetDays = Math.round(
+					(today.getTime() - cellDate.getTime()) / 86_400_000
+				);
+				const value =
+					offsetDays >= 0 && offsetDays < heatmapDays.length
+						? heatmapDays[offsetDays] ?? 0
+						: 0;
+				col.push({
+					value,
+					date: cellDate,
+					isFuture: offsetDays < 0
+				});
 			}
 			cols.push(col);
 		}
 		return cols;
+	});
+
+	const todayCol = 11; // rightmost column is always the current week
+	const todayRow = $derived.by(() => (today.getDay() + 6) % 7);
+
+	interface MonthLabel {
+		col: number;
+		label: string;
+	}
+
+	const monthLabels = $derived.by<MonthLabel[]>(() => {
+		const out: MonthLabel[] = [];
+		let prevMonth = -1;
+		for (let c = 0; c < 12; c++) {
+			const colMonday = addDays(thisMonday, (c - 11) * 7);
+			const m = colMonday.getMonth();
+			if (m !== prevMonth) {
+				out.push({ col: c, label: monthFmt.format(colMonday) });
+				prevMonth = m;
+			}
+		}
+		// Drop a label that lands on the very last column if there's already
+		// one earlier — prevents two month names crowding the right edge.
+		if (out.length >= 2 && out[out.length - 1].col === 11) {
+			const before = out[out.length - 2];
+			if (11 - before.col <= 1) out.pop();
+		}
+		return out;
 	});
 
 	const totalSessions = $derived(filteredSessions.length);
@@ -151,18 +225,49 @@
 				{totalSessions} session{totalSessions === 1 ? '' : 's'}
 			</div>
 		</div>
-		<div class="mt-3 flex gap-1 overflow-x-auto pb-1" style="scrollbar-width: none;">
-			{#each weeks as col, wi (wi)}
-				<div class="flex flex-col gap-1">
-					{#each col as v, di (di)}
-						<div
-							class="h-[18px] w-[18px] rounded-[4px]"
-							style="background: {colorFor(v)};"
-							title={v > 0 ? `${v} session${v === 1 ? '' : 's'}` : 'no sessions'}
-						></div>
-					{/each}
+		<div class="relative mt-2 h-[14px]" style="padding-left: 32px;">
+			{#each monthLabels as ml (ml.col)}
+				<div
+					class="absolute top-0 text-[9px] font-bold uppercase tracking-[0.12em]"
+					style="left: calc(32px + {ml.col} * 22px); color: var(--color-text-dim-2);"
+				>
+					{ml.label}
 				</div>
 			{/each}
+		</div>
+		<div class="mt-1 flex items-end gap-2 overflow-x-auto pb-1" style="scrollbar-width: none;">
+			<div class="flex flex-col gap-1 pt-[4px]">
+				{#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as dow (dow)}
+					<div
+						class="flex h-[18px] items-center text-right text-[9px] font-bold uppercase tracking-[0.12em]"
+						style="color: var(--color-text-dim-2); width: 24px;"
+					>
+						{dow}
+					</div>
+				{/each}
+			</div>
+			<div class="flex gap-1">
+				{#each weekCells as col, wi (wi)}
+					<div class="flex flex-col gap-1">
+						{#each col as cell, di (di)}
+							<div
+								class="h-[18px] w-[18px] rounded-[4px]"
+								style="background: {cell.isFuture
+									? 'rgba(244,237,226,0.025)'
+									: colorFor(cell.value)}; outline: {wi === todayCol &&
+								di === todayRow
+									? '1px solid var(--color-amber)'
+									: 'none'}; outline-offset: 1px;"
+								title={cell.isFuture
+									? cell.date.toDateString()
+									: cell.value > 0
+										? `${cell.value} session${cell.value === 1 ? '' : 's'} · ${cell.date.toDateString()}`
+										: `no sessions · ${cell.date.toDateString()}`}
+							></div>
+						{/each}
+					</div>
+				{/each}
+			</div>
 		</div>
 		<div
 			class="mt-3 flex items-center gap-4 text-[11px] tabular-nums"
@@ -178,13 +283,18 @@
 				</span>
 				total
 			</div>
-			<div class="ml-auto flex items-center gap-1">
-				<span>less</span>
-				<span class="h-[10px] w-[10px] rounded-[2px]" style="background: {colorFor(0)};"></span>
-				<span class="h-[10px] w-[10px] rounded-[2px]" style="background: {colorFor(1)};"></span>
-				<span class="h-[10px] w-[10px] rounded-[2px]" style="background: {colorFor(2)};"></span>
-				<span class="h-[10px] w-[10px] rounded-[2px]" style="background: {colorFor(3)};"></span>
-				<span>more</span>
+			<div class="ml-auto flex items-end gap-2">
+				{#each [0, 1, 2, 3] as n (n)}
+					<div class="flex flex-col items-center gap-0.5">
+						<span class="text-[9px] font-bold uppercase tracking-[0.12em]" style="color: var(--color-text-dim-2);">
+							{n === 3 ? '3+' : n}
+						</span>
+						<span class="h-[10px] w-[10px] rounded-[2px]" style="background: {colorFor(n)};"></span>
+					</div>
+				{/each}
+				<span class="ml-1 text-[10px] font-medium" style="color: var(--color-text-dim-2);">
+					sessions
+				</span>
 			</div>
 		</div>
 	</section>
