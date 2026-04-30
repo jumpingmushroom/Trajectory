@@ -53,12 +53,12 @@
 		<circle cx="14" cy="34" r="5" stroke={stroke} stroke-width={sw}/>
 		<circle cx="66" cy="34" r="5" stroke={stroke} stroke-width={sw}/>
 	{:else if kind === 'preacher'}
-		<path d="M14 50v-20l12-8h14" stroke={stroke} stroke-width={sw}/>
-		<path d="M40 22h10l6 6" stroke={stroke} stroke-width={sw}/>
-		<path d="M20 50h36" stroke={stroke} stroke-width={sw}/>
-		<circle cx="62" cy="14" r="4" stroke={accent} stroke-width={aSw}/>
-		<circle cx="62" cy="36" r="4" stroke={accent} stroke-width={aSw}/>
-		<path d="M62 18v14" stroke={accent} stroke-width={aSw}/>
+		<path d="M8 54h64" stroke={stroke} stroke-width={sw}/>
+		<path d="M30 54v-22" stroke={stroke} stroke-width={sw}/>
+		<rect x="22" y="44" width="18" height="6" rx="2" stroke={stroke} stroke-width={sw}/>
+		<path d="M30 32l28 -14" stroke={accent} stroke-width={aSw}/>
+		<path d="M58 18l8 4" stroke={accent} stroke-width={aSw}/>
+		<circle cx="68" cy="22" r="3" stroke={accent} stroke-width={aSw}/>
 	{:else if kind === 'chestpress'}
 		<rect x="18" y="14" width="16" height="32" rx="3" stroke={stroke} stroke-width={sw}/>
 		<path d="M34 22l14-4v20l-14-4" stroke={accent} stroke-width={aSw}/>
