@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { mutate, ulid } from '$lib/mutate';
+	import { invalidateAll } from '$app/navigation';
 	import EquipmentGlyph from './EquipmentGlyph.svelte';
 	import {
 		GLYPHS,
@@ -189,8 +190,105 @@
 	}
 
 	async function handleEditSave() {
-		// Wired up in Task 8. For now, just close so the button is non-broken.
-		onClose();
+		if (!editTarget) return;
+		error = null;
+
+		// Compute diff against `initial`. Build a payload of only changed fields.
+		type DiffPayload = {
+			id: string;
+			name?: string;
+			type?: EquipmentType;
+			group?: MuscleGroup;
+			glyph?: string;
+			cardioKind?: CardioKind | null;
+			notes?: string | null;
+		};
+		const diff: DiffPayload = { id: editTarget.id };
+		let hasFieldDiff = false;
+
+		const trimmedName = name.trim();
+		if (!trimmedName) {
+			error = 'Name is required.';
+			return;
+		}
+		if (trimmedName !== initial.name) {
+			diff.name = trimmedName;
+			hasFieldDiff = true;
+		}
+		if (type !== initial.type) {
+			diff.type = type;
+			hasFieldDiff = true;
+		}
+		if (group !== initial.group) {
+			diff.group = group;
+			hasFieldDiff = true;
+		}
+		if (glyph !== initial.glyph) {
+			diff.glyph = glyph;
+			hasFieldDiff = true;
+		}
+		if (notes !== initial.notes) {
+			diff.notes = notes.length === 0 ? null : notes;
+			hasFieldDiff = true;
+		}
+
+		// cardioKind reconciliation (mirrors the server invariant for clean state):
+		// - resulting type is cardio: include cardioKind if it differs from initial,
+		//   defaulting to 'generic' if somehow null.
+		// - resulting type is non-cardio: include cardioKind: null if initial had one.
+		if (type === 'cardio') {
+			const next = cardioKind ?? 'generic';
+			if (next !== initial.cardioKind) {
+				diff.cardioKind = next;
+				hasFieldDiff = true;
+			}
+		} else if (initial.cardioKind != null) {
+			diff.cardioKind = null;
+			hasFieldDiff = true;
+		}
+
+		submitting = true;
+		try {
+			// Photo first: if upload fails, we don't want stale field updates to
+			// mask the photo problem. POST overwrites the same path on retry.
+			if (photoFile) {
+				const form = new FormData();
+				form.append('photo', photoFile);
+				const res = await fetch(`/api/equipment/${editTarget.id}/photo`, {
+					method: 'POST',
+					body: form
+				});
+				if (!res.ok) {
+					error = `Photo upload failed (${res.status}).`;
+					return;
+				}
+			} else if (removePhoto && initial.photoPath) {
+				const res = await fetch(`/api/equipment/${editTarget.id}/photo`, {
+					method: 'DELETE'
+				});
+				if (!res.ok) {
+					error = `Photo remove failed (${res.status}).`;
+					return;
+				}
+			}
+
+			if (hasFieldDiff) {
+				await mutate('equipment.update', diff);
+			}
+
+			// Photo POST/DELETE doesn't go through mutate(), so its drain doesn't
+			// trigger invalidation. Re-fetch the page data so the Setup row reflects
+			// the new state immediately.
+			if (photoFile || removePhoto) {
+				await invalidateAll();
+			}
+
+			onClose();
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Could not save changes.';
+		} finally {
+			submitting = false;
+		}
 	}
 
 	function next() {
