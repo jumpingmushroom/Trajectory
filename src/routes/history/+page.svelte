@@ -283,13 +283,18 @@
 				</span>
 				total
 			</div>
-			<div class="ml-auto flex items-center gap-1">
-				<span>less</span>
-				<span class="h-[10px] w-[10px] rounded-[2px]" style="background: {colorFor(0)};"></span>
-				<span class="h-[10px] w-[10px] rounded-[2px]" style="background: {colorFor(1)};"></span>
-				<span class="h-[10px] w-[10px] rounded-[2px]" style="background: {colorFor(2)};"></span>
-				<span class="h-[10px] w-[10px] rounded-[2px]" style="background: {colorFor(3)};"></span>
-				<span>more</span>
+			<div class="ml-auto flex items-end gap-2">
+				{#each [0, 1, 2, 3] as n (n)}
+					<div class="flex flex-col items-center gap-0.5">
+						<span class="text-[9px] font-bold uppercase tracking-[0.12em]" style="color: var(--color-text-dim-2);">
+							{n === 3 ? '3+' : n}
+						</span>
+						<span class="h-[10px] w-[10px] rounded-[2px]" style="background: {colorFor(n)};"></span>
+					</div>
+				{/each}
+				<span class="ml-1 text-[10px] font-medium" style="color: var(--color-text-dim-2);">
+					sessions
+				</span>
 			</div>
 		</div>
 	</section>
