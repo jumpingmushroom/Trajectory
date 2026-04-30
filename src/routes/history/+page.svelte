@@ -230,18 +230,30 @@
 				{totalSessions} session{totalSessions === 1 ? '' : 's'}
 			</div>
 		</div>
-		<div class="mt-3 flex gap-1 overflow-x-auto pb-1" style="scrollbar-width: none;">
-			{#each weeks as col, wi (wi)}
-				<div class="flex flex-col gap-1">
-					{#each col as v, di (di)}
-						<div
-							class="h-[18px] w-[18px] rounded-[4px]"
-							style="background: {colorFor(v)};"
-							title={v > 0 ? `${v} session${v === 1 ? '' : 's'}` : 'no sessions'}
-						></div>
-					{/each}
-				</div>
-			{/each}
+		<div class="mt-3 flex items-end gap-2 overflow-x-auto pb-1" style="scrollbar-width: none;">
+			<div class="flex flex-col gap-1 pt-[4px]">
+				{#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as dow (dow)}
+					<div
+						class="flex h-[18px] items-center text-right text-[9px] font-bold uppercase tracking-[0.12em]"
+						style="color: var(--color-text-dim-2); width: 24px;"
+					>
+						{dow}
+					</div>
+				{/each}
+			</div>
+			<div class="flex gap-1">
+				{#each weeks as col, wi (wi)}
+					<div class="flex flex-col gap-1">
+						{#each col as v, di (di)}
+							<div
+								class="h-[18px] w-[18px] rounded-[4px]"
+								style="background: {colorFor(v)};"
+								title={v > 0 ? `${v} session${v === 1 ? '' : 's'}` : 'no sessions'}
+							></div>
+						{/each}
+					</div>
+				{/each}
+			</div>
 		</div>
 		<div
 			class="mt-3 flex items-center gap-4 text-[11px] tabular-nums"
