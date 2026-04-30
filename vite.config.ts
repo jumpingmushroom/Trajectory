@@ -56,14 +56,15 @@ export default defineConfig({
 				globPatterns: ['client/**/*.{js,css,ico,png,svg,webp,woff,woff2}'],
 				runtimeCaching: [
 					{
+						// /api/ is always fresh-from-network. The earlier NetworkFirst
+						// config cached /api/export.csv (full per-user CSV) and
+						// /api/auth/get-session for 24h regardless of cache-control,
+						// which on a shared device would serve user A's data to user B.
+						// The IndexedDB queue (sync.ts) is the offline write buffer;
+						// the SW cache adds nothing for reads here and is a privacy
+						// liability.
 						urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
-						handler: 'NetworkFirst',
-						options: {
-							cacheName: 'trajectory-api',
-							networkTimeoutSeconds: 3,
-							expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 },
-							cacheableResponse: { statuses: [0, 200] }
-						}
+						handler: 'NetworkOnly'
 					},
 					{
 						urlPattern: ({ url }) => url.pathname.startsWith('/uploads/'),

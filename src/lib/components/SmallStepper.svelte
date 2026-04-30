@@ -21,7 +21,11 @@
 	} = $props();
 
 	function nudge(direction: 1 | -1) {
-		onChange(Math.max(min, Math.min(max, value + direction * step)));
+		// Force integer — reps and target-set counts can never be fractional,
+		// so even if `value` arrives non-integer (external set, future bug)
+		// we land on a whole number after a single tap.
+		const next = Math.round(value + direction * step);
+		onChange(Math.max(min, Math.min(max, next)));
 	}
 </script>
 

@@ -10,6 +10,13 @@ import { syncStatus, refreshPendingCount } from './status';
 const BACKOFFS_MS = [1_000, 2_000, 4_000, 8_000, 16_000];
 const STEADY_BACKOFF_MS = 30_000;
 
+// 4xx codes that are NOT terminal: the same payload may succeed on a later
+// attempt once the underlying condition clears. 401 = expired session;
+// 408 = request timeout; 425 = server says retry; 429 = rate limit.
+// Anything else in 4xx is treated as a permanent client error and dropped
+// (with the entry surfaced via authExpired/console for visibility).
+const RETRYABLE_4XX = new Set([401, 408, 425, 429]);
+
 let draining = false;
 let drainScheduled: ReturnType<typeof setTimeout> | null = null;
 
@@ -63,9 +70,37 @@ export async function drainNow(): Promise<{ drained: number; remaining: number }
 			if (result.ok) {
 				await complete(m.mutationId);
 				drained += 1;
+				// Successful POST means the cookie is valid again, clear the flag.
+				syncStatus.update((s) => (s.authExpired ? { ...s, authExpired: false } : s));
+			} else if (result.status === 401) {
+				// Session expired. Don't drop the mutation — the user's set is
+				// safe in IndexedDB. Surface via authExpired so the banner
+				// prompts re-sign-in, and stop draining (every subsequent POST
+				// would 401 too).
+				syncStatus.update((s) => ({ ...s, authExpired: true }));
+				await recordFailure(
+					m.mutationId,
+					`401 unauthenticated (session expired)`,
+					Date.now() + STEADY_BACKOFF_MS
+				);
+				break;
+			} else if (RETRYABLE_4XX.has(result.status)) {
+				const delay = backoffFor(m.attempts);
+				await recordFailure(
+					m.mutationId,
+					`${result.status} ${result.body || 'retryable'}`,
+					Date.now() + delay
+				);
+				if (drainScheduled) clearTimeout(drainScheduled);
+				drainScheduled = setTimeout(() => {
+					drainScheduled = null;
+					drainNow().catch(() => undefined);
+				}, delay);
+				break;
 			} else if (result.status >= 400 && result.status < 500) {
-				// 4xx → bad request that won't fix itself. Drop and surface
-				// so the user can take action; otherwise we'd loop forever.
+				// Permanent 4xx (validation, 404, 413). Won't fix itself; drop
+				// to avoid an infinite loop. Logged loudly so a debug screen
+				// (or `console.error` in DevTools on desktop) surfaces it.
 				console.error(`[sync] ${m.op} ${m.mutationId} rejected (${result.status}): ${result.body}`);
 				await complete(m.mutationId);
 			} else {

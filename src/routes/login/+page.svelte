@@ -22,6 +22,9 @@
 			const email = `${name.trim().toLowerCase()}@trajectory.local`;
 			const result = await authClient.signIn.email({ email, password });
 			if (result.error) {
+				// Intentionally identical to the unknown-user case — a more
+				// "helpful" message ("user not found" / "wrong password") would
+				// turn this form into a username-enumeration oracle.
 				error = 'Wrong name or password.';
 				return;
 			}

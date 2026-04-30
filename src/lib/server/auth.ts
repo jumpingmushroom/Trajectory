@@ -11,9 +11,12 @@ import { user, session, account, verification } from './db/schema';
 // NODE_ENV=production but no app env vars) can complete. The real
 // guard runs in hooks.server.ts on first request.
 const baseURL = process.env.PUBLIC_BASE_URL ?? 'http://localhost:5173';
-const secret =
-	process.env.BETTER_AUTH_SECRET ??
+// Sentinel string used as the dev fallback. Exported so hooks.server.ts
+// can refuse it in production even when BETTER_AUTH_SECRET is "set" but
+// to this known-public value (e.g. compose default leaked into prod).
+export const DEV_SECRET_SENTINEL =
 	'dev-only-insecure-secret-please-set-BETTER_AUTH_SECRET-in-prod';
+const secret = process.env.BETTER_AUTH_SECRET ?? DEV_SECRET_SENTINEL;
 
 export const auth = betterAuth({
 	baseURL,

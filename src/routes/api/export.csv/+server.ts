@@ -47,9 +47,21 @@ const COLUMNS = [
 
 const KNOWN_EXTRAS = new Set(['distance', 'calories', 'hr']);
 
+// Cells starting with =, +, -, @, or whitespace control chars are interpreted
+// as formulas by Excel/Numbers/Sheets — a gym/equipment named "=HYPERLINK(...)"
+// would execute on open. Wrap in quotes and prefix a single quote so the
+// spreadsheet treats it as literal text. Pure-numeric leading minus (e.g. a
+// negative weight delta in a future column) is still safe because it's a
+// number, not user-controlled string — but our user-controlled fields here
+// are all strings, so blanket-escape any leading-formula-char string.
+const FORMULA_PREFIX = /^[=+\-@\t\r]/;
+
 function csvEscape(value: unknown): string {
 	if (value == null) return '';
 	const str = typeof value === 'string' ? value : String(value);
+	if (FORMULA_PREFIX.test(str)) {
+		return `"'${str.replace(/"/g, '""')}"`;
+	}
 	if (/[",\r\n]/.test(str)) {
 		return `"${str.replace(/"/g, '""')}"`;
 	}

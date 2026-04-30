@@ -11,13 +11,18 @@ export interface SyncSnapshot {
 	pending: number;
 	draining: boolean;
 	pendingMutations: PendingMutation[];
+	// Set when the server returns 401 on a queued mutation — the user's
+	// session has expired and the queue can't drain until they sign in
+	// again. UI surfaces this as a "Sign in again" banner.
+	authExpired: boolean;
 }
 
 const initial: SyncSnapshot = {
 	online: typeof navigator === 'undefined' ? true : navigator.onLine,
 	pending: 0,
 	draining: false,
-	pendingMutations: []
+	pendingMutations: [],
+	authExpired: false
 };
 
 const store = writable<SyncSnapshot>(initial);

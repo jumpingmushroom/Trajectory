@@ -12,7 +12,7 @@ import { building } from '$app/environment';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { auth } from '$lib/server/auth';
+import { auth, DEV_SECRET_SENTINEL } from '$lib/server/auth';
 import { ensureMigrations } from '$lib/server/db/migrate';
 import { seedUsersIfEmpty } from '$lib/server/seed';
 
@@ -37,16 +37,35 @@ function ensurePlaceholder() {
 	}
 }
 
-let bootDone = false;
+// Singleton-promise pattern so concurrent first requests await the same
+// boot rather than each running migrations + seed in parallel.
+let bootPromise: Promise<void> | null = null;
 async function ensureBoot() {
-	if (bootDone) return;
-	if (process.env.NODE_ENV === 'production' && !process.env.BETTER_AUTH_SECRET) {
-		throw new Error('BETTER_AUTH_SECRET must be set in production');
+	if (bootPromise) return bootPromise;
+	bootPromise = (async () => {
+		if (process.env.NODE_ENV === 'production') {
+			const secret = process.env.BETTER_AUTH_SECRET;
+			if (!secret) {
+				throw new Error('BETTER_AUTH_SECRET must be set in production');
+			}
+			if (secret === DEV_SECRET_SENTINEL) {
+				throw new Error(
+					'BETTER_AUTH_SECRET is set to the dev fallback value — generate a real secret before going to production'
+				);
+			}
+		}
+		ensurePlaceholder();
+		await ensureMigrations();
+		await seedUsersIfEmpty();
+	})();
+	try {
+		await bootPromise;
+	} catch (err) {
+		// Reset so a future request can retry; otherwise a transient migration
+		// failure would brick the server until restart.
+		bootPromise = null;
+		throw err;
 	}
-	ensurePlaceholder();
-	await ensureMigrations();
-	await seedUsersIfEmpty();
-	bootDone = true;
 }
 
 function isPublicPath(pathname: string): boolean {

@@ -315,12 +315,17 @@ async function equipmentUpdate(payload: EquipmentUpdate): Promise<Equipment> {
 		hasUserField = true;
 	}
 	if (payload.notes !== undefined) {
-		updates.notes =
-			payload.notes == null
-				? null
-				: typeof payload.notes === 'string'
-					? payload.notes.slice(0, 4000)
-					: badRequest('notes must be a string or null');
+		if (payload.notes === null) {
+			updates.notes = null;
+		} else if (typeof payload.notes === 'string') {
+			// Trim trailing whitespace; reject (don't silently truncate) when
+			// the textarea's maxlength was bypassed by a non-UI client.
+			const trimmed = payload.notes.replace(/\s+$/, '');
+			if (trimmed.length > 4000) badRequest('notes must be at most 4000 characters');
+			updates.notes = trimmed.length === 0 ? null : trimmed;
+		} else {
+			badRequest('notes must be a string or null');
+		}
 		hasUserField = true;
 	}
 
@@ -366,15 +371,19 @@ async function equipmentDelete(payload: {
 }): Promise<{ id: string; deletedAt: number }> {
 	assertUlid(payload.id, 'id');
 	const now = Date.now();
-	await db
-		.update(equipment)
-		.set({ deletedAt: new Date(now), updatedAt: new Date(now) })
-		.where(eq(equipment.id, payload.id));
-	// Cascade soft-delete to attached exercises.
-	await db
-		.update(exercise)
-		.set({ deletedAt: new Date(now), updatedAt: new Date(now) })
-		.where(eq(exercise.equipmentId, payload.id));
+	// Atomic: if the cascade fails, the equipment row stays live too. Otherwise
+	// a crash mid-cascade leaves orphaned exercises that join cleanly through
+	// to a tombstoned equipment.
+	await db.transaction(async (tx) => {
+		await tx
+			.update(equipment)
+			.set({ deletedAt: new Date(now), updatedAt: new Date(now) })
+			.where(eq(equipment.id, payload.id));
+		await tx
+			.update(exercise)
+			.set({ deletedAt: new Date(now), updatedAt: new Date(now) })
+			.where(eq(exercise.equipmentId, payload.id));
+	});
 	return { id: payload.id, deletedAt: now };
 }
 
@@ -427,16 +436,22 @@ async function exerciseDelete(payload: {
 // ─── set handlers (with implicit session boundary) ─────────────────────
 
 const SESSION_EXTEND_MS = 90 * 60 * 1000;
-const SESSION_SAFETY_MS = 6 * 60 * 60 * 1000;
+
+// Type of the callback parameter that `db.transaction()` provides. Lets us
+// pass either the top-level db or an inflight transaction to resolveSession,
+// whichever the caller has, without depending on the deeper drizzle generic
+// types directly.
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function resolveSession(
+	tx: Tx,
 	userId: string,
 	gymId: string,
 	tsMs: number
 ): Promise<{ sessionId: string; isNew: boolean }> {
 	// Look at the user's most recent open session.
 	const open = (
-		await db
+		await tx
 			.select()
 			.from(workoutSession)
 			.where(and(eq(workoutSession.userId, userId), isNull(workoutSession.endedAt)))
@@ -447,7 +462,7 @@ async function resolveSession(
 	let lastTs: number | null = null;
 	if (open) {
 		const lastSet = (
-			await db
+			await tx
 				.select({ ts: setTable.ts })
 				.from(setTable)
 				.where(
@@ -466,25 +481,23 @@ async function resolveSession(
 		return { sessionId: open.id, isNew: false };
 	}
 
-	// Close the stale open session, if any. Cap endedAt at lastTs (the
-	// real last activity) when the gap exceeds the safety window so the
-	// session's duration isn't bloated by user inactivity.
+	// Close the stale open session, if any. endedAt is always pinned to
+	// the last real activity (lastTs) — never to the new set's tsMs —
+	// because the gap between sessions is downtime, not workout time.
 	if (open && lastTs != null) {
-		const gap = tsMs - lastTs;
-		const endedAt = gap > SESSION_SAFETY_MS ? new Date(lastTs) : new Date(lastTs);
-		await db
+		await tx
 			.update(workoutSession)
-			.set({ endedAt, updatedAt: new Date() })
+			.set({ endedAt: new Date(lastTs), updatedAt: new Date() })
 			.where(eq(workoutSession.id, open.id));
 	} else if (open) {
-		await db
+		await tx
 			.update(workoutSession)
 			.set({ endedAt: open.startedAt, updatedAt: new Date() })
 			.where(eq(workoutSession.id, open.id));
 	}
 
 	const sessionId = newUlid();
-	await db.insert(workoutSession).values({
+	await tx.insert(workoutSession).values({
 		id: sessionId,
 		userId,
 		gymId,
@@ -561,27 +574,33 @@ async function setCreate(
 		reps = payload.reps;
 	}
 
-	const session = await resolveSession(userId, eqRow.gymId, ts);
-
-	await db
-		.insert(setTable)
-		.values({
-			id: payload.id,
-			userId,
-			workoutSessionId: session.sessionId,
-			exerciseId: payload.exerciseId,
-			weight,
-			reps,
-			durationMin,
-			extras,
-			ts: new Date(ts)
-		})
-		.onConflictDoNothing();
-
-	const row = (
-		await db.select().from(setTable).where(eq(setTable.id, payload.id)).limit(1)
-	)[0];
-	if (!row) notFound(`set ${payload.id} not found after insert`);
+	// Resolve session + insert the set in one transaction. Two concurrent
+	// set.create calls from the same user (e.g. queue drain firing twice)
+	// would otherwise each see "no open session" and create duplicates.
+	// SQLite WAL serialises BEGIN IMMEDIATE writers, so the second caller
+	// blocks until the first commits and then sees the open session.
+	const { session, row } = await db.transaction(async (tx) => {
+		const session = await resolveSession(tx, userId, eqRow.gymId, ts);
+		await tx
+			.insert(setTable)
+			.values({
+				id: payload.id,
+				userId,
+				workoutSessionId: session.sessionId,
+				exerciseId: payload.exerciseId,
+				weight,
+				reps,
+				durationMin,
+				extras,
+				ts: new Date(ts)
+			})
+			.onConflictDoNothing();
+		const row = (
+			await tx.select().from(setTable).where(eq(setTable.id, payload.id)).limit(1)
+		)[0];
+		if (!row) notFound(`set ${payload.id} not found after insert`);
+		return { session, row };
+	});
 
 	return { set: row, sessionId: session.sessionId, sessionIsNew: session.isNew };
 }
@@ -635,8 +654,15 @@ async function setUpdate(payload: SetUpdate, userId: string): Promise<SetRow> {
 		.set(updates)
 		.where(and(eq(setTable.id, payload.id), eq(setTable.userId, userId)));
 
+	// SELECT must also filter by userId — otherwise a request that targets
+	// another user's set id would update nothing but still return the row,
+	// leaking weight/reps/ts.
 	const row = (
-		await db.select().from(setTable).where(eq(setTable.id, payload.id)).limit(1)
+		await db
+			.select()
+			.from(setTable)
+			.where(and(eq(setTable.id, payload.id), eq(setTable.userId, userId)))
+			.limit(1)
 	)[0];
 	if (!row) notFound(`set ${payload.id} not found`);
 	return row;
@@ -670,8 +696,7 @@ export async function applyMutation(
 	userId: string
 ): Promise<{ replayed: boolean; result: unknown }> {
 	if (!isUlid(envelope.mutationId)) badRequest('mutationId must be a ULID');
-	if (typeof envelope.clientId !== 'string' || envelope.clientId.length === 0)
-		badRequest('clientId required');
+	if (!isUlid(envelope.clientId)) badRequest('clientId must be a ULID');
 	if (typeof envelope.op !== 'string') badRequest('op required');
 	if (envelope.payload == null || typeof envelope.payload !== 'object')
 		badRequest('payload required');

@@ -46,6 +46,11 @@ export const holdRepeat: Action<HTMLElement, HoldRepeatOptions> = (node, opts) =
 	node.addEventListener('pointerup', clearTimers);
 	node.addEventListener('pointerleave', clearTimers);
 	node.addEventListener('pointercancel', clearTimers);
+	// If the user backgrounds the app or switches tabs mid-hold, the
+	// pointer events may never fire. Stop the interval so the value
+	// doesn't keep rocketing while the screen is off.
+	window.addEventListener('blur', clearTimers);
+	document.addEventListener('visibilitychange', clearTimers);
 
 	return {
 		update(next: HoldRepeatOptions) {
@@ -57,6 +62,8 @@ export const holdRepeat: Action<HTMLElement, HoldRepeatOptions> = (node, opts) =
 			node.removeEventListener('pointerup', clearTimers);
 			node.removeEventListener('pointerleave', clearTimers);
 			node.removeEventListener('pointercancel', clearTimers);
+			window.removeEventListener('blur', clearTimers);
+			document.removeEventListener('visibilitychange', clearTimers);
 		}
 	};
 };

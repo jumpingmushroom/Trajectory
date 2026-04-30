@@ -30,9 +30,12 @@
 	}
 
 	function snap(v: number): number {
-		// Round to nearest `step` to avoid float drift after long hold.
+		// Round to nearest `step` AND quantise to 3 decimals so a long hold
+		// (e.g. step=2.5 × 80 ticks) doesn't accumulate IEEE-754 drift like
+		// 7.500000000001 — which would then get serialised verbatim into the
+		// CSV export.
 		const k = Math.round(v / step);
-		return clamp(k * step);
+		return clamp(Number((k * step).toFixed(3)));
 	}
 
 	function nudge(direction: 1 | -1) {

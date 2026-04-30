@@ -15,6 +15,8 @@ When in doubt about whether to add a feature: it goes here. Promoting from FUTUR
 - **Set-level notes** — quick text field per set ("dropped from rack on rep 7"). New `set.note` text column.
 - **Edit a logged set** — currently swipe-delete + re-log. v0.2 lets you tap-to-edit weight/reps in place.
 - **Equipment delete: "moved" vs "removed" distinction** — moving equipment between gyms keeps history; removing soft-deletes. v0.1 only has soft-delete.
+- **Replace `derivedExerciseId` with `equipment.hiddenExerciseId` FK column** — current scheme encodes the hidden-exercise PK as `equipmentId.slice(0,25)+'X'`. Works, but a real ULID happening to share 25 chars + ending in 'X' would collide silently on `onConflictDoNothing`. Also blocks future per-equipment multi-hidden-exercises (warm-up, drop). Migration: add nullable column, backfill from `derivedExerciseId(eq.id)`, switch reads, drop the convention.
+- **Denormalize `equipment.lastSet*` to avoid scanning all sets on every Home load** — `+page.server.ts`, `equipment/[id]/+page.server.ts`, `history/+page.server.ts` all pull every set the user has logged. Cheap now (low row count) but linear in lifetime sets. Update from `set.create` / `set.update` / `set.delete`. Until then leave the comment in place.
 - **Backup / restore UI** — schedule, last-run timestamp, manual trigger. v0.1 is a manual `.backup` shell command.
 - **"Your edit was overwritten" notifications** — surface silent-loss conflicts from sync (per D8) in a per-user mailbox.
 - **Reassign session gym** — admin action to fix a session that was logged with the wrong active gym.
