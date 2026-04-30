@@ -41,3 +41,4 @@ pnpm-debug.log*
 # Testing
 coverage/
 .nyc_output/
+.claude/scheduled_tasks.lock

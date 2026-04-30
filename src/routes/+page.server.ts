@@ -12,7 +12,6 @@ import {
 } from '$lib/server/db/schema';
 import { isNull, eq, and, desc, asc } from 'drizzle-orm';
 import { resolveActiveGym } from '$lib/server/active-gym';
-import pkg from '../../package.json' with { type: 'json' };
 
 const SAFETY_MS = 6 * 60 * 60 * 1000;
 
@@ -147,7 +146,6 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
 	return {
 		userName: locals.user.name,
 		userId: locals.user.id,
-		version: pkg.version,
 		gyms: gyms as Gym[],
 		activeGym,
 		tiles,

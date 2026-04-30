@@ -3,6 +3,7 @@ import { isNull, eq, asc, sql, inArray, and } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { gym, equipment, exercise, set as setTable } from '$lib/server/db/schema';
 import type { PageServerLoad } from './$types';
+import pkg from '../../../package.json' with { type: 'json' };
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) throw redirect(303, '/login');
@@ -51,6 +52,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	return {
 		userName: locals.user.name,
+		version: pkg.version,
 		gyms,
 		equipments,
 		exercises,
