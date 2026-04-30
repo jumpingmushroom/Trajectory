@@ -10,8 +10,9 @@ import {
 	type Equipment,
 	type Gym
 } from '$lib/server/db/schema';
-import { isNull, eq, and, desc, asc } from 'drizzle-orm';
+import { isNull, eq, and, desc, asc, gte, lt } from 'drizzle-orm';
 import { resolveActiveGym } from '$lib/server/active-gym';
+import { parseAsOfTs, startOfUtcDay, endOfUtcDay } from '$lib/dateMode';
 
 const SAFETY_MS = 6 * 60 * 60 * 1000;
 
@@ -24,8 +25,15 @@ export interface EquipmentTileMeta {
 	daysSince: number | null;
 }
 
-export const load: PageServerLoad = async ({ locals, cookies }) => {
+export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 	if (!locals.user) throw redirect(303, '/login');
+
+	const asOfTs = parseAsOfTs(url.searchParams);
+	// "Now" for the page is the user-perceived day: if backdating, it's the
+	// chosen ts; if live, it's actually now. Tile prefill / days-since are
+	// computed against this so the home screen shows what the gym looked
+	// like on the chosen day.
+	const referenceTs = asOfTs ?? Date.now();
 
 	const gyms = await db
 		.select()
@@ -43,8 +51,18 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
 		.where(and(isNull(equipment.deletedAt), eq(equipment.gymId, activeGym.id)))
 		.orderBy(asc(equipment.sortOrder), asc(equipment.createdAt));
 
-	// Last-set-per-equipment for the current user. One query, group in JS.
-	// At 2 users × ~1000 sets/year scale this is well under a millisecond.
+	// Last-set-per-equipment for the current user, scoped to ts ≤ referenceTs
+	// when in date-mode. Without that filter, backdating would prefill a
+	// past entry with newer data — silently rewriting the past.
+	const setFilters = [
+		eq(setTable.userId, locals.user.id),
+		isNull(setTable.deletedAt),
+		isNull(exercise.deletedAt)
+	];
+	if (asOfTs != null) {
+		setFilters.push(lt(setTable.ts, new Date(endOfUtcDay(asOfTs))));
+	}
+
 	const lastSetsRaw = equipments.length
 		? ((await db
 				.select({
@@ -56,13 +74,7 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
 				})
 				.from(setTable)
 				.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
-				.where(
-					and(
-						eq(setTable.userId, locals.user.id),
-						isNull(setTable.deletedAt),
-						isNull(exercise.deletedAt)
-					)
-				)
+				.where(and(...setFilters))
 				.orderBy(desc(setTable.ts))) as {
 				equipmentId: string;
 				weight: number | null;
@@ -79,7 +91,6 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
 		}
 	}
 
-	const now = Date.now();
 	const dayMs = 24 * 60 * 60 * 1000;
 	const tiles: EquipmentTileMeta[] = equipments.map((eq) => {
 		const last = lastByEquipment.get(eq.id);
@@ -90,23 +101,9 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
 			lastReps: last?.reps ?? null,
 			lastDurationMin: last?.durationMin ?? null,
 			lastTs: ts,
-			daysSince: ts == null ? null : Math.max(0, Math.floor((now - ts) / dayMs))
+			daysSince: ts == null ? null : Math.max(0, Math.floor((referenceTs - ts) / dayMs))
 		};
 	});
-
-	// Active session for the SessionBar. We accept any open session (across
-	// gyms) for this user; the bar links back to the equipment of the
-	// last-logged set. If the last set is older than 6h we treat the
-	// session as effectively over and hide the bar (the row stays open in
-	// the DB; resolveSession() will close it on the next set.create).
-	const open = (
-		await db
-			.select()
-			.from(workoutSession)
-			.where(and(eq(workoutSession.userId, locals.user.id), isNull(workoutSession.endedAt)))
-			.orderBy(desc(workoutSession.startedAt))
-			.limit(1)
-	)[0];
 
 	let activeSession: {
 		startedAt: number;
@@ -116,27 +113,88 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
 		lastEquipmentId: string | null;
 	} | null = null;
 
-	if (open) {
-		const sessionSets = (await db
-			.select({
-				ts: setTable.ts,
-				equipmentId: exercise.equipmentId
-			})
-			.from(setTable)
-			.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
-			.where(and(eq(setTable.workoutSessionId, open.id), isNull(setTable.deletedAt)))
-			.orderBy(desc(setTable.ts))) as { ts: Date; equipmentId: string }[];
+	let backdatedSession: {
+		id: string;
+		setCount: number;
+		lastEquipmentName: string | null;
+		lastEquipmentId: string | null;
+	} | null = null;
 
-		const lastSetTs = sessionSets[0]?.ts.getTime() ?? null;
-		const isStale = lastSetTs != null && Date.now() - lastSetTs > SAFETY_MS;
+	if (asOfTs == null) {
+		// Live mode: the existing SessionBar lookup. Most recent open session
+		// for this user across gyms; hide if last activity is older than 6h
+		// (auto-close window).
+		const open = (
+			await db
+				.select()
+				.from(workoutSession)
+				.where(and(eq(workoutSession.userId, locals.user.id), isNull(workoutSession.endedAt)))
+				.orderBy(desc(workoutSession.startedAt))
+				.limit(1)
+		)[0];
 
-		if (!isStale && sessionSets.length > 0) {
-			const lastEquipmentId = sessionSets[0].equipmentId;
-			const lastEquipment = equipments.find((e) => e.id === lastEquipmentId);
-			activeSession = {
-				startedAt: open.startedAt.getTime(),
+		if (open) {
+			const sessionSets = (await db
+				.select({
+					ts: setTable.ts,
+					equipmentId: exercise.equipmentId
+				})
+				.from(setTable)
+				.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
+				.where(and(eq(setTable.workoutSessionId, open.id), isNull(setTable.deletedAt)))
+				.orderBy(desc(setTable.ts))) as { ts: Date; equipmentId: string }[];
+
+			const lastSetTs = sessionSets[0]?.ts.getTime() ?? null;
+			const isStale = lastSetTs != null && Date.now() - lastSetTs > SAFETY_MS;
+
+			if (!isStale && sessionSets.length > 0) {
+				const lastEquipmentId = sessionSets[0].equipmentId;
+				const lastEquipment = equipments.find((e) => e.id === lastEquipmentId);
+				activeSession = {
+					startedAt: open.startedAt.getTime(),
+					setCount: sessionSets.length,
+					lastSetTs,
+					lastEquipmentName: lastEquipment?.name ?? null,
+					lastEquipmentId
+				};
+			}
+		}
+	} else {
+		// Date-mode: look up *any* session (open or closed) for this user +
+		// active gym whose startedAt falls on the chosen calendar day.
+		const dayStart = startOfUtcDay(asOfTs);
+		const dayEnd = dayStart + 86_400_000;
+		const past = (
+			await db
+				.select()
+				.from(workoutSession)
+				.where(
+					and(
+						eq(workoutSession.userId, locals.user.id),
+						eq(workoutSession.gymId, activeGym.id),
+						gte(workoutSession.startedAt, new Date(dayStart)),
+						lt(workoutSession.startedAt, new Date(dayEnd))
+					)
+				)
+				.orderBy(asc(workoutSession.startedAt))
+				.limit(1)
+		)[0];
+
+		if (past) {
+			const sessionSets = (await db
+				.select({ equipmentId: exercise.equipmentId })
+				.from(setTable)
+				.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
+				.where(and(eq(setTable.workoutSessionId, past.id), isNull(setTable.deletedAt)))
+				.orderBy(desc(setTable.ts))) as { equipmentId: string }[];
+
+			const lastEquipmentId = sessionSets[0]?.equipmentId ?? null;
+			const lastEquipment = lastEquipmentId
+				? equipments.find((e) => e.id === lastEquipmentId)
+				: undefined;
+			backdatedSession = {
+				id: past.id,
 				setCount: sessionSets.length,
-				lastSetTs,
 				lastEquipmentName: lastEquipment?.name ?? null,
 				lastEquipmentId
 			};
@@ -149,6 +207,8 @@ export const load: PageServerLoad = async ({ locals, cookies }) => {
 		gyms: gyms as Gym[],
 		activeGym,
 		tiles,
-		activeSession
+		activeSession,
+		backdatedSession,
+		asOfTs
 	};
 };

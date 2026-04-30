@@ -4,9 +4,13 @@
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import LineChart from '$lib/components/LineChart.svelte';
 	import type { GlyphKind } from '$lib/components/glyph-kinds';
+	import { page } from '$app/state';
+	import { parseAsOfTs, withDateMode } from '$lib/dateMode';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	const asOfTs = $derived(parseAsOfTs(page.url.searchParams));
 
 	const eq = $derived(data.equipment);
 	const isCardio = $derived(eq.type === 'cardio');
@@ -96,7 +100,7 @@
 <main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pt-12 pb-24">
 	<header class="flex items-start gap-3">
 		<a
-			href="/"
+			href={withDateMode('/', asOfTs)}
 			class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border"
 			style="background: var(--color-surface); border-color: var(--color-line-2); color: var(--color-text-dim);"
 			aria-label="Back"
@@ -150,7 +154,7 @@
 	</section>
 
 	<a
-		href={`/log/${eq.id}`}
+		href={withDateMode(`/log/${eq.id}`, asOfTs)}
 		class="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[15px] font-bold"
 		style="background: var(--color-amber); color: #1b0a00; box-shadow: 0 6px 18px var(--color-amber-glow);"
 	>

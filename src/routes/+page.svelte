@@ -3,8 +3,12 @@
 	import GymChip from '$lib/components/GymChip.svelte';
 	import GymSheet from '$lib/components/GymSheet.svelte';
 	import SessionBar from '$lib/components/SessionBar.svelte';
+	import BackdatedSessionPreview from '$lib/components/BackdatedSessionPreview.svelte';
+	import DateChip from '$lib/components/DateChip.svelte';
+	import DateModeSheet from '$lib/components/DateModeSheet.svelte';
 	import TabBar from '$lib/components/TabBar.svelte';
 	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
+	import { withDateMode } from '$lib/dateMode';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -21,6 +25,9 @@
 
 	let filter = $state<Filter>('all');
 	let gymSheetOpen = $state(false);
+	let dateSheetOpen = $state(false);
+
+	const asOfTs = $derived(data.asOfTs);
 
 	const visibleTiles = $derived(
 		filter === 'all'
@@ -50,11 +57,8 @@
 				>
 					Trajectory
 				</div>
-				<div
-					class="mt-0.5 text-[22px] font-bold tracking-[-0.02em]"
-					style="color: var(--color-text);"
-				>
-					Today
+				<div class="mt-0.5">
+					<DateChip {asOfTs} onOpen={() => (dateSheetOpen = true)} />
 				</div>
 			</div>
 			<GymChip gym={data.activeGym} onClick={() => (gymSheetOpen = true)} />
@@ -134,7 +138,7 @@
 					lastReps={tile.lastReps}
 					lastDurationMin={tile.lastDurationMin}
 					daysSince={tile.daysSince}
-					href={`/equipment/${tile.equipment.id}`}
+					href={withDateMode(`/equipment/${tile.equipment.id}`, asOfTs)}
 				/>
 			{/each}
 		</section>
@@ -152,7 +156,9 @@
 	</a>
 </main>
 
-{#if data.activeSession}
+{#if asOfTs != null}
+	<BackdatedSessionPreview {asOfTs} session={data.backdatedSession} />
+{:else if data.activeSession}
 	<SessionBar
 		startedAt={data.activeSession.startedAt}
 		setCount={data.activeSession.setCount}
@@ -170,4 +176,8 @@
 		activeGymId={data.activeGym.id}
 		onClose={() => (gymSheetOpen = false)}
 	/>
+{/if}
+
+{#if dateSheetOpen}
+	<DateModeSheet {asOfTs} onClose={() => (dateSheetOpen = false)} />
 {/if}

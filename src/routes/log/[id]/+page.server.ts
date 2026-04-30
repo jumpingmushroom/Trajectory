@@ -8,7 +8,8 @@ import {
 	workoutSession
 } from '$lib/server/db/schema';
 import { isUlid } from '$lib/server/ulid';
-import { isNull, eq, and, asc, desc, inArray } from 'drizzle-orm';
+import { isNull, eq, and, asc, desc, inArray, gte, lt } from 'drizzle-orm';
+import { parseAsOfTs, startOfUtcDay, endOfUtcDay } from '$lib/dateMode';
 
 export interface ExerciseContext {
 	id: string;
@@ -21,10 +22,12 @@ export interface ExerciseContext {
 	sparklineSeries: number[];
 }
 
-export const load: PageServerLoad = async ({ locals, params }) => {
+export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!locals.user) throw redirect(303, '/login');
 	const id = params.id;
 	if (!id || !isUlid(id)) throw error(404, 'not found');
+
+	const asOfTs = parseAsOfTs(url.searchParams);
 
 	const eqRow = (
 		await db
@@ -44,6 +47,15 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 
 	const exerciseIds = exercises.map((x) => x.id);
 
+	const setFilters = [
+		eq(setTable.userId, locals.user.id),
+		isNull(setTable.deletedAt),
+		inArray(setTable.exerciseId, exerciseIds)
+	];
+	if (asOfTs != null) {
+		setFilters.push(lt(setTable.ts, new Date(endOfUtcDay(asOfTs))));
+	}
+
 	const sets = ((await db
 		.select({
 			id: setTable.id,
@@ -56,13 +68,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			ts: setTable.ts
 		})
 		.from(setTable)
-		.where(
-			and(
-				eq(setTable.userId, locals.user.id),
-				isNull(setTable.deletedAt),
-				inArray(setTable.exerciseId, exerciseIds)
-			)
-		)
+		.where(and(...setFilters))
 		.orderBy(desc(setTable.ts))) as {
 		id: string;
 		workoutSessionId: string;
@@ -128,19 +134,44 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		};
 	});
 
-	// Currently-open session for this user (for in-session set list).
-	const openSession = (
-		await db
-			.select()
-			.from(workoutSession)
-			.where(and(eq(workoutSession.userId, locals.user.id), isNull(workoutSession.endedAt)))
-			.orderBy(desc(workoutSession.startedAt))
-			.limit(1)
-	)[0];
+	// Pick the session whose set list this page should show:
+	//   - live mode: the user's most recent open session (existing behavior).
+	//   - date-mode: any session for this user on the picked calendar day,
+	//     scoped to this equipment's gym so we only show sets the user could
+	//     have logged here.
+	let activeSession: { id: string; startedAt: Date } | undefined;
+	if (asOfTs != null) {
+		const dayStart = startOfUtcDay(asOfTs);
+		const dayEnd = dayStart + 86_400_000;
+		activeSession = (
+			await db
+				.select({ id: workoutSession.id, startedAt: workoutSession.startedAt })
+				.from(workoutSession)
+				.where(
+					and(
+						eq(workoutSession.userId, locals.user.id),
+						eq(workoutSession.gymId, eqRow.gymId),
+						gte(workoutSession.startedAt, new Date(dayStart)),
+						lt(workoutSession.startedAt, new Date(dayEnd))
+					)
+				)
+				.orderBy(asc(workoutSession.startedAt))
+				.limit(1)
+		)[0];
+	} else {
+		activeSession = (
+			await db
+				.select({ id: workoutSession.id, startedAt: workoutSession.startedAt })
+				.from(workoutSession)
+				.where(and(eq(workoutSession.userId, locals.user.id), isNull(workoutSession.endedAt)))
+				.orderBy(desc(workoutSession.startedAt))
+				.limit(1)
+		)[0];
+	}
 
 	const sessionSets =
-		openSession != null
-			? sets.filter((s) => s.workoutSessionId === openSession.id).reverse()
+		activeSession != null
+			? sets.filter((s) => s.workoutSessionId === activeSession.id).reverse()
 			: [];
 
 	return {
@@ -148,8 +179,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		equipment: eqRow,
 		exercises: exercises.map((ex) => ({ id: ex.id, name: ex.name, isHidden: ex.isHidden })),
 		contexts,
-		openSessionId: openSession?.id ?? null,
-		openSessionStartedAt: openSession?.startedAt.getTime() ?? null,
+		openSessionId: activeSession?.id ?? null,
+		openSessionStartedAt: activeSession?.startedAt.getTime() ?? null,
 		sessionSets: sessionSets.map((s) => ({
 			id: s.id,
 			exerciseId: s.exerciseId,
@@ -158,6 +189,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			durationMin: s.durationMin,
 			extras: s.extras,
 			ts: s.ts.getTime()
-		}))
+		})),
+		asOfTs
 	};
 };

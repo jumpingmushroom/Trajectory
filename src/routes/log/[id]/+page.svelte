@@ -7,13 +7,23 @@
 	import SmallStepper from '$lib/components/SmallStepper.svelte';
 	import SetRow from '$lib/components/SetRow.svelte';
 	import CardioRow from '$lib/components/CardioRow.svelte';
+	import DateChip from '$lib/components/DateChip.svelte';
+	import DateModeSheet from '$lib/components/DateModeSheet.svelte';
 	import { holdRepeat } from '$lib/actions/holdRepeat';
 	import type { GlyphKind } from '$lib/components/glyph-kinds';
 	import { fieldsFor, type CardioField } from '$lib/cardio-templates';
 	import { syncStatus } from '$lib/sync/status';
+	import { tsForBackdate, withDateMode } from '$lib/dateMode';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+
+	const asOfTs = $derived(data.asOfTs);
+	let dateSheetOpen = $state(false);
+
+	function setTs(): number {
+		return asOfTs == null ? Date.now() : tsForBackdate(asOfTs);
+	}
 
 	const eq = $derived(data.equipment);
 	const photoSrc = $derived(
@@ -185,7 +195,7 @@
 					exerciseId: selectedExerciseId,
 					durationMin: duration,
 					extras: Object.keys(extras).length > 0 ? extras : null,
-					ts: Date.now()
+					ts: setTs()
 				});
 			} else {
 				await mutate('set.create', {
@@ -193,7 +203,7 @@
 					exerciseId: selectedExerciseId,
 					weight,
 					reps,
-					ts: Date.now()
+					ts: setTs()
 				});
 				if (setsDone + 1 > targetSets) targetSets = setsDone + 1;
 			}
@@ -220,7 +230,7 @@
 				exerciseId: selectedExerciseId,
 				weight: s.weight,
 				reps: s.reps,
-				ts: Date.now()
+				ts: setTs()
 			});
 			lastLogAt = Date.now();
 		} catch (err) {
@@ -281,7 +291,7 @@
 <main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pb-32 pt-12">
 	<header class="flex items-start gap-3">
 		<a
-			href="/"
+			href={withDateMode('/', asOfTs)}
 			class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border"
 			style="background: var(--color-surface); border-color: var(--color-line-2); color: var(--color-text-dim);"
 			aria-label="Back"
@@ -303,9 +313,14 @@
 			>
 				{eq.name}
 			</div>
+			{#if asOfTs != null}
+				<div class="mt-1.5">
+					<DateChip {asOfTs} onOpen={() => (dateSheetOpen = true)} />
+				</div>
+			{/if}
 		</div>
 		<a
-			href={`/equipment/${eq.id}`}
+			href={withDateMode(`/equipment/${eq.id}`, asOfTs)}
 			class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border"
 			style="background: var(--color-surface); border-color: var(--color-line-2); color: var(--color-text-dim);"
 			aria-label="Equipment detail"
@@ -721,3 +736,7 @@
 		</button>
 	</div>
 </div>
+
+{#if dateSheetOpen}
+	<DateModeSheet {asOfTs} onClose={() => (dateSheetOpen = false)} />
+{/if}

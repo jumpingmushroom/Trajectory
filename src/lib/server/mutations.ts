@@ -7,8 +7,9 @@
 // ULIDs in payloads are minted client-side (per DECISIONS D4). The
 // server validates their format on every call.
 
-import { eq, and, isNull, desc } from 'drizzle-orm';
+import { eq, and, isNull, desc, asc, gte, lt } from 'drizzle-orm';
 import { db } from './db';
+import { startOfUtcDay } from '../dateMode';
 import {
 	gym,
 	equipment,
@@ -448,52 +449,101 @@ async function resolveSession(
 	userId: string,
 	gymId: string,
 	tsMs: number
-): Promise<{ sessionId: string; isNew: boolean }> {
-	// Look at the user's most recent open session.
-	const open = (
+): Promise<{ sessionId: string; isNew: boolean; isBackdated: boolean }> {
+	// A set is "live" when its ts is within one extension window of now.
+	// Anything older is a backdated entry and must not touch the user's
+	// current open session — that's the whole reason this branch exists.
+	const isLive = Math.abs(Date.now() - tsMs) <= SESSION_EXTEND_MS;
+
+	if (isLive) {
+		// Look at the user's most recent open session.
+		const open = (
+			await tx
+				.select()
+				.from(workoutSession)
+				.where(and(eq(workoutSession.userId, userId), isNull(workoutSession.endedAt)))
+				.orderBy(desc(workoutSession.startedAt))
+				.limit(1)
+		)[0] as WorkoutSession | undefined;
+
+		let lastTs: number | null = null;
+		if (open) {
+			const lastSet = (
+				await tx
+					.select({ ts: setTable.ts })
+					.from(setTable)
+					.where(and(eq(setTable.workoutSessionId, open.id), isNull(setTable.deletedAt)))
+					.orderBy(desc(setTable.ts))
+					.limit(1)
+			)[0] as { ts: Date } | undefined;
+			lastTs = lastSet?.ts.getTime() ?? open.startedAt.getTime();
+		}
+
+		const shouldExtend =
+			open && lastTs != null && tsMs - lastTs <= SESSION_EXTEND_MS && tsMs - lastTs >= 0;
+
+		if (shouldExtend && open) {
+			return { sessionId: open.id, isNew: false, isBackdated: false };
+		}
+
+		// Close the stale open session, if any. endedAt is always pinned to
+		// the last real activity (lastTs) — never to the new set's tsMs —
+		// because the gap between sessions is downtime, not workout time.
+		if (open && lastTs != null) {
+			await tx
+				.update(workoutSession)
+				.set({ endedAt: new Date(lastTs), updatedAt: new Date() })
+				.where(eq(workoutSession.id, open.id));
+		} else if (open) {
+			await tx
+				.update(workoutSession)
+				.set({ endedAt: open.startedAt, updatedAt: new Date() })
+				.where(eq(workoutSession.id, open.id));
+		}
+
+		const sessionId = newUlid();
+		await tx.insert(workoutSession).values({
+			id: sessionId,
+			userId,
+			gymId,
+			startedAt: new Date(tsMs)
+		});
+		return { sessionId, isNew: true, isBackdated: false };
+	}
+
+	// Backdated path: scope by the calendar day of tsMs (UTC). Append to an
+	// existing same-day session for this user+gym if one exists; otherwise
+	// create a fresh closed session. Critically, never touch the user's
+	// live open session for today.
+	const dayStart = startOfUtcDay(tsMs);
+	const dayEnd = dayStart + 86_400_000;
+
+	const candidate = (
 		await tx
 			.select()
 			.from(workoutSession)
-			.where(and(eq(workoutSession.userId, userId), isNull(workoutSession.endedAt)))
-			.orderBy(desc(workoutSession.startedAt))
+			.where(
+				and(
+					eq(workoutSession.userId, userId),
+					eq(workoutSession.gymId, gymId),
+					gte(workoutSession.startedAt, new Date(dayStart)),
+					lt(workoutSession.startedAt, new Date(dayEnd))
+				)
+			)
+			.orderBy(asc(workoutSession.startedAt))
 			.limit(1)
 	)[0] as WorkoutSession | undefined;
 
-	let lastTs: number | null = null;
-	if (open) {
-		const lastSet = (
+	if (candidate) {
+		// If the new set predates the current startedAt, push the start
+		// back. endedAt is recomputed by the caller after the set inserts.
+		if (tsMs < candidate.startedAt.getTime()) {
 			await tx
-				.select({ ts: setTable.ts })
-				.from(setTable)
-				.where(
-					and(eq(setTable.workoutSessionId, open.id), isNull(setTable.deletedAt))
-				)
-				.orderBy(desc(setTable.ts))
-				.limit(1)
-		)[0] as { ts: Date } | undefined;
-		lastTs = lastSet?.ts.getTime() ?? open.startedAt.getTime();
-	}
-
-	const shouldExtend =
-		open && lastTs != null && tsMs - lastTs <= SESSION_EXTEND_MS && tsMs - lastTs >= 0;
-
-	if (shouldExtend && open) {
-		return { sessionId: open.id, isNew: false };
-	}
-
-	// Close the stale open session, if any. endedAt is always pinned to
-	// the last real activity (lastTs) — never to the new set's tsMs —
-	// because the gap between sessions is downtime, not workout time.
-	if (open && lastTs != null) {
-		await tx
-			.update(workoutSession)
-			.set({ endedAt: new Date(lastTs), updatedAt: new Date() })
-			.where(eq(workoutSession.id, open.id));
-	} else if (open) {
-		await tx
-			.update(workoutSession)
-			.set({ endedAt: open.startedAt, updatedAt: new Date() })
-			.where(eq(workoutSession.id, open.id));
+				.update(workoutSession)
+				.set({ startedAt: new Date(tsMs), updatedAt: new Date() })
+				.where(eq(workoutSession.id, candidate.id));
+		}
+		return { sessionId: candidate.id, isNew: false, isBackdated: true };
 	}
 
 	const sessionId = newUlid();
@@ -501,9 +551,12 @@ async function resolveSession(
 		id: sessionId,
 		userId,
 		gymId,
-		startedAt: new Date(tsMs)
+		startedAt: new Date(tsMs),
+		// Provisional close at tsMs; the caller's MAX(set.ts) update keeps
+		// this honest if more sets later land in this same session.
+		endedAt: new Date(tsMs)
 	});
-	return { sessionId, isNew: true };
+	return { sessionId, isNew: true, isBackdated: true };
 }
 
 async function setCreate(
@@ -542,6 +595,10 @@ async function setCreate(
 		typeof payload.ts === 'number' && Number.isFinite(payload.ts) && payload.ts > 0
 			? payload.ts
 			: Date.now();
+
+	// Reject future timestamps. Sets logged "tomorrow" can't represent a
+	// workout that hasn't happened yet, and they'd corrupt the heatmap.
+	if (ts > Date.now() + 60_000) badRequest('ts must not be in the future');
 
 	let weight: number | null = null;
 	let reps: number | null = null;
@@ -599,6 +656,32 @@ async function setCreate(
 			await tx.select().from(setTable).where(eq(setTable.id, payload.id)).limit(1)
 		)[0];
 		if (!row) notFound(`set ${payload.id} not found after insert`);
+
+		// Backdated sessions stay closed; pin endedAt to the latest set ts
+		// so History/Stats see a coherent (startedAt..endedAt) range no
+		// matter what order sets arrive in.
+		if (session.isBackdated) {
+			const latest = (
+				await tx
+					.select({ ts: setTable.ts })
+					.from(setTable)
+					.where(
+						and(
+							eq(setTable.workoutSessionId, session.sessionId),
+							isNull(setTable.deletedAt)
+						)
+					)
+					.orderBy(desc(setTable.ts))
+					.limit(1)
+			)[0] as { ts: Date } | undefined;
+			if (latest) {
+				await tx
+					.update(workoutSession)
+					.set({ endedAt: latest.ts, updatedAt: new Date() })
+					.where(eq(workoutSession.id, session.sessionId));
+			}
+		}
+
 		return { session, row };
 	});
 
