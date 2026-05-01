@@ -246,6 +246,14 @@
 		}
 	}
 
+	async function handleEdit(setId: string, weightVal: number, repsVal: number) {
+		try {
+			await mutate('set.update', { id: setId, weight: weightVal, reps: repsVal });
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Could not update set.';
+		}
+	}
+
 	function fmtRest(s: number): string {
 		const m = Math.floor(s / 60);
 		const r = s % 60;
@@ -266,7 +274,13 @@
 	const buttonLabel = $derived.by(() => {
 		if (justSaved) return 'Logged';
 		if (isCardio) {
-			return `Log · ${fmtNum(duration)} min`;
+			const parts = [`${fmtNum(duration)} min`];
+			for (const f of cardioFields) {
+				if (f.id in cardioExtras) {
+					parts.push(`${fmtFieldValue(f.id, cardioExtras[f.id])}${f.unit ? ' ' + f.unit : ''}`);
+				}
+			}
+			return `Log · ${parts.join(' · ')}`;
 		}
 		if (allDone) return `Extra set · ${fmtNum(weight)} kg × ${reps}`;
 		return `Log set ${setsDone + 1} of ${Math.max(targetSets, 1)} · ${fmtNum(weight)} kg × ${reps}`;
@@ -325,10 +339,9 @@
 			style="background: var(--color-surface); border-color: var(--color-line-2); color: var(--color-text-dim);"
 			aria-label="Equipment detail"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-				<circle cx="5" cy="12" r="1.7"/>
-				<circle cx="12" cy="12" r="1.7"/>
-				<circle cx="19" cy="12" r="1.7"/>
+			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="M3 17l5-5 4 4 8-9" />
+				<path d="M14 7h7v7" />
 			</svg>
 		</a>
 	</header>
@@ -354,8 +367,10 @@
 					{(() => {
 						const s = ctx.sparklineSeries;
 						const delta = s[s.length - 1] - s[0];
-						const sign = delta > 0 ? '+' : '';
-						return `${sign}${fmtNum(delta)} ${isCardio ? 'min' : 'kg'}`;
+						const unit = isCardio ? 'min' : 'kg';
+						if (delta === 0) return `flat ${unit}`;
+						const arrow = delta > 0 ? '▲' : '▼';
+						return `${arrow} ${fmtNum(Math.abs(delta))} ${unit}`;
 					})()}
 				</span>
 			</div>
@@ -688,6 +703,7 @@
 							pending={s.pending}
 							onClone={() => handleClone(s)}
 							onDelete={() => handleDelete(s.id)}
+							onEdit={(w, r) => handleEdit(s.id, w, r)}
 						/>
 					{/if}
 				{/each}
@@ -696,7 +712,9 @@
 				class="text-center text-[11px]"
 				style="color: var(--color-text-dim-2);"
 			>
-				{isCardio ? '← swipe to delete' : '← swipe to delete · swipe right to clone →'}
+				{isCardio
+					? '← swipe to delete'
+					: 'tap a set to edit · swipe ← to delete · swipe → to clone'}
 			</div>
 		</section>
 	{/if}

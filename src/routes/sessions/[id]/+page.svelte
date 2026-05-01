@@ -143,8 +143,8 @@
 	}
 
 	function formatVol(kg: number): string {
-		if (kg >= 1000) return `${(kg / 1000).toFixed(1)} t`;
-		return `${kg} kg`;
+		const rounded = Math.round(kg);
+		return `${rounded.toLocaleString('en-US').replace(/,/g, ' ')} kg`;
 	}
 
 	function timeOnly(ms: number): string {
@@ -323,7 +323,7 @@
 								</div>
 							{:else}
 								<div class="flex flex-1 items-baseline gap-2 text-[13px]" style="color: var(--color-text);">
-									{#if set.exerciseName !== block.equipment.name}
+									{#if !set.exerciseIsHidden && set.exerciseName !== block.equipment.name}
 										<span class="text-[10px]" style="color: var(--color-text-dim);">
 											{set.exerciseName}
 										</span>

@@ -177,7 +177,7 @@
 					lastReps={tile.lastReps}
 					lastDurationMin={tile.lastDurationMin}
 					daysSince={tile.daysSince}
-					href={withDateMode(`/equipment/${tile.equipment.id}`, asOfTs)}
+					href={withDateMode(`/log/${tile.equipment.id}`, asOfTs)}
 				/>
 			{/each}
 		</section>
@@ -197,7 +197,7 @@
 
 {#if asOfTs != null}
 	<BackdatedSessionPreview {asOfTs} session={data.backdatedSession} />
-{:else if data.activeSession}
+{:else if data.activeSession && data.activeSession.setCount > 0}
 	<SessionBar
 		id={data.activeSession.id}
 		startedAt={data.activeSession.startedAt}

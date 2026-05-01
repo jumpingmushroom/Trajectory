@@ -98,4 +98,10 @@
 			</svg>
 		</button>
 	</div>
+	<div
+		class="px-1 text-[10px]"
+		style="color: var(--color-text-dim-2);"
+	>
+		Tap +/− to nudge by {fmt(step)} {unit} · hold to scroll fast
+	</div>
 </div>

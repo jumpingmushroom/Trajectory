@@ -28,6 +28,13 @@
 
 	let gymFilter = $state<'all' | string>('all');
 
+	// Only chip-list gyms where this user has actually trained — otherwise
+	// every shared/test gym ever seeded shows up forever.
+	const visibleGyms = $derived.by(() => {
+		const seen = new Set(data.sessions.map((s) => s.gymId));
+		return data.gyms.filter((g) => seen.has(g.id));
+	});
+
 	const filteredSessions = $derived(
 		gymFilter === 'all' ? data.sessions : data.sessions.filter((s) => s.gymId === gymFilter)
 	);
@@ -131,7 +138,7 @@
 		primary: string;
 		secondary: string;
 	} {
-		if (s.dayOffset === 0) return { primary: 'Now', secondary: 'today' };
+		if (s.dayOffset === 0) return { primary: 'Today', secondary: '' };
 		if (s.dayOffset === 1) return { primary: '1d', secondary: 'ago' };
 		if (s.dayOffset < 14) return { primary: `${s.dayOffset}d`, secondary: 'ago' };
 		const weeks = Math.round(s.dayOffset / 7);
@@ -140,14 +147,22 @@
 
 	function summarize(machineNames: string[]): string {
 		if (machineNames.length === 0) return 'Empty session';
-		const heads = machineNames.slice(0, 4).map((n) => n.split(' ')[0]);
-		if (machineNames.length > 4) heads.push(`+${machineNames.length - 4}`);
+		// Use the first 2 full equipment names. First word alone (e.g.
+		// "Power" from "Power Rack #2") is too ambiguous when several
+		// machines share a prefix.
+		const heads = machineNames.slice(0, 2);
+		if (machineNames.length > 2) {
+			return `${heads.join(' · ')} +${machineNames.length - 2}`;
+		}
 		return heads.join(' · ');
 	}
 
 	function formatVol(kg: number): string {
-		if (kg >= 1000) return `${(kg / 1000).toFixed(1)} t`;
-		return `${kg} kg`;
+		const rounded = Math.round(kg);
+		// Use a thin space as the thousands separator so the unit stays
+		// consistent across the list — switching to t for 1000+ kg makes
+		// rows incomparable at a glance.
+		return `${rounded.toLocaleString('en-US').replace(/,/g, ' ')} kg`;
 	}
 </script>
 
@@ -190,7 +205,7 @@
 			>
 				All gyms
 			</button>
-			{#each data.gyms as g (g.id)}
+			{#each visibleGyms as g (g.id)}
 				<button
 					type="button"
 					class="flex-shrink-0 rounded-full border px-3 py-1.5 text-[12px] font-medium"
@@ -329,15 +344,20 @@
 							class="flex h-11 w-11 flex-shrink-0 flex-col items-center justify-center rounded-xl border tabular-nums"
 							style="background: var(--color-surface-2); border-color: var(--color-line-2);"
 						>
-							<span class="text-[15px] font-bold leading-none" style="color: var(--color-text);">
+							<span
+								class="font-bold leading-none {badge.secondary === '' ? 'text-[12px]' : 'text-[15px]'}"
+								style="color: var(--color-text);"
+							>
 								{badge.primary}
 							</span>
-							<span
-								class="mt-0.5 text-[9px]"
-								style="color: var(--color-text-dim-2);"
-							>
-								{badge.secondary}
-							</span>
+							{#if badge.secondary}
+								<span
+									class="mt-0.5 text-[9px]"
+									style="color: var(--color-text-dim-2);"
+								>
+									{badge.secondary}
+								</span>
+							{/if}
 						</div>
 						<div class="flex flex-1 flex-col">
 							<div

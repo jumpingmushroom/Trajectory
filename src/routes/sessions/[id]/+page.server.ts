@@ -9,7 +9,6 @@ import {
 	workoutSession,
 	type Equipment
 } from '$lib/server/db/schema';
-import { isUlid } from '$lib/server/ulid';
 import { isNull, eq, and, asc } from 'drizzle-orm';
 
 export interface SessionDetailEquipmentBlock {
@@ -17,6 +16,7 @@ export interface SessionDetailEquipmentBlock {
 	sets: Array<{
 		id: string;
 		exerciseName: string;
+		exerciseIsHidden: boolean;
 		weight: number | null;
 		reps: number | null;
 		durationMin: number | null;
@@ -30,7 +30,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const load: PageServerLoad = async ({ locals, params }) => {
 	if (!locals.user) throw redirect(303, '/login');
 	const id = params.id;
-	if (!id || !isUlid(id)) throw error(404, 'not found');
+	if (!id) throw error(404, 'session not found');
 
 	const session = (
 		await db
@@ -55,6 +55,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			ts: setTable.ts,
 			exerciseId: exercise.id,
 			exerciseName: exercise.name,
+			exerciseIsHidden: exercise.isHidden,
 			equipmentId: equipment.id,
 			equipmentName: equipment.name,
 			equipmentType: equipment.type,
@@ -75,6 +76,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		ts: Date;
 		exerciseId: string;
 		exerciseName: string;
+		exerciseIsHidden: boolean;
 		equipmentId: string;
 		equipmentName: string;
 		equipmentType: string;
@@ -104,6 +106,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		blocks.get(s.equipmentId)!.sets.push({
 			id: s.id,
 			exerciseName: s.exerciseName,
+			exerciseIsHidden: s.exerciseIsHidden,
 			weight: s.weight,
 			reps: s.reps,
 			durationMin: s.durationMin,

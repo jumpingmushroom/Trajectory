@@ -7,7 +7,6 @@ import {
 	set as setTable,
 	workoutSession
 } from '$lib/server/db/schema';
-import { isUlid } from '$lib/server/ulid';
 import { isNull, eq, and, asc, desc, inArray, gte, lt } from 'drizzle-orm';
 import { parseAsOfTs, startOfUtcDay, endOfUtcDay } from '$lib/dateMode';
 
@@ -25,7 +24,7 @@ export interface ExerciseContext {
 export const load: PageServerLoad = async ({ locals, params, url }) => {
 	if (!locals.user) throw redirect(303, '/login');
 	const id = params.id;
-	if (!id || !isUlid(id)) throw error(404, 'not found');
+	if (!id) throw error(404, 'equipment not found');
 
 	const asOfTs = parseAsOfTs(url.searchParams);
 

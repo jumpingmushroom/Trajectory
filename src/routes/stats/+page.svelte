@@ -188,8 +188,18 @@
 			No top-set data yet. Log a few sets and your progression appears here.
 		</div>
 	{:else}
+		{@const strengthCards = data.machineCards.filter((m) => m.type !== 'cardio')}
+		{@const cardioCards = data.machineCards.filter((m) => m.type === 'cardio')}
+		{#if strengthCards.length > 0 && cardioCards.length > 0}
+			<div
+				class="mb-2 px-1 text-[10px] font-bold uppercase tracking-[0.14em]"
+				style="color: var(--color-text-dim-2);"
+			>
+				Strength
+			</div>
+		{/if}
 		<ul class="flex flex-col gap-2">
-			{#each data.machineCards as m (m.equipmentId)}
+			{#each strengthCards as m (m.equipmentId)}
 				{@const hasComparison = m.series.length > 1}
 				<li>
 					<a
@@ -241,6 +251,67 @@
 				</li>
 			{/each}
 		</ul>
+		{#if cardioCards.length > 0}
+			<div
+				class="mb-2 mt-4 px-1 text-[10px] font-bold uppercase tracking-[0.14em]"
+				style="color: var(--color-text-dim-2);"
+			>
+				Cardio
+			</div>
+			<ul class="flex flex-col gap-2">
+				{#each cardioCards as m (m.equipmentId)}
+					{@const hasComparison = m.series.length > 1}
+					<li>
+						<a
+							href={`/equipment/${m.equipmentId}`}
+							class="flex items-center gap-3 rounded-xl border px-3 py-3"
+							style="background: var(--color-surface); border-color: var(--color-line);"
+						>
+							<div
+								class="h-12 w-12 flex-shrink-0 rounded-xl border p-2"
+								style="background: linear-gradient(135deg, {m.tint}, var(--color-bg)); border-color: var(--color-line-2);"
+							>
+								<EquipmentGlyph kind={m.glyph as GlyphKind} />
+							</div>
+							<div class="flex flex-1 flex-col gap-1 overflow-hidden">
+								<div class="flex items-baseline justify-between gap-3">
+									<span
+										class="truncate text-[13px] font-semibold tracking-[-0.01em]"
+										style="color: var(--color-text);"
+									>
+										{m.name}
+									</span>
+									{#if hasComparison}
+										<span
+											class="text-[12px] font-bold tabular-nums"
+											style="color: {m.delta > 0
+												? 'var(--color-amber)'
+												: m.delta < 0
+													? '#ff8080'
+													: 'var(--color-text-dim-2)'};"
+										>
+											{m.delta > 0 ? '+' : ''}{fmtNum(m.delta)}
+											{m.unit}
+										</span>
+									{:else}
+										<span
+											class="text-[12px] font-bold tabular-nums"
+											style="color: var(--color-text-dim-2);"
+										>
+											{fmtNum(m.lastValue)}
+											{m.unit}
+										</span>
+									{/if}
+								</div>
+								<div class="h-[28px]">
+									<Sparkline data={m.series} width={260} height={28} />
+								</div>
+							</div>
+						</a>
+					</li>
+				{/each}
+			</ul>
+		{/if}
 	{/if}
 
 	<a
@@ -258,7 +329,7 @@
 		class="mt-2 text-center text-[11px] underline-offset-2 hover:underline"
 		style="color: var(--color-text-dim-2);"
 	>
-		Export everyone's data as CSV
+		Or export the whole household (all users · for backup)
 	</a>
 	<div class="mt-2 text-center text-[10px]" style="color: var(--color-text-dim-2);">
 		Your data is portable. Always.

@@ -74,6 +74,10 @@
 		return ago;
 	}
 
+	function capitalizeWord(s: string): string {
+		return s.length ? s[0].toUpperCase() + s.slice(1) : s;
+	}
+
 	const metaTiles = $derived([
 		{
 			label: isCardio ? 'Last' : 'PR',
@@ -88,7 +92,9 @@
 		{ label: 'Sessions', value: String(data.sessionsCount) },
 		{
 			label: isCardio ? 'Type' : 'Sets',
-			value: isCardio ? (eq.cardioKind ?? 'Cardio') : String(data.setsCount)
+			value: isCardio
+				? capitalizeWord(eq.cardioKind ?? 'Cardio')
+				: String(data.setsCount)
 		}
 	]);
 </script>
@@ -145,8 +151,10 @@
 				<span class="text-[10px] tabular-nums" style="color: var(--color-text-dim);">
 					{(() => {
 						const delta = data.series[data.series.length - 1] - data.series[0];
-						const sign = delta > 0 ? '+' : '';
-						return `${sign}${fmtNum(delta)} ${isCardio ? 'min' : 'kg'}`;
+						const unit = isCardio ? 'min' : 'kg';
+						if (delta === 0) return `flat ${unit}`;
+						const arrow = delta > 0 ? '▲' : '▼';
+						return `${arrow} ${fmtNum(Math.abs(delta))} ${unit}`;
 					})()}
 				</span>
 			</div>
@@ -185,7 +193,7 @@
 					{t.label}
 				</div>
 				<div
-					class="text-[18px] font-bold tabular-nums tracking-[-0.01em] capitalize"
+					class="text-[18px] font-bold tabular-nums tracking-[-0.01em]"
 					style="color: var(--color-text);"
 				>
 					{t.value}

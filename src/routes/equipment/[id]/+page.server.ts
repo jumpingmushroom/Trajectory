@@ -6,13 +6,12 @@ import {
 	exercise,
 	set as setTable
 } from '$lib/server/db/schema';
-import { isUlid } from '$lib/server/ulid';
 import { isNull, eq, and, asc, inArray } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals, params }) => {
 	if (!locals.user) throw redirect(303, '/login');
 	const id = params.id;
-	if (!id || !isUlid(id)) throw error(404, 'not found');
+	if (!id) throw error(404, 'equipment not found');
 
 	const eqRow = (
 		await db

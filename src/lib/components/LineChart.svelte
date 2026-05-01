@@ -26,8 +26,29 @@
 		const padBottom = 16;
 		const innerW = width - padLeft - padRight;
 		const innerH = height - padTop - padBottom;
-		const min = Math.min(...data);
-		const max = Math.max(...data);
+		const rawMin = Math.min(...data);
+		const rawMax = Math.max(...data);
+		// When the data is flat (or nearly flat), auto-fitting produces a
+		// chart full of meaningless 0.x decimals. Expand the y-range so the
+		// line sits in the middle of a sensible window.
+		const rawSpan = rawMax - rawMin;
+		const refMag = Math.max(Math.abs(rawMax), Math.abs(rawMin), 1);
+		const minSpan = Math.max(refMag * 0.1, unit === 'kg' ? 5 : 2);
+		let min = rawMin;
+		let max = rawMax;
+		if (rawSpan < minSpan) {
+			const center = (rawMin + rawMax) / 2;
+			const half = minSpan / 2;
+			min = center - half;
+			max = center + half;
+			// Snap bounds outward to whole-step values so ySteps gridlines
+			// land on integers (or sensible 0.5 increments) instead of
+			// 78.75 / 81.25 noise.
+			const stepGuess = (max - min) / ySteps;
+			const niceStep = stepGuess >= 1 ? Math.ceil(stepGuess) : 0.5;
+			min = Math.floor(min / niceStep) * niceStep;
+			max = min + niceStep * ySteps;
+		}
 		const span = max - min || 1;
 		const stepX = data.length > 1 ? innerW / (data.length - 1) : 0;
 		const points = data.map((v, i) => ({
@@ -51,7 +72,7 @@
 	function roundLabel(v: number): string {
 		if (Math.abs(v) >= 100) return v.toFixed(0);
 		if (Math.abs(v) >= 10) return v.toFixed(1).replace(/\.0$/, '');
-		return v.toFixed(1);
+		return v.toFixed(1).replace(/\.0$/, '');
 	}
 </script>
 

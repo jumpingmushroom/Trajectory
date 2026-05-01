@@ -280,6 +280,19 @@
 										{eq.type} · {eq.group}{eq.cardioKind ? ` · ${eq.cardioKind}` : ''}
 									</div>
 								</div>
+								<button
+									type="button"
+									class="rounded-full p-1.5"
+									style="color: var(--color-text-dim);"
+									onclick={() => (editingEq = eq)}
+									aria-label="Edit equipment photo, glyph, and tint"
+									title="Edit photo & glyph"
+								>
+									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+										<path d="M12 20h9" />
+										<path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
+									</svg>
+								</button>
 								{#if freeWeightLike(eq.type)}
 									<button
 										type="button"
@@ -287,9 +300,15 @@
 										style="color: var(--color-text-dim);"
 										onclick={() => (managingExercisesFor = eq)}
 										aria-label="Manage exercises"
+										title="Manage exercises"
 									>
 										<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-											<path d="M9 6l6 6-6 6"/>
+											<line x1="8" y1="6" x2="21" y2="6" />
+											<line x1="8" y1="12" x2="21" y2="12" />
+											<line x1="8" y1="18" x2="21" y2="18" />
+											<line x1="3" y1="6" x2="3.01" y2="6" />
+											<line x1="3" y1="12" x2="3.01" y2="12" />
+											<line x1="3" y1="18" x2="3.01" y2="18" />
 										</svg>
 									</button>
 								{/if}
@@ -299,6 +318,7 @@
 									style="color: var(--color-text-dim);"
 									onclick={() => (pendingEqDelete = eq)}
 									aria-label="Delete equipment"
+									title="Delete equipment"
 								>
 									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
 										<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13M9 7V4h6v3"/>
@@ -316,16 +336,19 @@
 							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
 								<path d="M12 5v14M5 12h14"/>
 							</svg>
-							Add equipment to {g.name.split(' ')[0]}
+							Add equipment to {g.name}
 						</button>
 
 						{#if data.gyms.length > 1}
 							<button
 								type="button"
-								class="text-left text-[11px]"
-								style="color: var(--color-text-dim-2);"
+								class="mt-1 inline-flex items-center justify-center gap-2 self-start rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em]"
+								style="border-color: rgba(255,128,128,0.3); color: #ff8080;"
 								onclick={() => (pendingGymDelete = g)}
 							>
+								<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+									<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13M9 7V4h6v3"/>
+								</svg>
 								Remove this gym
 							</button>
 						{/if}

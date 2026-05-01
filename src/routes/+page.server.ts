@@ -45,6 +45,19 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 
 	const activeGym = (await resolveActiveGym(cookies)) ?? gyms[0];
 
+	// Gyms this user has ever trained at (plus the active gym). Hides
+	// smoke-seeded test gyms from other users, while still letting users
+	// pick a fresh travel gym they're newly active in.
+	const userGymIds = new Set(
+		(
+			await db
+				.selectDistinct({ gymId: workoutSession.gymId })
+				.from(workoutSession)
+				.where(eq(workoutSession.userId, locals.user.id))
+		).map((row) => row.gymId)
+	);
+	const switcherGyms = gyms.filter((g) => userGymIds.has(g.id) || g.id === activeGym.id);
+
 	const equipments = await db
 		.select()
 		.from(equipment)
@@ -222,7 +235,7 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 	return {
 		userName: locals.user.name,
 		userId: locals.user.id,
-		gyms: gyms as Gym[],
+		gyms: switcherGyms as Gym[],
 		activeGym,
 		tiles,
 		activeSession,
