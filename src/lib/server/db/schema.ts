@@ -1,5 +1,13 @@
 import { sql } from 'drizzle-orm';
-import { sqliteTable, text, integer, real, index, primaryKey } from 'drizzle-orm/sqlite-core';
+import {
+	sqliteTable,
+	text,
+	integer,
+	real,
+	index,
+	uniqueIndex,
+	primaryKey
+} from 'drizzle-orm/sqlite-core';
 
 // ─── Better Auth tables ────────────────────────────────────────────────
 // Canonical Better Auth schema for SQLite + Drizzle, plus our additional
@@ -262,6 +270,41 @@ export const set = sqliteTable(
 	]
 );
 
+// achievement: per-user badge unlocks. Awards are appended once when a
+// definition's predicate first matches; the unique (user_id, badge_key)
+// + ON CONFLICT DO NOTHING in the evaluator keeps replays idempotent.
+// `seenAt` drives the modal queue — null rows pop a celebration on the
+// next page load and are acknowledged via /api/achievement/[id]/seen.
+// Source FKs are nullable + ON DELETE SET NULL: soft-deleting the set or
+// session that triggered an award doesn't retroactively un-unlock it.
+export const achievement = sqliteTable(
+	'achievement',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		badgeKey: text('badge_key').notNull(),
+		unlockedAt: integer('unlocked_at', { mode: 'timestamp_ms' }).notNull(),
+		seenAt: integer('seen_at', { mode: 'timestamp_ms' }),
+		sourceSetId: text('source_set_id').references(() => set.id, { onDelete: 'set null' }),
+		sourceSessionId: text('source_session_id').references(() => workoutSession.id, {
+			onDelete: 'set null'
+		}),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull(),
+		updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.$onUpdate(() => new Date())
+			.notNull()
+	},
+	(table) => [
+		uniqueIndex('achievement_user_badge_unq').on(table.userId, table.badgeKey),
+		index('achievement_user_seen_idx').on(table.userId, table.seenAt)
+	]
+);
+
 // mutation_log: idempotency table for the offline-first sync layer (M10).
 // Composite PK on (clientId, mutationId) means a replayed POST from a
 // reconnecting client is a no-op rather than a duplicate write. Already
@@ -298,3 +341,5 @@ export type Set = typeof set.$inferSelect;
 export type NewSet = typeof set.$inferInsert;
 export type MutationLog = typeof mutationLog.$inferSelect;
 export type NewMutationLog = typeof mutationLog.$inferInsert;
+export type Achievement = typeof achievement.$inferSelect;
+export type NewAchievement = typeof achievement.$inferInsert;
