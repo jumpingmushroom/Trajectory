@@ -36,6 +36,20 @@
       "when": 1777659580818,
       "tag": "0004_acoustic_victor_mancha",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1777662396635,
+      "tag": "0005_multiuser",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1777663800000,
+      "tag": "0006_fix_gym_user_cascade",
+      "breakpoints": true
     }
   ]
 }

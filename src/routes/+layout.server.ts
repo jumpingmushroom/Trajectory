@@ -10,12 +10,12 @@ import { and, eq, isNull, asc } from 'drizzle-orm';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
 	if (!locals.user) {
-		return { achievementQueue: [] };
+		return { achievementQueue: [], isAdmin: false };
 	}
 	const rows = await db
 		.select({ id: achievement.id, badgeKey: achievement.badgeKey })
 		.from(achievement)
 		.where(and(eq(achievement.userId, locals.user.id), isNull(achievement.seenAt)))
 		.orderBy(asc(achievement.unlockedAt));
-	return { achievementQueue: rows };
+	return { achievementQueue: rows, isAdmin: locals.user.role === 'admin' };
 };

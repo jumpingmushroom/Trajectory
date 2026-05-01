@@ -1,11 +1,9 @@
-// GET /api/export.csv?scope=user|all
+// GET /api/export.csv
 // Streams a flat per-set CSV with joined gym + equipment + exercise +
 // user names so the export opens cleanly in any spreadsheet without
-// needing the relational context. scope=user (default) restricts to
-// the requesting user's rows; scope=all dumps everything (per
-// BRAINSTORM Q1 — equipment is shared, sessions/sets are per-user, and
-// the CSV button under "your data is portable" should genuinely export
-// everything if asked).
+// needing the relational context. Always scoped to the calling user's
+// own rows under v0.2 multiuser tenancy (the prior `scope=all` mode is
+// no longer accepted; one user's data is opaque to another).
 
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
@@ -72,16 +70,16 @@ function sanitizeFilename(name: string): string {
 	return name.replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 40) || 'user';
 }
 
-export const GET: RequestHandler = async ({ url, locals }) => {
+export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) throw error(401, 'unauthenticated');
-	const scope = url.searchParams.get('scope') === 'all' ? 'all' : 'user';
 
 	const baseFilter = and(
 		isNull(setTable.deletedAt),
 		isNull(exercise.deletedAt),
 		isNull(equipment.deletedAt),
 		isNull(gym.deletedAt),
-		scope === 'all' ? undefined : eq(setTable.userId, locals.user.id)
+		eq(setTable.userId, locals.user.id),
+		eq(gym.userId, locals.user.id)
 	);
 
 	const rows = (await db
@@ -181,10 +179,7 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 
 	const body = lines.join('\r\n') + '\r\n';
 	const dateStamp = new Date().toISOString().slice(0, 10);
-	const filename =
-		scope === 'all'
-			? `trajectory-export-all-${dateStamp}.csv`
-			: `trajectory-export-${sanitizeFilename(locals.user.name)}-${dateStamp}.csv`;
+	const filename = `trajectory-export-${sanitizeFilename(locals.user.name)}-${dateStamp}.csv`;
 
 	return new Response(body, {
 		status: 200,

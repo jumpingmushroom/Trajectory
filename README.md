@@ -1,12 +1,12 @@
 # Trajectory
 
-Self-hosted, equipment-first workout tracker for two people.
+Self-hosted, equipment-first workout tracker.
 
-**Status:** v0.1.0 (shipped). All twelve milestones from `ROADMAP.md` are done. Open `CLAUDE.md` for the project context every future session reads first.
+**Status:** v0.2 multiuser (in development). v0.1 shipped per `ROADMAP.md`; v0.2 converts the two-user-shared-gym model into a public multi-user instance with admin-issued accounts. Open `CLAUDE.md` for the project context every future session reads first.
 
 ## What it is
 
-A web app where the user's specific gym and its specific machines are the primary objects, not a generic exercise library. You walk up to "the cable row near the mirror," tap it, log a set. Two users (Johnny + Alina) on one shared gym (multi-gym supported in schema and UI for travel). Self-hosted on a public HTTPS domain. PWA-installable on iOS + Android. Offline-first writes via IndexedDB queue.
+A web app where each user's specific gym and its specific machines are the primary objects, not a generic exercise library. You walk up to "the cable row near the mirror," tap it, log a set. Per-user tenancy: each account owns its own gyms, equipment, sessions, and sets. Self-hosted on a public HTTPS domain. PWA-installable on iOS + Android. Offline-first writes via IndexedDB queue.
 
 ## Quickstart (development)
 
@@ -19,27 +19,41 @@ That's the entire dev workflow. The container handles `pnpm install`, runs Vite 
 
 The only supported way to run Trajectory locally is inside the container — there is no `pnpm dev` workflow on the host.
 
-Default seed users (overridable in `.env`):
+## Accounts
 
-```
-johnny / changeme
-alina  / changeme
-```
-
-Both are forced to change their password on first sign-in.
+v0.2 instances are admin-issued: there is no public sign-up. On first boot
+of an empty database, Trajectory seeds a single admin from
+`ADMIN_EMAIL` / `ADMIN_PASSWORD`. After signing in, the admin invites users
+from `/admin/users`; recipients receive an email link that lets them set
+their own password. Self-service password reset (`/login/reset`) is
+available to anyone with a valid account.
 
 ## Environment
 
-Copy `.env.example` to `.env` before booting. Trajectory boots fine without any env vars (defaults are dev-friendly), but in production you must set:
+Copy `.env.example` to `.env` before booting. Trajectory boots fine in
+development without any env vars (the mailer falls back to logging
+"would-send" messages to stdout); in production you must set:
 
 ```
 NODE_ENV=production
 PUBLIC_BASE_URL=https://your-trajectory-domain
 BETTER_AUTH_SECRET=<random 32+ char string>
-SEED_USERS=johnny:strongpassword,alina:strongpassword
+
+ADMIN_EMAIL=<admin email>            # only consumed when user table is empty
+ADMIN_PASSWORD=<initial password>    # admin should change this from /profile
+
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=...
+SMTP_PASS=...
+SMTP_FROM="Trajectory <noreply@your-domain>"
+SMTP_SECURE=false                    # true for port 465
 ```
 
-`SEED_USERS` is consumed only when the user table is empty — once seeded, changes to the env var have no effect.
+`ADMIN_EMAIL` / `ADMIN_PASSWORD` are consumed only when the user table is
+empty — once seeded, changes to those vars have no effect. SMTP is required
+in production; missing config throws on boot rather than silently disabling
+invites or password reset.
 
 ## Production deployment
 
@@ -71,7 +85,7 @@ Override the defaults via env vars: `TRAJECTORY_CONTAINER` (default `trajectory`
 
 This script writes snapshots **inside the same `data/` volume** — it protects against in-app data corruption (bad migration, bad write) but NOT against host disk loss. For off-host protection, schedule restic / borg / rsync of the whole `data/` directory separately. That covers `db.sqlite`, the snapshots under `data/backups/`, and equipment photos under `data/uploads/`.
 
-You can also export everything as CSV from inside the app: Stats screen → "Export everyone's data as CSV". Useful for portability + spreadsheet analysis; not a substitute for binary backups (the CSV doesn't include equipment photos or DB-internal state like the mutation_log).
+You can also export your own data as CSV from inside the app: Stats screen → "Export my data as CSV". Useful for portability + spreadsheet analysis; not a substitute for binary backups (the CSV doesn't include equipment photos or DB-internal state like the mutation_log). Under v0.2 multiuser, the export is always scoped to the calling user; cross-account export is intentionally not supported.
 
 ## Smoke test
 
@@ -81,7 +95,7 @@ A node-fetch smoke test runs the full server-side contract against the dev conta
 pnpm test:smoke
 ```
 
-Hits the running app at http://localhost:5173 (default — override with `TRAJECTORY_URL=...`). Signs in as the seeded user (`SMOKE_USER=…`, `SMOKE_PASS=…`, defaults `johnny`/whatever fresh password got set), then exercises gym.create → equipment.create → set.create×3 → /api/export.csv and asserts that the CSV contains the new rows.
+Hits the running app at http://localhost:5173 (default — override with `TRAJECTORY_URL=...`). Signs in as the seeded admin (`SMOKE_USER=$ADMIN_EMAIL`, `SMOKE_PASS=$ADMIN_PASSWORD`), then exercises gym.create → equipment.create → set.create×3 → /api/export.csv and asserts that the CSV contains the new rows.
 
 The test is deliberately small and contract-focused — no Playwright, no UI assertions. It's the safety net that catches "I broke `/api/mutate` while refactoring." UI testing belongs in v0.2 if it earns the lift.
 

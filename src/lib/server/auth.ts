@@ -1,10 +1,13 @@
-// Better Auth server config — email/password only, no social providers,
-// custom `mustChangePassword` field on user, Drizzle/SQLite adapter.
+// Better Auth server config — email/password + admin plugin + reset-password
+// email hook. v0.2 multiuser: no public sign-up surface (admins create users
+// via the invite flow), reset-password is self-service via email.
 
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { admin } from 'better-auth/plugins';
 import { db } from './db/index';
 import { user, session, account, verification } from './db/schema';
+import { sendResetPasswordEmail } from './mailer';
 
 // Secret resolution is intentionally non-throwing here so SvelteKit's
 // build-time analyse step (which imports server modules with
@@ -28,16 +31,17 @@ export const auth = betterAuth({
 	emailAndPassword: {
 		enabled: true,
 		autoSignIn: false,
-		minPasswordLength: 6
-	},
-	user: {
-		additionalFields: {
-			mustChangePassword: {
-				type: 'boolean',
-				required: false,
-				defaultValue: false,
-				input: false
-			}
+		// Public sign-up is closed under v0.2 multiuser; admins create users
+		// via the invite flow. We DON'T set `disableSignUp: true` here because
+		// it also blocks the server-side `auth.api.signUpEmail` call we use
+		// during admin seed and invite creation. Instead, `hooks.server.ts`
+		// blocks the public POST /api/auth/sign-up/email route.
+		minPasswordLength: 6,
+		// Self-service password reset: BA fires this when /request-password-reset
+		// is POSTed with a known email. The `url` argument already includes the
+		// reset token as a query parameter, pointing at the redirectTo we send.
+		sendResetPassword: async ({ user, url }) => {
+			await sendResetPasswordEmail({ to: user.email, url });
 		}
 	},
 	session: {
@@ -46,7 +50,14 @@ export const auth = betterAuth({
 	},
 	advanced: {
 		cookiePrefix: 'trajectory'
-	}
+	},
+	plugins: [
+		// Admin plugin: adds role/banned/banReason/banExpires to user, plus
+		// /admin/* server endpoints (createUser, listUsers, removeUser, …).
+		// We only surface a subset in the UI (list, invite, remove); the rest
+		// are available for future scope without additional plumbing.
+		admin()
+	]
 });
 
 export type Session = typeof auth.$Infer.Session;

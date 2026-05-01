@@ -10,9 +10,10 @@ import {
 } from 'drizzle-orm/sqlite-core';
 
 // ─── Better Auth tables ────────────────────────────────────────────────
-// Canonical Better Auth schema for SQLite + Drizzle, plus our additional
-// `mustChangePassword` column on `user` (registered via additionalFields
-// in the Better Auth config — the two must stay in sync).
+// Canonical Better Auth schema for SQLite + Drizzle. The admin plugin
+// (configured in src/lib/server/auth.ts) is the source of truth for the
+// `role`, `banned`, `banReason`, `banExpires` columns on `user` and the
+// `impersonatedBy` column on `session`. Keep schema + plugin in sync.
 
 export const user = sqliteTable('user', {
 	id: text('id').primaryKey(),
@@ -20,9 +21,13 @@ export const user = sqliteTable('user', {
 	email: text('email').notNull().unique(),
 	emailVerified: integer('email_verified', { mode: 'boolean' }).default(false).notNull(),
 	image: text('image'),
-	mustChangePassword: integer('must_change_password', { mode: 'boolean' })
-		.default(false)
-		.notNull(),
+	// Better Auth `admin` plugin fields. `role` is 'user' (default) or 'admin'.
+	// banned/banReason/banExpires are reserved for the plugin's ban API; we
+	// don't expose UI for it in v0.2 but the columns must exist for the plugin.
+	role: text('role').default('user').notNull(),
+	banned: integer('banned', { mode: 'boolean' }).default(false).notNull(),
+	banReason: text('ban_reason'),
+	banExpires: integer('ban_expires', { mode: 'timestamp_ms' }),
 	createdAt: integer('created_at', { mode: 'timestamp_ms' })
 		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 		.notNull(),
@@ -48,7 +53,9 @@ export const session = sqliteTable(
 		userAgent: text('user_agent'),
 		userId: text('user_id')
 			.notNull()
-			.references(() => user.id, { onDelete: 'cascade' })
+			.references(() => user.id, { onDelete: 'cascade' }),
+		// Better Auth `admin` plugin: ID of the admin impersonating this session.
+		impersonatedBy: text('impersonated_by')
 	},
 	(table) => [index('session_user_id_idx').on(table.userId)]
 );
@@ -97,6 +104,27 @@ export const verification = sqliteTable(
 	(table) => [index('verification_identifier_idx').on(table.identifier)]
 );
 
+// invite: server-issued single-use tokens for new accounts. Created when an
+// admin invites a user; consumed when the recipient sets their password via
+// /invite/<token>. The user row exists from creation but cannot log in until
+// the invite is consumed (no `account` row with a password yet).
+export const invite = sqliteTable(
+	'invite',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		token: text('token').notNull().unique(),
+		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+		consumedAt: integer('consumed_at', { mode: 'timestamp_ms' }),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [index('invite_user_id_idx').on(table.userId)]
+);
+
 // ─── Trajectory tables ─────────────────────────────────────────────────
 // Equipment-first schema. The workout-session table is named
 // `workout_session` (not `session`) so it never collides with Better
@@ -108,6 +136,12 @@ export const gym = sqliteTable(
 	'gym',
 	{
 		id: text('id').primaryKey(),
+		// userId: gym ownership. Per-user tenancy (v0.2). Equipment + exercise
+		// inherit ownership transitively through this column; reads of any of
+		// those tables MUST scope by `gym.userId = locals.user.id`.
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
 		name: text('name').notNull(),
 		city: text('city'),
 		tint: text('tint').default('#1c2026').notNull(),
@@ -121,7 +155,10 @@ export const gym = sqliteTable(
 			.notNull(),
 		deletedAt: integer('deleted_at', { mode: 'timestamp_ms' })
 	},
-	(table) => [index('gym_deleted_at_idx').on(table.deletedAt)]
+	(table) => [
+		index('gym_user_deleted_idx').on(table.userId, table.deletedAt),
+		index('gym_deleted_at_idx').on(table.deletedAt)
+	]
 );
 
 export const equipment = sqliteTable(
@@ -343,3 +380,5 @@ export type MutationLog = typeof mutationLog.$inferSelect;
 export type NewMutationLog = typeof mutationLog.$inferInsert;
 export type Achievement = typeof achievement.$inferSelect;
 export type NewAchievement = typeof achievement.$inferInsert;
+export type Invite = typeof invite.$inferSelect;
+export type NewInvite = typeof invite.$inferInsert;

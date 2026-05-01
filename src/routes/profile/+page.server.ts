@@ -9,6 +9,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	return {
 		userName: locals.user.name,
 		userEmail: locals.user.email,
+		userImage: locals.user.image ?? null,
+		userRole: locals.user.role ?? 'user',
 		version: pkg.version,
 		buildSha: process.env.TRAJECTORY_BUILD_SHA ?? 'dev'
 	};

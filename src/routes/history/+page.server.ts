@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const gyms = await db
 		.select()
 		.from(gym)
-		.where(isNull(gym.deletedAt))
+		.where(and(eq(gym.userId, locals.user.id), isNull(gym.deletedAt)))
 		.orderBy(asc(gym.createdAt));
 	if (gyms.length === 0) throw redirect(303, '/setup/first-run');
 

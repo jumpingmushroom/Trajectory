@@ -2,7 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import { ulid } from 'ulid';
 import { db } from '$lib/server/db';
 import { gym } from '$lib/server/db/schema';
-import { isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -13,7 +13,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		(await db
 			.select({ n: sql<number>`count(*)` })
 			.from(gym)
-			.where(isNull(gym.deletedAt))) as { n: number }[]
+			.where(and(eq(gym.userId, locals.user.id), isNull(gym.deletedAt)))) as { n: number }[]
 	)[0]?.n;
 	if (existingCount && existingCount > 0) {
 		throw redirect(303, '/');
@@ -37,6 +37,7 @@ export const actions: Actions = {
 		const id = ulid();
 		await db.insert(gym).values({
 			id,
+			userId: locals.user.id,
 			name,
 			city: city || null,
 			tint: '#1c2026',

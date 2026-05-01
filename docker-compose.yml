@@ -20,8 +20,16 @@ services:
       TRAJECTORY_DATA_DIR: /app/data
       TRAJECTORY_DB_FILE: /app/data/db.sqlite
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
-      SEED_USERS: ${SEED_USERS:-johnny:changeme,alina:changeme}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-johnny@trajectory.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-claude-dev-pw}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-only-insecure-secret-please-set-BETTER_AUTH_SECRET-in-prod}
+      # SMTP unset in dev → mailer logs "would-send" to stdout instead of sending.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-Trajectory <noreply@trajectory.local>}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
     volumes:
       # Source tree — edits on host trigger HMR in container.
       - ./src:/app/src

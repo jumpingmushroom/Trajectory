@@ -13,9 +13,9 @@ import type { RequestHandler } from './$types';
 import sharp from 'sharp';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '$lib/server/db';
-import { equipment } from '$lib/server/db/schema';
+import { equipment, gym } from '$lib/server/db/schema';
 import { isUlid } from '$lib/server/ulid';
 
 const DATA_DIR = process.env.TRAJECTORY_DATA_DIR ?? 'data';
@@ -27,8 +27,22 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
 	const { id } = params;
 	if (!id || !isUlid(id)) throw error(400, 'invalid equipment id');
 
+	// Ownership scope: equipment belongs to a gym; the gym belongs to a user.
+	// Reject uploads against another user's equipment with 404 (don't leak
+	// existence) rather than 403.
 	const existing = (
-		await db.select().from(equipment).where(eq(equipment.id, id)).limit(1)
+		await db
+			.select({ id: equipment.id })
+			.from(equipment)
+			.innerJoin(gym, eq(gym.id, equipment.gymId))
+			.where(
+				and(
+					eq(equipment.id, id),
+					eq(gym.userId, locals.user.id),
+					isNull(gym.deletedAt)
+				)
+			)
+			.limit(1)
 	)[0];
 	if (!existing) throw error(404, 'equipment not found');
 
@@ -67,6 +81,22 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 	if (!locals.user) throw error(401, 'unauthenticated');
 	const { id } = params;
 	if (!id || !isUlid(id)) throw error(400, 'invalid equipment id');
+
+	const owned = (
+		await db
+			.select({ id: equipment.id })
+			.from(equipment)
+			.innerJoin(gym, eq(gym.id, equipment.gymId))
+			.where(
+				and(
+					eq(equipment.id, id),
+					eq(gym.userId, locals.user.id),
+					isNull(gym.deletedAt)
+				)
+			)
+			.limit(1)
+	)[0];
+	if (!owned) throw error(404, 'equipment not found');
 
 	await db
 		.update(equipment)

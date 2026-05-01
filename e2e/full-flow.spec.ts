@@ -1,12 +1,16 @@
 // Trajectory full-flow e2e test (M12).
 //
-// Drives the actual UI: signs up a fresh throwaway user via the
-// Better Auth API (mirroring tests/smoke.mjs), then logs in via the
-// /login form, walks the first-run wizard, adds a strength piece of
-// equipment, logs three sets at different weights — across three
-// sessions so the per-session top-set chart has at least two points
-// and the Detail sparkline renders — and finally exports the CSV
-// and parses it for the three set rows.
+// Drives the actual UI: signs in as the seeded admin via the /login form,
+// walks the first-run wizard (or skips it if the admin already has gyms),
+// adds a strength piece of equipment, logs three sets at different
+// weights — across three sessions so the per-session top-set chart has
+// at least two points and the Detail sparkline renders — and finally
+// exports the CSV and parses it for the three set rows.
+//
+// Under v0.2 multiuser, public sign-up is disabled, so the test reuses
+// the seeded admin account (ADMIN_EMAIL / ADMIN_PASSWORD, override via
+// E2E_EMAIL / E2E_PASSWORD). State accumulates across runs; each piece
+// of equipment is timestamp-suffixed to keep selectors unique.
 //
 // Run: `pnpm test:e2e` (assumes `docker compose up` separately, like
 // tests/smoke.mjs does). Override base URL via TRAJECTORY_URL.
@@ -14,9 +18,10 @@
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
 
 const STAMP = Date.now();
-const NAME = `e2e_${STAMP}`;
-const EMAIL = `${NAME}@trajectory.local`;
-const PASSWORD = `e2e-${STAMP}-pw`;
+const EMAIL =
+	process.env.E2E_EMAIL ?? process.env.ADMIN_EMAIL ?? 'admin@trajectory.local';
+const PASSWORD =
+	process.env.E2E_PASSWORD ?? process.env.ADMIN_PASSWORD ?? 'change-me-on-first-login';
 
 // Equipment we'll create in Setup. Strength so the chart series uses
 // weight (per equipment/[id]/+page.server.ts).
@@ -25,42 +30,31 @@ const GYM_NAME = `E2E Gym ${STAMP}`;
 
 const WEIGHTS: number[] = [60, 65, 70];
 
-async function signUpThrowawayUser(request: APIRequestContext, baseURL: string): Promise<void> {
-	// Better Auth's signUp endpoint isn't exposed on the /login form
-	// (sign-in only). Mirror smoke.mjs and seed via the API, then drive
-	// the login form for the rest. We deliberately skip the seed users
-	// johnny/alina — alina is reserved for manual smoke testing.
-	const res = await request.post(`${baseURL}/api/auth/sign-up/email`, {
-		data: { email: EMAIL, password: PASSWORD, name: NAME },
-		headers: { 'content-type': 'application/json' }
-	});
-	if (!res.ok()) {
-		throw new Error(`sign-up failed (${res.status()}): ${await res.text()}`);
-	}
-}
-
 async function logIn(page: Page): Promise<void> {
 	await page.goto('/login');
-	// The login form takes the bare name and composes
-	// {name}@trajectory.local internally — see src/routes/login/+page.svelte.
-	await page.getByLabel('Name').fill(NAME);
+	await page.getByLabel('Email').fill(EMAIL);
 	await page.getByLabel('Password').fill(PASSWORD);
 	await page.getByRole('button', { name: 'Sign in' }).click();
 }
 
-async function createGymViaFirstRun(page: Page): Promise<void> {
-	// New user → /+page.server.ts redirects to /setup/first-run when
-	// the user has no gyms.
-	await page.waitForURL(/\/setup\/first-run\b/);
-	await page.getByLabel('Gym name').fill(GYM_NAME);
-	await page.getByRole('button', { name: 'Create gym' }).click();
-	// Lands on Home with one gym + zero equipment.
-	await page.waitForURL(/^[^?]*\/(?:\?.*)?$/);
+async function ensureGymExists(page: Page): Promise<void> {
+	// Fresh admin → /+page.server.ts redirects to /setup/first-run.
+	// Returning admin → already lands on Home; first-run is then unreachable
+	// (the wizard's load redirects away when the user already has a gym).
+	// Wait for either outcome and create a gym only when first-run shows.
+	await page.waitForURL(/(\/|\/setup\/first-run\b)/);
+	if (/\/setup\/first-run\b/.test(page.url())) {
+		await page.getByLabel('Gym name').fill(GYM_NAME);
+		await page.getByRole('button', { name: 'Create gym' }).click();
+		await page.waitForURL(/^[^?]*\/(?:\?.*)?$/);
+	}
 }
 
 async function addStrengthEquipment(page: Page): Promise<void> {
 	await page.goto('/setup');
-	await page.getByRole('button', { name: new RegExp(`Add equipment to ${escapeRegExp(GYM_NAME)}`) }).click();
+	// On a returning admin the gym name may differ; the Add button
+	// always reads "Add equipment to <gym name>", so anchor on the prefix.
+	await page.getByRole('button', { name: /^Add equipment to / }).first().click();
 
 	// Step 1: pick a glyph. We choose 'Chest Press' because its default
 	// type is 'machine' (see src/lib/components/glyph-kinds.ts) — and
@@ -149,7 +143,7 @@ async function exportAndParseCsv(
 	// Drive the export endpoint directly with the logged-in session
 	// cookie. The CSV link in the UI ultimately hits the same endpoint;
 	// fetching it here keeps the parse step explicit and side-effect-free.
-	const res = await request.get(`${baseURL}/api/export.csv?scope=user`, {
+	const res = await request.get(`${baseURL}/api/export.csv`, {
 		headers: { cookie: cookieHeader }
 	});
 	expect(res.status()).toBe(200);
@@ -168,7 +162,7 @@ function escapeRegExp(s: string): string {
 	return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-test('full flow: signup → login → gym → equipment → 3 sets → sparkline → CSV', async ({
+test('full flow: login → gym → equipment → 3 sets → sparkline → CSV', async ({
 	page,
 	request,
 	baseURL
@@ -176,14 +170,11 @@ test('full flow: signup → login → gym → equipment → 3 sets → sparkline
 	if (!baseURL) throw new Error('baseURL is not configured');
 	test.setTimeout(120_000);
 
-	// 1. Seed throwaway user via API (no UI form for sign-up).
-	await signUpThrowawayUser(request, baseURL);
-
-	// 2. Log in via the actual /login form.
+	// 1. Log in as the seeded admin via the actual /login form.
 	await logIn(page);
 
-	// 3. Create a gym via the first-run wizard.
-	await createGymViaFirstRun(page);
+	// 2. Create a gym via the first-run wizard, or skip if one already exists.
+	await ensureGymExists(page);
 
 	// 4. Add a strength equipment via Setup.
 	await addStrengthEquipment(page);

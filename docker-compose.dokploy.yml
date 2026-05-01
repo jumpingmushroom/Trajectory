@@ -15,7 +15,18 @@
 # Required env (set in Dokploy's Environment panel for the compose):
 #   PUBLIC_BASE_URL=https://trajectory.apps.jumpingmushroom.com
 #   BETTER_AUTH_SECRET=<random 32+ char string>
-#   SEED_USERS=johnny:initialpw,alina:initialpw
+#
+#   # First-admin seed (consumed only on first boot of a fresh DB):
+#   ADMIN_EMAIL=<admin email>
+#   ADMIN_PASSWORD=<initial password — change from /profile after login>
+#
+#   # SMTP — required in production for invites + password reset:
+#   SMTP_HOST=...
+#   SMTP_PORT=587
+#   SMTP_USER=...
+#   SMTP_PASS=...
+#   SMTP_FROM="Trajectory <noreply@your-domain>"
+#   SMTP_SECURE=false   # true for port 465
 
 services:
   app:
@@ -32,7 +43,14 @@ services:
       TRAJECTORY_DB_FILE: /app/data/db.sqlite
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://trajectory.apps.jumpingmushroom.com}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
-      SEED_USERS: ${SEED_USERS:-johnny:changeme,alina:changeme}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
     volumes:
       - trajectory_data:/app/data
     restart: unless-stopped

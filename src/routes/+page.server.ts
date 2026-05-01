@@ -38,12 +38,12 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 	const gyms = await db
 		.select()
 		.from(gym)
-		.where(isNull(gym.deletedAt))
+		.where(and(eq(gym.userId, locals.user.id), isNull(gym.deletedAt)))
 		.orderBy(desc(gym.isPrimary), asc(gym.createdAt));
 
 	if (gyms.length === 0) throw redirect(303, '/setup/first-run');
 
-	const activeGym = (await resolveActiveGym(cookies)) ?? gyms[0];
+	const activeGym = (await resolveActiveGym(cookies, locals.user.id)) ?? gyms[0];
 
 	// Gyms this user has ever trained at (plus the active gym). Hides
 	// smoke-seeded test gyms from other users, while still letting users

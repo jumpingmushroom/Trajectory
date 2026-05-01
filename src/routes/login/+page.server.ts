@@ -9,5 +9,16 @@ export const load: PageServerLoad = async ({ url }) => {
 	// somewhere they were trying to reach. The login page uses it to show
 	// a "Session expired" banner, distinguishing it from a fresh visit.
 	const redirected = raw != null && next !== '/';
-	return { next, redirected };
+
+	// Pre-fill email after invite acceptance or password reset. Validate
+	// shape minimally (presence of '@') so we don't echo arbitrary input.
+	const emailParam = url.searchParams.get('email');
+	const emailPrefill =
+		emailParam && emailParam.includes('@') && emailParam.length <= 200
+			? emailParam
+			: null;
+	const fresh = url.searchParams.get('fresh') === '1';
+	const reset = url.searchParams.get('reset') === '1';
+
+	return { next, redirected, emailPrefill, fresh, reset };
 };

@@ -6,7 +6,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 		throw redirect(303, '/login');
 	}
 	return {
-		userName: locals.user.name,
-		mustChange: locals.user.mustChangePassword === true
+		userName: locals.user.name
 	};
 };

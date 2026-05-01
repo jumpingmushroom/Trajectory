@@ -181,7 +181,24 @@ function logMutation(clientId: string, mutationId: string, userId: string): bool
 
 // ─── op handlers ────────────────────────────────────────────────────────
 
-async function gymCreate(payload: GymCreate): Promise<Gym> {
+// Per-user tenancy guard. A gym is the root of ownership in this schema —
+// equipment + exercise inherit through `gym.userId`. Returns the gym row
+// when it belongs to the caller, otherwise throws notFound. This both
+// defends against cross-tenant access and gives callers a populated row
+// without a second SELECT.
+async function assertGymOwned(gymId: string, userId: string): Promise<Gym> {
+	const row = (
+		await db
+			.select()
+			.from(gym)
+			.where(and(eq(gym.id, gymId), eq(gym.userId, userId), isNull(gym.deletedAt)))
+			.limit(1)
+	)[0];
+	if (!row) notFound(`gym ${gymId} not found`);
+	return row;
+}
+
+async function gymCreate(payload: GymCreate, userId: string): Promise<Gym> {
 	assertUlid(payload.id, 'id');
 	const name = assertString(payload.name, 'name', 80);
 	const city = payload.city == null ? null : assertString(payload.city, 'city', 80);
@@ -190,15 +207,23 @@ async function gymCreate(payload: GymCreate): Promise<Gym> {
 
 	await db
 		.insert(gym)
-		.values({ id: payload.id, name, city, tint, isPrimary })
+		.values({ id: payload.id, userId, name, city, tint, isPrimary })
 		.onConflictDoNothing();
-	const row = (await db.select().from(gym).where(eq(gym.id, payload.id)).limit(1))[0];
+	const row = (
+		await db
+			.select()
+			.from(gym)
+			.where(and(eq(gym.id, payload.id), eq(gym.userId, userId)))
+			.limit(1)
+	)[0];
 	if (!row) notFound(`gym ${payload.id} not found after insert`);
 	return row;
 }
 
-async function gymUpdate(payload: GymUpdate): Promise<Gym> {
+async function gymUpdate(payload: GymUpdate, userId: string): Promise<Gym> {
 	assertUlid(payload.id, 'id');
+	await assertGymOwned(payload.id, userId);
+
 	const updates: Partial<Gym> = { updatedAt: new Date() };
 	if (payload.name !== undefined) updates.name = assertString(payload.name, 'name', 80);
 	if (payload.city !== undefined) {
@@ -208,25 +233,42 @@ async function gymUpdate(payload: GymUpdate): Promise<Gym> {
 	if (payload.isPrimary !== undefined) updates.isPrimary = payload.isPrimary === true;
 	if (Object.keys(updates).length === 1) badRequest('gym.update needs at least one field');
 
-	await db.update(gym).set(updates).where(eq(gym.id, payload.id));
-	const row = (await db.select().from(gym).where(eq(gym.id, payload.id)).limit(1))[0];
+	await db
+		.update(gym)
+		.set(updates)
+		.where(and(eq(gym.id, payload.id), eq(gym.userId, userId)));
+	const row = (
+		await db
+			.select()
+			.from(gym)
+			.where(and(eq(gym.id, payload.id), eq(gym.userId, userId)))
+			.limit(1)
+	)[0];
 	if (!row) notFound(`gym ${payload.id} not found`);
 	return row;
 }
 
-async function gymDelete(payload: { id: string }): Promise<{ id: string; deletedAt: number }> {
+async function gymDelete(
+	payload: { id: string },
+	userId: string
+): Promise<{ id: string; deletedAt: number }> {
 	assertUlid(payload.id, 'id');
+	await assertGymOwned(payload.id, userId);
 	const now = Date.now();
 	await db
 		.update(gym)
 		.set({ deletedAt: new Date(now), updatedAt: new Date(now) })
-		.where(eq(gym.id, payload.id));
+		.where(and(eq(gym.id, payload.id), eq(gym.userId, userId)));
 	return { id: payload.id, deletedAt: now };
 }
 
-async function equipmentCreate(payload: EquipmentCreate): Promise<{ equipment: Equipment; hiddenExercise?: Exercise }> {
+async function equipmentCreate(
+	payload: EquipmentCreate,
+	userId: string
+): Promise<{ equipment: Equipment; hiddenExercise?: Exercise }> {
 	assertUlid(payload.id, 'id');
 	assertUlid(payload.gymId, 'gymId');
+	await assertGymOwned(payload.gymId, userId);
 	const name = assertString(payload.name, 'name', 80);
 	const type = assertEnum(payload.type, 'type', EQUIPMENT_TYPES);
 	const group = assertEnum(payload.group, 'group', MUSCLE_GROUPS);
@@ -284,13 +326,76 @@ async function equipmentCreate(payload: EquipmentCreate): Promise<{ equipment: E
 	return { equipment: row, hiddenExercise };
 }
 
-async function equipmentUpdate(payload: EquipmentUpdate): Promise<Equipment> {
+// Resolve an equipment row and assert it belongs to the caller (via the
+// owning gym). Returns the row when authorised, throws notFound otherwise.
+async function assertEquipmentOwned(
+	equipmentId: string,
+	userId: string
+): Promise<Equipment> {
+	const row = (
+		await db
+			.select({
+				id: equipment.id,
+				gymId: equipment.gymId,
+				name: equipment.name,
+				type: equipment.type,
+				group: equipment.group,
+				glyph: equipment.glyph,
+				tint: equipment.tint,
+				photoPath: equipment.photoPath,
+				cardioKind: equipment.cardioKind,
+				sortOrder: equipment.sortOrder,
+				notes: equipment.notes,
+				createdAt: equipment.createdAt,
+				updatedAt: equipment.updatedAt,
+				deletedAt: equipment.deletedAt
+			})
+			.from(equipment)
+			.innerJoin(gym, eq(gym.id, equipment.gymId))
+			.where(
+				and(
+					eq(equipment.id, equipmentId),
+					eq(gym.userId, userId),
+					isNull(gym.deletedAt)
+				)
+			)
+			.limit(1)
+	)[0] as Equipment | undefined;
+	if (!row) notFound(`equipment ${equipmentId} not found`);
+	return row;
+}
+
+// Resolve an exercise row and assert ownership transitively
+// (exercise → equipment → gym → userId).
+async function assertExerciseOwned(
+	exerciseId: string,
+	userId: string
+): Promise<{ id: string; equipmentId: string }> {
+	const row = (
+		await db
+			.select({ id: exercise.id, equipmentId: exercise.equipmentId })
+			.from(exercise)
+			.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
+			.innerJoin(gym, eq(gym.id, equipment.gymId))
+			.where(
+				and(
+					eq(exercise.id, exerciseId),
+					eq(gym.userId, userId),
+					isNull(exercise.deletedAt),
+					isNull(equipment.deletedAt),
+					isNull(gym.deletedAt)
+				)
+			)
+			.limit(1)
+	)[0];
+	if (!row) notFound(`exercise ${exerciseId} not found`);
+	return row;
+}
+
+async function equipmentUpdate(payload: EquipmentUpdate, userId: string): Promise<Equipment> {
 	assertUlid(payload.id, 'id');
 
-	const existing = (
-		await db.select().from(equipment).where(eq(equipment.id, payload.id)).limit(1)
-	)[0];
-	if (!existing) notFound(`equipment ${payload.id} not found`);
+	const existing = await assertEquipmentOwned(payload.id, userId);
 
 	const updates: Partial<Equipment> = { updatedAt: new Date() };
 	let hasUserField = false;
@@ -378,10 +483,12 @@ async function equipmentUpdate(payload: EquipmentUpdate): Promise<Equipment> {
 	return row;
 }
 
-async function equipmentDelete(payload: {
-	id: string;
-}): Promise<{ id: string; deletedAt: number }> {
+async function equipmentDelete(
+	payload: { id: string },
+	userId: string
+): Promise<{ id: string; deletedAt: number }> {
 	assertUlid(payload.id, 'id');
+	await assertEquipmentOwned(payload.id, userId);
 	const now = Date.now();
 	// Atomic: if the cascade fails, the equipment row stays live too. Otherwise
 	// a crash mid-cascade leaves orphaned exercises that join cleanly through
@@ -401,9 +508,10 @@ async function equipmentDelete(payload: {
 	return { id: payload.id, deletedAt: now };
 }
 
-async function exerciseCreate(payload: ExerciseCreate): Promise<Exercise> {
+async function exerciseCreate(payload: ExerciseCreate, userId: string): Promise<Exercise> {
 	assertUlid(payload.id, 'id');
 	assertUlid(payload.equipmentId, 'equipmentId');
+	await assertEquipmentOwned(payload.equipmentId, userId);
 	const name = assertString(payload.name, 'name', 80);
 	const isHidden = payload.isHidden === true;
 	const sortOrder =
@@ -420,8 +528,9 @@ async function exerciseCreate(payload: ExerciseCreate): Promise<Exercise> {
 	return row;
 }
 
-async function exerciseUpdate(payload: ExerciseUpdate): Promise<Exercise> {
+async function exerciseUpdate(payload: ExerciseUpdate, userId: string): Promise<Exercise> {
 	assertUlid(payload.id, 'id');
+	await assertExerciseOwned(payload.id, userId);
 	const updates: Partial<Exercise> = { updatedAt: new Date() };
 	if (payload.name !== undefined) updates.name = assertString(payload.name, 'name', 80);
 	if (typeof payload.sortOrder === 'number' && Number.isInteger(payload.sortOrder)) {
@@ -435,10 +544,12 @@ async function exerciseUpdate(payload: ExerciseUpdate): Promise<Exercise> {
 	return row;
 }
 
-async function exerciseDelete(payload: {
-	id: string;
-}): Promise<{ id: string; deletedAt: number }> {
+async function exerciseDelete(
+	payload: { id: string },
+	userId: string
+): Promise<{ id: string; deletedAt: number }> {
 	assertUlid(payload.id, 'id');
+	await assertExerciseOwned(payload.id, userId);
 	const now = Date.now();
 	await db
 		.update(exercise)
@@ -653,27 +764,32 @@ async function setCreate(
 
 	// Resolve exercise → equipment → gym so the session attaches to the
 	// right gym (per D4 trade-off #3 — session.gymId is captured on the
-	// first set, immutable after).
+	// first set, immutable after). The join asserts ownership: a set
+	// referencing another user's exercise resolves to no row and 404s.
 	const ex = (
 		await db
 			.select({
 				id: exercise.id,
-				equipmentId: exercise.equipmentId
+				equipmentId: exercise.equipmentId,
+				gymId: equipment.gymId,
+				type: equipment.type
 			})
 			.from(exercise)
-			.where(and(eq(exercise.id, payload.exerciseId), isNull(exercise.deletedAt)))
+			.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
+			.innerJoin(gym, eq(gym.id, equipment.gymId))
+			.where(
+				and(
+					eq(exercise.id, payload.exerciseId),
+					eq(gym.userId, userId),
+					isNull(exercise.deletedAt),
+					isNull(equipment.deletedAt),
+					isNull(gym.deletedAt)
+				)
+			)
 			.limit(1)
 	)[0];
 	if (!ex) notFound(`exercise ${payload.exerciseId} not found`);
-
-	const eqRow = (
-		await db
-			.select({ id: equipment.id, gymId: equipment.gymId, type: equipment.type })
-			.from(equipment)
-			.where(and(eq(equipment.id, ex.equipmentId), isNull(equipment.deletedAt)))
-			.limit(1)
-	)[0];
-	if (!eqRow) notFound(`equipment ${ex.equipmentId} not found`);
+	const eqRow = { id: ex.equipmentId, gymId: ex.gymId, type: ex.type };
 
 	const isCardio = eqRow.type === 'cardio';
 	const ts =
@@ -878,14 +994,7 @@ async function sessionStart(
 	assertUlid(payload.id, 'id');
 	assertUlid(payload.gymId, 'gymId');
 
-	const g = (
-		await db
-			.select({ id: gym.id })
-			.from(gym)
-			.where(and(eq(gym.id, payload.gymId), isNull(gym.deletedAt)))
-			.limit(1)
-	)[0];
-	if (!g) notFound(`gym ${payload.gymId} not found`);
+	await assertGymOwned(payload.gymId, userId);
 
 	const startedAt =
 		typeof payload.startedAt === 'number' &&
@@ -1065,23 +1174,23 @@ export async function applyMutation(
 	const payload = envelope.payload as never;
 	switch (op) {
 		case 'gym.create':
-			return { replayed: false, result: await gymCreate(payload) };
+			return { replayed: false, result: await gymCreate(payload, userId) };
 		case 'gym.update':
-			return { replayed: false, result: await gymUpdate(payload) };
+			return { replayed: false, result: await gymUpdate(payload, userId) };
 		case 'gym.delete':
-			return { replayed: false, result: await gymDelete(payload) };
+			return { replayed: false, result: await gymDelete(payload, userId) };
 		case 'equipment.create':
-			return { replayed: false, result: await equipmentCreate(payload) };
+			return { replayed: false, result: await equipmentCreate(payload, userId) };
 		case 'equipment.update':
-			return { replayed: false, result: await equipmentUpdate(payload) };
+			return { replayed: false, result: await equipmentUpdate(payload, userId) };
 		case 'equipment.delete':
-			return { replayed: false, result: await equipmentDelete(payload) };
+			return { replayed: false, result: await equipmentDelete(payload, userId) };
 		case 'exercise.create':
-			return { replayed: false, result: await exerciseCreate(payload) };
+			return { replayed: false, result: await exerciseCreate(payload, userId) };
 		case 'exercise.update':
-			return { replayed: false, result: await exerciseUpdate(payload) };
+			return { replayed: false, result: await exerciseUpdate(payload, userId) };
 		case 'exercise.delete':
-			return { replayed: false, result: await exerciseDelete(payload) };
+			return { replayed: false, result: await exerciseDelete(payload, userId) };
 		case 'set.create':
 			return { replayed: false, result: await setCreate(payload, userId) };
 		case 'set.update':

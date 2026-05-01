@@ -1,20 +1,21 @@
 // Server-side request lifecycle:
-// 1. Ensure data dir + bind-mount sentinel exist (M1 carryover).
+// 1. Ensure data dir + bind-mount sentinel exist.
 // 2. Apply pending Drizzle migrations + take pre-migration snapshot (D9).
-// 3. Seed users from SEED_USERS env on empty database (M2).
+// 3. Seed first admin from ADMIN_EMAIL/ADMIN_PASSWORD on empty database.
 // 4. Populate event.locals.session/user from Better Auth.
-// 5. Redirect unauthenticated traffic to /login (except /login* and /api/auth/*).
-// 6. Hand off to Better Auth's svelteKitHandler so /api/auth/* works.
+// 5. Redirect unauthenticated traffic to /login (except public paths).
+// 6. Gate /admin/* on role === 'admin'.
+// 7. Hand off to Better Auth's svelteKitHandler so /api/auth/* works.
 
 import type { Handle } from '@sveltejs/kit';
-import { redirect } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import { building } from '$app/environment';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { auth, DEV_SECRET_SENTINEL } from '$lib/server/auth';
 import { ensureMigrations } from '$lib/server/db/migrate';
-import { seedUsersIfEmpty } from '$lib/server/seed';
+import { seedAdminIfEmpty } from '$lib/server/seedAdmin';
 
 const DATA_DIR = process.env.TRAJECTORY_DATA_DIR ?? 'data';
 const PLACEHOLDER = join(DATA_DIR, '.placeholder');
@@ -53,10 +54,15 @@ async function ensureBoot() {
 					'BETTER_AUTH_SECRET is set to the dev fallback value — generate a real secret before going to production'
 				);
 			}
+			if (!process.env.SMTP_HOST || !process.env.SMTP_FROM) {
+				throw new Error(
+					'SMTP_HOST and SMTP_FROM must be set in production (invites + password reset rely on email)'
+				);
+			}
 		}
 		ensurePlaceholder();
 		await ensureMigrations();
-		await seedUsersIfEmpty();
+		await seedAdminIfEmpty();
 	})();
 	try {
 		await bootPromise;
@@ -72,6 +78,7 @@ function isPublicPath(pathname: string): boolean {
 	return (
 		pathname === '/login' ||
 		pathname.startsWith('/login/') ||
+		pathname.startsWith('/invite/') ||
 		pathname.startsWith('/api/auth/') ||
 		pathname === '/api/health'
 	);
@@ -89,20 +96,23 @@ export const handle: Handle = async ({ event, resolve }) => {
 
 	const { pathname } = event.url;
 
-	// Force password change for users flagged on seed. The clear-flag and
-	// auth endpoints are whitelisted so the user can complete the change.
-	if (
-		event.locals.user?.mustChangePassword &&
-		pathname !== '/login/change-password' &&
-		!pathname.startsWith('/api/auth/') &&
-		pathname !== '/api/profile/clear-must-change'
-	) {
-		throw redirect(303, '/login/change-password');
+	// Block public sign-up. Admins create users via /admin/users → /api/admin/invite,
+	// which calls signUpEmail server-side. The /api/auth/sign-up/email route is
+	// what a client would hit directly; refuse it outright.
+	if (pathname.startsWith('/api/auth/sign-up')) {
+		throw error(403, 'Sign-up is admin-only on this instance');
 	}
 
 	// Auth gate.
 	if (!event.locals.user && !isPublicPath(pathname)) {
 		throw redirect(303, `/login?next=${encodeURIComponent(pathname)}`);
+	}
+
+	// Admin gate. Path-prefix match covers /admin and any nested route +
+	// matching API endpoints under /api/admin/*.
+	const isAdminPath = pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
+	if (isAdminPath && event.locals.user?.role !== 'admin') {
+		throw error(403, 'Admin only');
 	}
 
 	// Already-signed-in users hitting /login go home.

@@ -33,17 +33,8 @@
 				error = result.error.message ?? 'Could not change password.';
 				return;
 			}
-			// Tell the server to clear the mustChangePassword flag.
-			const flagRes = await fetch('/api/profile/clear-must-change', { method: 'POST' });
-			if (!flagRes.ok) {
-				error = 'Password changed but flag clear failed. Sign in again.';
-				return;
-			}
-			// Force a full navigation so hooks.server.ts re-resolves the
-			// session (mustChangePassword is now false) and routes the user
-			// to first-run or Home as appropriate. A client-side goto here
-			// races the page's own load function and sometimes lands back
-			// on this screen.
+			// Force a full navigation so the new session cookie is read by
+			// hooks.server.ts on the next request.
 			window.location.href = '/';
 		} catch (err) {
 			console.error('change-password failed:', err);
@@ -75,13 +66,8 @@
 				class="text-[20px] font-bold tracking-[-0.02em]"
 				style="color: var(--color-text);"
 			>
-				{data.mustChange ? 'Set a new password' : 'Change password'}
+				Change password
 			</div>
-			{#if data.mustChange}
-				<div class="mt-1 text-[12px]" style="color: var(--color-text-dim);">
-					You're using a seeded password. Pick a new one before continuing.
-				</div>
-			{/if}
 		</div>
 
 		<label class="flex flex-col gap-1">

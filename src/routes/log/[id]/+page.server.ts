@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import {
 	equipment,
 	exercise,
+	gym,
 	set as setTable,
 	workoutSession
 } from '$lib/server/db/schema';
@@ -32,11 +33,36 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 
 	const asOfTs = parseAsOfTs(url.searchParams);
 
+	// Ownership-scoped lookup: a request for someone else's equipment id
+	// resolves to no row and surfaces as 404 (no existence leak).
 	const eqRow = (
 		await db
-			.select()
+			.select({
+				id: equipment.id,
+				gymId: equipment.gymId,
+				name: equipment.name,
+				type: equipment.type,
+				group: equipment.group,
+				glyph: equipment.glyph,
+				tint: equipment.tint,
+				photoPath: equipment.photoPath,
+				cardioKind: equipment.cardioKind,
+				sortOrder: equipment.sortOrder,
+				notes: equipment.notes,
+				createdAt: equipment.createdAt,
+				updatedAt: equipment.updatedAt,
+				deletedAt: equipment.deletedAt
+			})
 			.from(equipment)
-			.where(and(eq(equipment.id, id), isNull(equipment.deletedAt)))
+			.innerJoin(gym, eq(gym.id, equipment.gymId))
+			.where(
+				and(
+					eq(equipment.id, id),
+					eq(gym.userId, locals.user.id),
+					isNull(equipment.deletedAt),
+					isNull(gym.deletedAt)
+				)
+			)
 			.limit(1)
 	)[0];
 	if (!eqRow) throw error(404, 'equipment not found');

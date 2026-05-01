@@ -5,7 +5,7 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let name = $state('');
+	let email = $state(data.emailPrefill ?? '');
 	let password = $state('');
 	let error = $state<string | null>(null);
 	let submitting = $state(false);
@@ -13,14 +13,16 @@
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
 		error = null;
-		if (!name || !password) {
-			error = 'Name and password are required.';
+		if (!email || !password) {
+			error = 'Email and password are required.';
 			return;
 		}
 		submitting = true;
 		try {
-			const email = `${name.trim().toLowerCase()}@trajectory.local`;
-			const result = await authClient.signIn.email({ email, password });
+			const result = await authClient.signIn.email({
+				email: email.trim().toLowerCase(),
+				password
+			});
 			if (result.error) {
 				// Intentionally identical to the unknown-user case — a more
 				// "helpful" message ("user not found" / "wrong password") would
@@ -68,7 +70,23 @@
 			</div>
 		</div>
 
-		{#if data.redirected}
+		{#if data.fresh}
+			<div
+				role="status"
+				class="rounded-md border px-3 py-2 text-[12px]"
+				style="background: var(--color-amber-dim); border-color: var(--color-amber-line); color: var(--color-amber);"
+			>
+				Password set. Sign in to finish setting up your account.
+			</div>
+		{:else if data.reset}
+			<div
+				role="status"
+				class="rounded-md border px-3 py-2 text-[12px]"
+				style="background: var(--color-amber-dim); border-color: var(--color-amber-line); color: var(--color-amber);"
+			>
+				Password updated. Sign in with your new password.
+			</div>
+		{:else if data.redirected}
 			<div
 				role="alert"
 				class="rounded-md border px-3 py-2 text-[12px]"
@@ -83,13 +101,13 @@
 				class="text-[10px] font-bold uppercase tracking-[0.14em]"
 				style="color: var(--color-text-dim-2);"
 			>
-				Name
+				Email
 			</span>
 			<input
-				bind:value={name}
-				name="username"
-				type="text"
-				autocomplete="username"
+				bind:value={email}
+				name="email"
+				type="email"
+				autocomplete="email"
 				autocapitalize="none"
 				autocorrect="off"
 				required
@@ -133,5 +151,13 @@
 		>
 			{submitting ? 'Signing in…' : 'Sign in'}
 		</button>
+
+		<a
+			href="/login/reset"
+			class="text-center text-[12px] underline-offset-2 hover:underline"
+			style="color: var(--color-text-dim);"
+		>
+			Forgot password?
+		</a>
 	</form>
 </main>

@@ -4,6 +4,7 @@ import { db } from '$lib/server/db';
 import {
 	equipment,
 	exercise,
+	gym,
 	set as setTable
 } from '$lib/server/db/schema';
 import { isNull, eq, and, asc, inArray } from 'drizzle-orm';
@@ -15,9 +16,32 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 
 	const eqRow = (
 		await db
-			.select()
+			.select({
+				id: equipment.id,
+				gymId: equipment.gymId,
+				name: equipment.name,
+				type: equipment.type,
+				group: equipment.group,
+				glyph: equipment.glyph,
+				tint: equipment.tint,
+				photoPath: equipment.photoPath,
+				cardioKind: equipment.cardioKind,
+				sortOrder: equipment.sortOrder,
+				notes: equipment.notes,
+				createdAt: equipment.createdAt,
+				updatedAt: equipment.updatedAt,
+				deletedAt: equipment.deletedAt
+			})
 			.from(equipment)
-			.where(and(eq(equipment.id, id), isNull(equipment.deletedAt)))
+			.innerJoin(gym, eq(gym.id, equipment.gymId))
+			.where(
+				and(
+					eq(equipment.id, id),
+					eq(gym.userId, locals.user.id),
+					isNull(equipment.deletedAt),
+					isNull(gym.deletedAt)
+				)
+			)
 			.limit(1)
 	)[0];
 	if (!eqRow) throw error(404, 'equipment not found');

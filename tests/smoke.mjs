@@ -3,10 +3,11 @@
 // that catches "I broke /api/mutate while refactoring." Deliberately
 // small + contract-focused; UI testing comes later if it earns the lift.
 //
-// Each run creates its own smoke user (timestamped email) to avoid
-// fixture-state collisions with the seed flow. Logged data accumulates
-// in the dev DB; that's fine — these are realistic-looking rows
-// indistinguishable from any other use.
+// Under v0.2 multiuser, public sign-up is disabled. The test signs in as
+// the seeded admin (ADMIN_EMAIL / ADMIN_PASSWORD), or whatever override
+// the caller provides via SMOKE_EMAIL / SMOKE_PASSWORD. Logged rows
+// accumulate in the dev DB across runs; ULIDs make them sort cleanly
+// and the test never asserts a clean state.
 //
 // Run: `pnpm test:smoke` (assumes the container is up at
 // http://localhost:5173). Override base URL via env:
@@ -16,9 +17,10 @@ import { ulid } from 'ulid';
 
 const BASE = process.env.TRAJECTORY_URL ?? 'http://localhost:5173';
 const STAMP = Date.now();
-const SMOKE_NAME = `smoke_${STAMP}`;
-const SMOKE_EMAIL = `${SMOKE_NAME}@trajectory.local`;
-const SMOKE_PASSWORD = `smoke-${STAMP}-pw`;
+const SMOKE_EMAIL =
+	process.env.SMOKE_EMAIL ?? process.env.ADMIN_EMAIL ?? 'admin@trajectory.local';
+const SMOKE_PASSWORD =
+	process.env.SMOKE_PASSWORD ?? process.env.ADMIN_PASSWORD ?? 'change-me-on-first-login';
 
 let cookies = '';
 
@@ -73,15 +75,9 @@ function assert(cond, message) {
 async function main() {
 	console.log(`smoke against ${BASE} as ${SMOKE_EMAIL}`);
 
-	// 1. Sign up the smoke user. autoSignIn is off, so we sign in next.
-	console.log('step 1 — sign up');
-	const signup = await callJson('/api/auth/sign-up/email', {
-		method: 'POST',
-		body: JSON.stringify({ email: SMOKE_EMAIL, password: SMOKE_PASSWORD, name: SMOKE_NAME })
-	});
-	assert(signup.ok, `sign-up returns 2xx (got ${signup.status})`);
-
-	console.log('step 2 — sign in');
+	// 1. Sign in as the seeded admin. Public sign-up is disabled under v0.2;
+	//    fixtures reuse a known account rather than mint a fresh user per run.
+	console.log('step 1 — sign in');
 	const signin = await callJson('/api/auth/sign-in/email', {
 		method: 'POST',
 		body: JSON.stringify({ email: SMOKE_EMAIL, password: SMOKE_PASSWORD })
@@ -157,7 +153,7 @@ async function main() {
 
 	// 3. Pull CSV and verify our 3 rows landed.
 	console.log('step 6 — export CSV');
-	const csvRes = await call('/api/export.csv?scope=user');
+	const csvRes = await call('/api/export.csv');
 	assert(csvRes.status === 200, `csv → 200 (got ${csvRes.status})`);
 	const ct = csvRes.headers.get('content-type') ?? '';
 	assert(ct.includes('text/csv'), `csv content-type is text/csv (got ${ct})`);
@@ -195,7 +191,7 @@ async function main() {
 	assert(a.ok && b.ok, 'both mutate calls return 2xx');
 	assert(b.body?.replayed === true, 'second call flagged as replayed');
 
-	const csv2 = await (await call('/api/export.csv?scope=user')).text();
+	const csv2 = await (await call('/api/export.csv')).text();
 	const replayedHits = csv2.split('\n').filter((l) => l.startsWith(replayPayload.id)).length;
 	assert(replayedHits === 1, `replay produced exactly 1 row (got ${replayedHits})`);
 
