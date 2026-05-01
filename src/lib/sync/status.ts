@@ -18,7 +18,11 @@ export interface SyncSnapshot {
 }
 
 const initial: SyncSnapshot = {
-	online: typeof navigator === 'undefined' ? true : navigator.onLine,
+	// Default optimistic — we don't trust `navigator.onLine` because it
+	// lies often enough that seeding from it causes spurious "Offline"
+	// banners on boot. Real reachability is established by the first
+	// fetch or health ping in the sync runtime.
+	online: true,
 	pending: 0,
 	draining: false,
 	pendingMutations: [],

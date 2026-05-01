@@ -11,6 +11,15 @@ import { pushToast } from '$lib/stores/toast';
 const BACKOFFS_MS = [1_000, 2_000, 4_000, 8_000, 16_000];
 const STEADY_BACKOFF_MS = 30_000;
 
+// `navigator.onLine` lies often enough that we don't trust it on its own.
+// When the browser fires `offline`, wait this long and verify with a
+// real ping before flipping the banner. Most spurious offline events
+// (Wi-Fi handoff, VPN reconnect, sleep/wake) clear inside this window.
+const OFFLINE_VERIFY_DELAY_MS = 3_000;
+// While the banner says offline, re-check this often so the banner
+// self-clears once connectivity is back, even if no `online` event fires.
+const OFFLINE_HEARTBEAT_MS = 15_000;
+
 // 4xx codes that are NOT terminal: the same payload may succeed on a later
 // attempt once the underlying condition clears. 401 = expired session;
 // 408 = request timeout; 425 = server says retry; 429 = rate limit.
@@ -42,9 +51,11 @@ async function postOne(op: string, payload: unknown, mutationId: string): Promis
 				payload
 			})
 		});
+		markReachability(res.status);
 		const body = await res.text();
 		return { ok: res.ok, status: res.status, body };
 	} catch (err) {
+		markReachability(0);
 		return {
 			ok: false,
 			status: 0,
@@ -53,8 +64,56 @@ async function postOne(op: string, payload: unknown, mutationId: string): Promis
 	}
 }
 
-function isOnline(): boolean {
+function navigatorOnline(): boolean {
 	return typeof navigator === 'undefined' ? true : navigator.onLine;
+}
+
+// Mark online/offline based on actual fetch outcomes. Any HTTP response
+// (even 4xx/5xx) means we reached the server, so we're online. status===0
+// means the request never made it out — that's the only true "offline".
+function markReachability(status: number): void {
+	if (status === 0) {
+		syncStatus.update((s) => (s.online ? { ...s, online: false } : s));
+	} else {
+		syncStatus.update((s) => (s.online ? s : { ...s, online: true }));
+	}
+}
+
+async function pingHealth(): Promise<boolean> {
+	try {
+		const res = await fetch('/api/health', { method: 'GET', cache: 'no-store' });
+		markReachability(res.status);
+		return true;
+	} catch {
+		markReachability(0);
+		return false;
+	}
+}
+
+let offlineVerifyTimer: ReturnType<typeof setTimeout> | null = null;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+function startHeartbeat(): void {
+	if (heartbeatTimer || typeof window === 'undefined') return;
+	heartbeatTimer = setInterval(() => {
+		if (syncStatus.snapshot().online) {
+			stopHeartbeat();
+			return;
+		}
+		pingHealth().then((ok) => {
+			if (ok && syncStatus.snapshot().online) {
+				stopHeartbeat();
+				drainNow().catch(() => undefined);
+			}
+		});
+	}, OFFLINE_HEARTBEAT_MS);
+}
+
+function stopHeartbeat(): void {
+	if (heartbeatTimer) {
+		clearInterval(heartbeatTimer);
+		heartbeatTimer = null;
+	}
 }
 
 export async function drainNow(): Promise<{ drained: number; remaining: number }> {
@@ -131,7 +190,8 @@ export async function drainNow(): Promise<{ drained: number; remaining: number }
 			}
 		}
 		await refreshPendingCount();
-		syncStatus.update((s) => ({ ...s, draining: false, online: isOnline() }));
+		syncStatus.update((s) => ({ ...s, draining: false }));
+		if (!syncStatus.snapshot().online) startHeartbeat();
 	}
 	return { drained, remaining: await pendingCount() };
 }
@@ -141,18 +201,47 @@ export function startSyncRuntime() {
 	if (initialized || typeof window === 'undefined') return;
 	initialized = true;
 	window.addEventListener('online', () => {
+		if (offlineVerifyTimer) {
+			clearTimeout(offlineVerifyTimer);
+			offlineVerifyTimer = null;
+		}
 		syncStatus.update((s) => ({ ...s, online: true }));
+		stopHeartbeat();
 		drainNow().catch(() => undefined);
 	});
 	window.addEventListener('offline', () => {
-		syncStatus.update((s) => ({ ...s, online: false }));
+		// Don't trust this immediately — verify with a real ping after a
+		// short delay. Most spurious offline events clear inside this window.
+		if (offlineVerifyTimer) clearTimeout(offlineVerifyTimer);
+		offlineVerifyTimer = setTimeout(() => {
+			offlineVerifyTimer = null;
+			if (navigatorOnline()) return;
+			pingHealth().then(() => {
+				if (!syncStatus.snapshot().online) startHeartbeat();
+				else drainNow().catch(() => undefined);
+			});
+		}, OFFLINE_VERIFY_DELAY_MS);
 	});
 	window.addEventListener('focus', () => {
 		drainNow().catch(() => undefined);
 	});
 	// Kick off an initial drain shortly after boot so any leftovers from
-	// a prior session land before the user touches anything.
-	setTimeout(() => drainNow().catch(() => undefined), 500);
-	syncStatus.update((s) => ({ ...s, online: isOnline() }));
+	// a prior session land before the user touches anything. The drain
+	// itself updates the online flag from the actual fetch outcome, so
+	// we don't seed from `navigator.onLine` here.
+	setTimeout(() => {
+		drainNow()
+			.then(({ drained, remaining }) => {
+				// If the queue was empty (no fetch happened) and the browser
+				// thinks we're offline, do one health probe to settle the
+				// initial state honestly.
+				if (drained === 0 && remaining === 0 && !navigatorOnline()) {
+					pingHealth().then(() => {
+						if (!syncStatus.snapshot().online) startHeartbeat();
+					});
+				}
+			})
+			.catch(() => undefined);
+	}, 500);
 	refreshPendingCount();
 }
