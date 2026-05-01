@@ -1,4 +1,4 @@
-// Curated exercise list for free-weight stations (per BRAINSTORM Q9).
+// Curated exercise list for free-weight stations.
 // The picker shows these grouped by equipment.type when adding a child
 // exercise to a free-weight piece of equipment. "+ Custom" at the bottom
 // of the picker lets users add their own name. Machines and cables get
@@ -6,7 +6,7 @@
 // the picker.
 //
 // Promote this to a real `exercise_library` table only if/when users
-// want to curate the list themselves (FUTURE.md).
+// want to curate the list themselves.
 
 export type EquipmentType = 'barbell' | 'machine' | 'cable' | 'freeweight' | 'cardio';
 

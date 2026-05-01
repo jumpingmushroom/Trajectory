@@ -1,7 +1,6 @@
-/* Trajectory design tokens — locked palette for v0.1.
-   Source of truth: handoff/trajectory/project/components.jsx (T object).
+/* Trajectory design tokens.
    Mood = focus, density = standard, accent hue = amber 32°.
-   Tweaks panel (mood/density/hue switching) is FUTURE.md. */
+   Runtime mood/density/hue switching is intentionally not built. */
 
 @theme {
 	--color-bg: #0d0f12;

@@ -1,7 +1,7 @@
 // Cardio templates per equipment.cardioKind. The optional-field set is
-// hardcoded per BRAINSTORM Q7 (locked: kcal everywhere, HR everywhere
-// including treadmill, watts deliberately out for v0.1). Templates are
-// "baked in" — user-customizable cardio templates are FUTURE.md.
+// hardcoded: kcal everywhere, HR everywhere including treadmill, watts
+// deliberately omitted. Templates are "baked in" — user-customizable
+// cardio templates are deferred.
 
 export type CardioKind = 'treadmill' | 'bike' | 'rower' | 'generic';
 

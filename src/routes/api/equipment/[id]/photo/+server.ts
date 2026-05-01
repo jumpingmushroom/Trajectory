@@ -103,6 +103,6 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 		.set({ photoPath: null, updatedAt: new Date() })
 		.where(eq(equipment.id, id));
 	// Note: the .webp file is intentionally left on disk for recoverability.
-	// A FUTURE.md cleanup task can reap orphans.
+	// A future cleanup task can reap orphans.
 	return json({ ok: true });
 };

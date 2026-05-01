@@ -1,5 +1,7 @@
-// Migration runner per DECISIONS.md D9: take a hot-backup snapshot, then
-// apply pending migrations. Called once on first request via hooks.server.ts.
+// Migration runner: take a hot-backup snapshot, then apply pending
+// migrations. Called once on first request via hooks.server.ts. The
+// pre-migration snapshot lets us roll back a botched migration without
+// losing the working DB.
 
 import { migrate as drizzleMigrate } from 'drizzle-orm/better-sqlite3/migrator';
 import Database from 'better-sqlite3';

@@ -1,5 +1,5 @@
 // Drizzle client + SQLite operational profile.
-// PRAGMAs per DECISIONS.md D6: WAL + synchronous=NORMAL + foreign_keys=ON.
+// PRAGMAs: WAL + synchronous=NORMAL + foreign_keys=ON.
 // SIGTERM handler closes the DB cleanly so WAL doesn't get stranded.
 
 import Database from 'better-sqlite3';

@@ -1,9 +1,8 @@
 // POST /api/active-gym  body: { gymId }
-// Per-device, per-user "active gym" selection. Stored in a cookie so
-// each phone/browser can have its own pick (per BRAINSTORM Q5 — gym
-// is shared at the data level, but the active-gym chip is local UI
-// state). Server reads the cookie in load functions to filter the
-// equipment grid.
+// Per-device "active gym" selection. Stored in a cookie so each phone
+// or browser can have its own pick — the active-gym chip is local UI
+// state, not a per-user setting. Server reads the cookie in load
+// functions to filter the equipment grid.
 
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';

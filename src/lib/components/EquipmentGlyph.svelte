@@ -1,8 +1,7 @@
 <script lang="ts">
-	// Schematic SVG motif per equipment kind. 11 glyphs ported from the
-	// design handoff (components.jsx → EquipmentGlyph). Used as the
-	// equipment tile illustration when no photo is uploaded. Stroke-only,
-	// no stock photos / no brand marks (per the handoff README).
+	// Schematic SVG motif per equipment kind. Used as the equipment tile
+	// illustration when no photo is uploaded. Stroke-only, no stock photos
+	// or brand marks.
 
 	import type { GlyphKind } from './glyph-kinds';
 

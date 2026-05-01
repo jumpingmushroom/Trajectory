@@ -183,7 +183,7 @@ export const equipment = sqliteTable(
 		// generic), null otherwise. Determines the optional-fields template
 		// shown by the cardio Log screen.
 		cardioKind: text('cardio_kind'),
-		// sortOrder: reserved for "Walk order" sort (FUTURE.md); default 0.
+		// sortOrder: reserved for "Walk order" sort; default 0.
 		sortOrder: integer('sort_order').default(0).notNull(),
 		// notes: free text, shared across users (it's a fact about the
 		// machine, not the lifter). Surfaced on the Detail screen.
