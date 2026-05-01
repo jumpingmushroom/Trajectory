@@ -1,0 +1,1 @@
+ALTER TABLE `set` ADD `is_pr` integer DEFAULT false NOT NULL;

@@ -238,6 +238,11 @@ export const set = sqliteTable(
 		// incline, level, rpm, spm, splits, …). Schema doesn't enforce keys —
 		// the UI does. Unindexable on extras keys; acceptable at our scale.
 		extras: text('extras', { mode: 'json' }).$type<Record<string, number>>(),
+		// isPr: true when this set strictly beat the user's prior best for
+		// the same exercise at insert time. Strength = MAX(weight); cardio =
+		// MAX(extras.distance). Computed once on set.create and persisted;
+		// edits don't re-evaluate. Existing rows pre-feature stay false.
+		isPr: integer('is_pr', { mode: 'boolean' }).default(false).notNull(),
 		// ts: when the set actually happened (user-perceived time). Distinct
 		// from createdAt (when the row was inserted into the server DB).
 		ts: integer('ts', { mode: 'timestamp_ms' }).notNull(),
