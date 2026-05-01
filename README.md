@@ -1,38 +1,75 @@
 # Trajectory
 
-Self-hosted, equipment-first workout tracker.
+A self-hosted, equipment-first workout tracker.
 
-**Status:** v0.2 multiuser (in development). v0.1 shipped per `ROADMAP.md`; v0.2 converts the two-user-shared-gym model into a public multi-user instance with admin-issued accounts. Open `CLAUDE.md` for the project context every future session reads first.
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![CI](https://github.com/jumpingmushroom/Trajectory/actions/workflows/ci.yml/badge.svg)](https://github.com/jumpingmushroom/Trajectory/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/jumpingmushroom/Trajectory)](https://github.com/jumpingmushroom/Trajectory/releases)
+
+![Trajectory hero](docs/screenshots/hero.png)
 
 ## What it is
 
-A web app where each user's specific gym and its specific machines are the primary objects, not a generic exercise library. You walk up to "the cable row near the mirror," tap it, log a set. Per-user tenancy: each account owns its own gyms, equipment, sessions, and sets. Self-hosted on a public HTTPS domain. PWA-installable on iOS + Android. Offline-first writes via IndexedDB queue.
+Trajectory is a workout tracker built around the gym you actually train in. Instead of picking from a generic exercise catalog, you set up the specific machines and racks at your gym — that cable row near the mirror, that squat rack in the corner — and tap them to log a set. Sessions, history, progression charts, and achievements come from the equipment, not the abstract exercise. Self-hosted, multi-user, and PWA-installable on iOS and Android.
 
-## Quickstart (development)
+## Features
+
+- **Equipment-first logging** — your gym's specific machines are the primary objects, not a generic exercise list.
+- **Offline-first PWA** — log sets without a connection; an IndexedDB queue drains writes when you're back online.
+- **Multi-user with admin-issued accounts** — no public sign-up; the admin invites users by email.
+- **Sessions form themselves** — a 90-minute gap starts a new session; a 6-hour gap auto-closes the open one.
+- **Achievements + PR detection** — milestone unlocks and per-equipment top-set tracking happen server-side.
+- **Strength and cardio** — both are first-class, with templates per cardio kind (treadmill, bike, rower, generic).
+- **Stats with progression charts** — per-equipment top-set over time, muscle-group distribution, sparklines.
+- **CSV export** — your data is yours.
+- **SQLite + Docker** — single bind-mounted volume, no external services to operate.
+
+## Screenshots
+
+| | |
+|:-:|:-:|
+| ![Home](docs/screenshots/home.png) | ![Setup](docs/screenshots/setup.png) |
+| Tap a piece of equipment | Set up your gym |
+| ![Log strength](docs/screenshots/log-strength.png) | ![Log cardio](docs/screenshots/log-cardio.png) |
+| Log a strength set | Log a cardio session |
+| ![Session detail](docs/screenshots/session-detail.png) | ![History](docs/screenshots/history.png) |
+| Per-session breakdown | 12-week heatmap |
+| ![Stats](docs/screenshots/stats.png) | ![Achievement unlocked](docs/screenshots/achievement.png) |
+| Progression charts | Achievements unlock as you train |
+
+## Quickstart
 
 ```sh
+git clone https://github.com/jumpingmushroom/Trajectory.git
+cd Trajectory
+cp .env.example .env
+# edit .env: set BETTER_AUTH_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD
 docker compose up
-# → http://localhost:5173
 ```
 
-That's the entire dev workflow. The container handles `pnpm install`, runs Vite with HMR (polling-based so host edits trigger browser updates inside the container without a restart), and writes persistent state to `./data` on the host via a bind mount.
+Open <http://localhost:5173> and sign in with the admin credentials from your `.env`. The container handles `pnpm install`, runs Vite with HMR (host edits trigger browser updates without a restart), and persists state to `./data` via a bind mount. Running on the host (`pnpm dev`) is intentionally not supported — the only sanctioned dev workflow is the container.
 
-The only supported way to run Trajectory locally is inside the container — there is no `pnpm dev` workflow on the host.
+### Trying it out without entering data
 
-## Accounts
+Once the container is up, seed your admin account with eight weeks of believable workout history:
 
-v0.2 instances are admin-issued: there is no public sign-up. On first boot
-of an empty database, Trajectory seeds a single admin from
-`ADMIN_EMAIL` / `ADMIN_PASSWORD`. After signing in, the admin invites users
-from `/admin/users`; recipients receive an email link that lets them set
-their own password. Self-service password reset (`/login/reset`) is
-available to anyone with a valid account.
+```sh
+docker compose exec trajectory node scripts/seed-demo.mjs
+```
 
-## Environment
+The script signs in as the admin from your `.env`, creates a demo gym with ten pieces of equipment, and logs ~250 sets across eight weeks of push / pull / leg / cardio sessions. Useful for screenshots, tire-kicking, or seeing what the app looks like populated. Idempotent: bails if any sets already exist on the account. Re-seed by removing `data/db.sqlite` and rebooting.
 
-Copy `.env.example` to `.env` before booting. Trajectory boots fine in
-development without any env vars (the mailer falls back to logging
-"would-send" messages to stdout); in production you must set:
+## Production deployment
+
+Trajectory is designed to live on a **public HTTPS domain**: iOS Safari requires HTTPS for full PWA install (Add to Home Screen + offline cache + standalone launcher), and Better Auth's secure cookies require HTTPS in production.
+
+1. Build the prod image: `docker compose build --target prod`.
+2. Bind-mount `./data` to a persistent host path (e.g. `/srv/trajectory/data`).
+3. Front the container with a reverse proxy (Caddy / Traefik / Nginx) terminating TLS and forwarding to port 3000.
+4. Set restart policy to `unless-stopped` so the container survives reboots.
+5. Migrations apply automatically on container start; pre-migration snapshots land at `data/db.sqlite.pre-migration-<ISO timestamp>`.
+
+Required production environment:
 
 ```
 NODE_ENV=production
@@ -50,28 +87,13 @@ SMTP_FROM="Trajectory <noreply@your-domain>"
 SMTP_SECURE=false                    # true for port 465
 ```
 
-`ADMIN_EMAIL` / `ADMIN_PASSWORD` are consumed only when the user table is
-empty — once seeded, changes to those vars have no effect. SMTP is required
-in production; missing config throws on boot rather than silently disabling
-invites or password reset.
-
-## Production deployment
-
-Trajectory is designed to live on a **public HTTPS domain** (per `DECISIONS.md` D7). iOS Safari requires HTTPS for full PWA install (Add to Home Screen + offline cache + standalone launcher), and Better Auth's secure cookies need HTTPS in production.
-
-Recommended shape:
-
-1. Build the prod image: `docker compose build --target prod` (or use the `prod` target in your compose file).
-2. Bind-mount `./data` to a persistent host path: `/srv/trajectory/data`.
-3. Front the container with a reverse proxy (Caddy / Traefik / Nginx) that terminates TLS and forwards to port 3000 inside the container.
-4. Restart policy `unless-stopped` so the container survives reboots.
-5. Migrations apply automatically on container start; pre-migration snapshot lands at `data/db.sqlite.pre-migration-<ISO timestamp>` (per D9).
+SMTP is required in production: invites and self-service password resets both rely on email. Missing SMTP config throws on boot rather than silently disabling those flows.
 
 ## Backup
 
-**Use SQLite's `.backup` API, never `cp`** (per D6 — `cp` of a live SQLite file can copy a torn page).
+Use SQLite's `.backup` API, never `cp` — copying a live SQLite file can copy a torn page.
 
-`scripts/backup.sh` takes a snapshot via the running container (uses `better-sqlite3`'s online backup API, no `sqlite3` CLI required), drops it under `data/backups/db-<ts>.sqlite`, and prunes old snapshots. Retention: every snapshot from the last 14 days, plus the newest snapshot per ISO week for the 8 most recent weeks beyond. Pre-migration snapshots (`data/db.sqlite.pre-migration-*`) trim to the 5 most recent.
+`scripts/backup.sh` invokes `better-sqlite3`'s online backup API inside the running container, writes a snapshot to `data/backups/db-<ts>.sqlite`, and prunes old snapshots (every snapshot from the last 14 days, plus the newest snapshot per ISO week for the 8 most recent weeks beyond; pre-migration snapshots trim to the 5 most recent).
 
 ```sh
 # one-shot
@@ -81,45 +103,14 @@ Recommended shape:
 0 4 * * * /srv/trajectory/scripts/backup.sh >> /var/log/trajectory-backup.log 2>&1
 ```
 
-Override the defaults via env vars: `TRAJECTORY_CONTAINER` (default `trajectory`), `TRAJECTORY_DATA_DIR` (default `<repo>/data`).
+This script writes snapshots **inside the same `data/` volume** — it protects against in-app data corruption (bad migration, bad write) but not against host disk loss. For off-host protection, schedule restic / borg / rsync of the whole `data/` directory separately.
 
-This script writes snapshots **inside the same `data/` volume** — it protects against in-app data corruption (bad migration, bad write) but NOT against host disk loss. For off-host protection, schedule restic / borg / rsync of the whole `data/` directory separately. That covers `db.sqlite`, the snapshots under `data/backups/`, and equipment photos under `data/uploads/`.
+You can also export your own data as CSV from inside the app (Stats screen → "Export my data as CSV"). Useful for portability and spreadsheet analysis; not a substitute for binary backups (CSV doesn't include equipment photos or DB-internal state). The export is always scoped to the calling user; cross-account export is intentionally not supported.
 
-You can also export your own data as CSV from inside the app: Stats screen → "Export my data as CSV". Useful for portability + spreadsheet analysis; not a substitute for binary backups (the CSV doesn't include equipment photos or DB-internal state like the mutation_log). Under v0.2 multiuser, the export is always scoped to the calling user; cross-account export is intentionally not supported.
+## Status
 
-## Smoke test
+This is a single-author project I built for myself. It works well enough that I use it daily, and it might work for you too if your gym fits its assumptions (one or two regular gyms, equipment-first model, comfortable self-hosting on a HTTPS domain). Drive-by PRs welcome; for anything larger than a bug fix, please [open an issue](https://github.com/jumpingmushroom/Trajectory/issues) first so we can talk about scope. Release notes live in [`CHANGELOG.md`](CHANGELOG.md).
 
-A node-fetch smoke test runs the full server-side contract against the dev container:
+## License
 
-```sh
-pnpm test:smoke
-```
-
-Hits the running app at http://localhost:5173 (default — override with `TRAJECTORY_URL=...`). Signs in as the seeded admin (`SMOKE_USER=$ADMIN_EMAIL`, `SMOKE_PASS=$ADMIN_PASSWORD`), then exercises gym.create → equipment.create → set.create×3 → /api/export.csv and asserts that the CSV contains the new rows.
-
-The test is deliberately small and contract-focused — no Playwright, no UI assertions. It's the safety net that catches "I broke `/api/mutate` while refactoring." UI testing belongs in v0.2 if it earns the lift.
-
-## Where everything lives
-
-- `BRAINSTORM.md` — every design decision and the option chosen.
-- `DECISIONS.md` — every adversarial pressure point and the surviving decision.
-- `ROADMAP.md` — M1 through M12 with explicit Done criteria. Useful for code archaeology.
-- `FUTURE.md` — every idea deliberately deferred (programs, Tweaks panel, supersets, drop sets, PR detection, RPE, multi-tenancy, …).
-- `CLAUDE.md` — canonical project context. Every future Claude Code session reads this first.
-- `handoff/` — original Claude Design React/JSX prototype (visual reference, do not port code line-by-line).
-- `src/` — SvelteKit app source.
-  - `routes/` — pages + API routes.
-  - `lib/components/` — Svelte UI primitives.
-  - `lib/server/` — DB schema, auth config, mutation router, ULID utils.
-  - `lib/sync/` — IndexedDB mutation queue + drainer + status store.
-- `data/` — host-bind-mounted persistent state. SQLite DB + WAL/SHM + pre-migration snapshots + equipment photos under `uploads/`. Gitignored.
-- `drizzle/` — generated SQL migrations. Checked in.
-- `scripts/gen-icons.mjs` — regenerates PWA icons from `static/icons/source.svg`.
-
-## Stopping
-
-```sh
-docker compose down
-```
-
-`docker compose down -v` removes the named volumes for `node_modules` and `.svelte-kit` (forcing a reinstall on next boot) but never touches `./data`.
+[AGPL-3.0](LICENSE) — if you run a modified copy as a service, you must share your modifications.
