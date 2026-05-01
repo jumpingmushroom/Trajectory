@@ -1,0 +1,43 @@
+# Trajectory — production compose using the published GHCR image.
+#
+# The recommended production setup for self-hosters: pull the image
+# instead of building locally, front it with a reverse proxy that
+# terminates TLS, persist data/ to a host bind mount or named volume.
+#
+# Usage:
+#   cp .env.example .env
+#   # edit .env: set BETTER_AUTH_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD,
+#   # PUBLIC_BASE_URL, and SMTP_*
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Image tags are published by .github/workflows/release.yml on every
+# v*.*.* git tag. Pin to a specific version (`:0.2.0`), the current
+# minor (`:0.2`), or `:latest` — your call. Multi-arch (amd64 + arm64).
+
+services:
+  trajectory:
+    image: ghcr.io/jumpingmushroom/trajectory:latest
+    container_name: trajectory
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 5173
+      TRAJECTORY_DATA_DIR: /app/data
+      TRAJECTORY_DB_FILE: /app/data/db.sqlite
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+    ports:
+      # Bind only to localhost; expose to the public via your reverse
+      # proxy (Caddy / Traefik / Nginx) terminating TLS.
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - ./data:/app/data

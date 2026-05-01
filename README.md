@@ -63,13 +63,33 @@ The script signs in as the admin from your `.env`, creates a demo gym with ten p
 
 Trajectory is designed to live on a **public HTTPS domain**: iOS Safari requires HTTPS for full PWA install (Add to Home Screen + offline cache + standalone launcher), and Better Auth's secure cookies require HTTPS in production.
 
+### Recommended: pull the published image
+
+A multi-arch image (`linux/amd64` + `linux/arm64`) is published to GitHub Container Registry on every release. Self-hosters don't need to clone the repo:
+
+```sh
+mkdir trajectory && cd trajectory
+curl -O https://raw.githubusercontent.com/jumpingmushroom/Trajectory/main/docker-compose.prod.yml
+curl -O https://raw.githubusercontent.com/jumpingmushroom/Trajectory/main/.env.example
+mv .env.example .env
+# edit .env: set BETTER_AUTH_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD,
+# PUBLIC_BASE_URL, and the SMTP_* variables
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Pin to a specific version (`ghcr.io/jumpingmushroom/trajectory:0.2.0`), the current minor (`:0.2`), or `:latest` — `docker-compose.prod.yml` defaults to `:latest`.
+
+### Manual build (for forks or air-gapped hosts)
+
+If you've forked the repo or need to build without internet access at runtime:
+
 1. Build the prod image: `docker compose build --target prod`.
 2. Bind-mount `./data` to a persistent host path (e.g. `/srv/trajectory/data`).
-3. Front the container with a reverse proxy (Caddy / Traefik / Nginx) terminating TLS and forwarding to port 3000.
+3. Front the container with a reverse proxy (Caddy / Traefik / Nginx) terminating TLS and forwarding to port 5173.
 4. Set restart policy to `unless-stopped` so the container survives reboots.
 5. Migrations apply automatically on container start; pre-migration snapshots land at `data/db.sqlite.pre-migration-<ISO timestamp>`.
 
-Required production environment:
+### Required environment
 
 ```
 NODE_ENV=production
