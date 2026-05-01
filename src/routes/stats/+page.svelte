@@ -14,6 +14,15 @@
 		{ id: 'core', label: 'Core' }
 	];
 
+	const ranges: { key: '7d' | '30d' | '3mo' | '6mo' | '1y' | 'all'; label: string }[] = [
+		{ key: '7d', label: '7d' },
+		{ key: '30d', label: '30d' },
+		{ key: '3mo', label: '3mo' },
+		{ key: '6mo', label: '6mo' },
+		{ key: '1y', label: '1y' },
+		{ key: 'all', label: 'All' }
+	];
+
 	function fmtNum(n: number): string {
 		if (Number.isInteger(n)) return String(n);
 		return n.toFixed(1);
@@ -60,6 +69,24 @@
 		</a>
 	</header>
 
+	<nav class="mt-3 flex gap-1.5" aria-label="Time range">
+		{#each ranges as r (r.key)}
+			{@const active = r.key === data.range}
+			<a
+				href={r.key === '30d' ? '?' : `?range=${r.key}`}
+				class="rounded-full border px-3 py-1.5 text-[12px] font-semibold tabular-nums"
+				style={active
+					? 'background: var(--color-amber); border-color: var(--color-amber); color: var(--color-bg);'
+					: 'background: var(--color-surface); border-color: var(--color-line-2); color: var(--color-text-dim);'}
+				aria-current={active ? 'page' : undefined}
+				data-sveltekit-noscroll
+				data-sveltekit-replacestate
+			>
+				{r.label}
+			</a>
+		{/each}
+	</nav>
+
 	<section
 		class="mt-3 rounded-2xl border p-4"
 		style="background: var(--color-surface); border-color: var(--color-line);"
@@ -68,7 +95,7 @@
 			class="text-[10px] font-bold uppercase tracking-[0.14em]"
 			style="color: var(--color-text-dim-2);"
 		>
-			Distribution · last 30 days
+			Distribution · {data.rangeLabel}
 		</div>
 		<div class="mt-3 flex flex-col gap-2.5">
 			{#each groupOrder as g (g.id)}
@@ -106,7 +133,7 @@
 				class="text-[10px] font-bold uppercase tracking-[0.14em]"
 				style="color: var(--color-text-dim-2);"
 			>
-				Cardio · last 30 days
+				Cardio · {data.rangeLabel}
 			</div>
 			<div class="mt-3 grid grid-cols-3 gap-2">
 				<div

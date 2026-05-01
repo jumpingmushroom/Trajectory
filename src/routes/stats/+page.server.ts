@@ -9,7 +9,25 @@ import {
 import { isNull, eq, and, asc } from 'drizzle-orm';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const WINDOW_30D = 30 * DAY_MS;
+
+const RANGES = {
+	'7d': 7 * DAY_MS,
+	'30d': 30 * DAY_MS,
+	'3mo': 90 * DAY_MS,
+	'6mo': 180 * DAY_MS,
+	'1y': 365 * DAY_MS,
+	all: null
+} as const;
+export type RangeKey = keyof typeof RANGES;
+
+const RANGE_LABEL: Record<RangeKey, string> = {
+	'7d': 'last 7 days',
+	'30d': 'last 30 days',
+	'3mo': 'last 3 months',
+	'6mo': 'last 6 months',
+	'1y': 'last year',
+	all: 'lifetime'
+};
 
 export interface MachineCard {
 	equipmentId: string;
@@ -53,8 +71,13 @@ function distanceKm(extras: Record<string, number> | null | undefined): number |
 	return d;
 }
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) throw redirect(303, '/login');
+
+	const raw = url.searchParams.get('range') ?? '30d';
+	const range: RangeKey = raw in RANGES ? (raw as RangeKey) : '30d';
+	const windowMs = RANGES[range];
+	const cutoff = windowMs === null ? 0 : Date.now() - windowMs;
 
 	const sets = (await db
 		.select({
@@ -97,20 +120,18 @@ export const load: PageServerLoad = async ({ locals }) => {
 		ts: Date;
 	}>;
 
-	const cutoff30 = Date.now() - WINDOW_30D;
-
-	// Strength distribution by muscle group over last 30 days. Cardio gets
+	// Strength distribution by muscle group over the selected range. Cardio gets
 	// its own dedicated section below; counting cardio "sets" alongside
 	// strength sets is misleading (1 cardio set ≈ 45 min, 1 leg set ≈ 30 s).
 	const groupCounts: Record<string, number> = { push: 0, pull: 0, legs: 0, core: 0 };
 	for (const s of sets) {
-		if (s.ts.getTime() < cutoff30) continue;
+		if (s.ts.getTime() < cutoff) continue;
 		if (s.equipmentType === 'cardio') continue;
 		const g = s.equipmentGroup;
 		if (g in groupCounts) groupCounts[g] += 1;
 	}
 
-	// Cardio summary over last 30 days: top-line totals + per-equipment rows.
+	// Cardio summary over the selected range: top-line totals + per-equipment rows.
 	let cardioTotalMin = 0;
 	let cardioTotalKm = 0;
 	const cardioSessionIds = new Set<string>();
@@ -125,7 +146,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	>();
 	for (const s of sets) {
 		if (s.equipmentType !== 'cardio') continue;
-		if (s.ts.getTime() < cutoff30) continue;
+		if (s.ts.getTime() < cutoff) continue;
 		const min = s.durationMin ?? 0;
 		const km = distanceKm(s.extras) ?? 0;
 		cardioTotalMin += min;
@@ -187,8 +208,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 		}
 	>();
 	for (const s of sets) {
-		const isCardio = s.equipmentType === 'cardio';
 		const tsMs = s.ts.getTime();
+		if (tsMs < cutoff) continue;
+		const isCardio = s.equipmentType === 'cardio';
 		let row = perEquipment.get(s.equipmentId);
 		if (!row) {
 			row = {
@@ -253,7 +275,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			}
 			const points = [...pointsMap.values()]
 				.sort((a, b) => a.ts - b.ts)
-				.slice(-15);
+				.slice(-30);
 			const series = points.map((p) => p.value);
 			const delta = series.length > 1 ? series[series.length - 1] - series[0] : 0;
 			const lastValue = series.length > 0 ? series[series.length - 1] : 0;
@@ -277,6 +299,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	return {
 		userName: locals.user.name,
+		range,
+		rangeLabel: RANGE_LABEL[range],
 		groupCounts,
 		groupMax: Math.max(...Object.values(groupCounts), 1),
 		cardioSummary,
