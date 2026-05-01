@@ -142,6 +142,19 @@ async function main() {
 		});
 	}
 
+	// Each smoke set is a fresh PR for the smoke user (new exercise, no
+	// prior history) so set.is_pr=1 is on every row, which means the
+	// achievement evaluator should award strength.first_pr and
+	// strength.single_plate (60 kg threshold) by the first set, and
+	// easter.pr_day after the third (>=3 PRs in one session).
+	console.log('step 5b — achievements awarded after set logging');
+	const achRes = await callJson('/api/achievement');
+	assert(achRes.ok, `GET /api/achievement → 2xx (got ${achRes.status})`);
+	const earnedKeys = new Set((achRes.body?.earned ?? []).map((a) => a.badgeKey));
+	assert(earnedKeys.has('strength.first_pr'), 'strength.first_pr awarded');
+	assert(earnedKeys.has('strength.single_plate'), 'strength.single_plate awarded');
+	assert(earnedKeys.has('easter.pr_day'), 'easter.pr_day awarded after 3 PRs in session');
+
 	// 3. Pull CSV and verify our 3 rows landed.
 	console.log('step 6 — export CSV');
 	const csvRes = await call('/api/export.csv?scope=user');
