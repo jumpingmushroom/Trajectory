@@ -6,7 +6,7 @@
 # survives container rebuilds.
 
 services:
-  app:
+  trajectory:
     build:
       context: .
       dockerfile: Dockerfile
@@ -20,8 +20,8 @@ services:
       TRAJECTORY_DATA_DIR: /app/data
       TRAJECTORY_DB_FILE: /app/data/db.sqlite
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-johnny@trajectory.local}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-claude-dev-pw}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@trajectory.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-on-first-login}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-only-insecure-secret-please-set-BETTER_AUTH_SECRET-in-prod}
       # SMTP unset in dev → mailer logs "would-send" to stdout instead of sending.
       SMTP_HOST: ${SMTP_HOST:-}

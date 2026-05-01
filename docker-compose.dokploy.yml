@@ -1,19 +1,19 @@
-# Trajectory — production compose for Dokploy.
+# Trajectory — example production compose for Dokploy.
 #
 # Differs from the dev compose in three ways that all matter:
 #  1. Builds the `prod` Dockerfile target (node build, no Vite HMR).
 #  2. Persists data/ in a named Docker volume (Dokploy + named volumes
-#     handle ownership cleanly; bind-mounts collide with the dev
+#     handle ownership cleanly; bind-mounts collide with the prod
 #     image's `node` user UID 1000 vs the host's root-owned path).
 #  3. No source bind-mounts — the image is the deployable.
 #
 # Dokploy's reverse proxy (Traefik) routes the configured domain to
-# this service's port 5173. Port 5173 is hardcoded in the prod
-# Dockerfile target so the existing domain config (serviceName=app,
-# port=5173) works without changes.
+# this service's port 5173. The service is named `app` to match
+# Dokploy's default `serviceName=app` domain config; rename if your
+# Dokploy project is configured differently.
 #
 # Required env (set in Dokploy's Environment panel for the compose):
-#   PUBLIC_BASE_URL=https://trajectory.apps.jumpingmushroom.com
+#   PUBLIC_BASE_URL=https://your-trajectory-domain
 #   BETTER_AUTH_SECRET=<random 32+ char string>
 #
 #   # First-admin seed (consumed only on first boot of a fresh DB):
@@ -41,7 +41,7 @@ services:
       PORT: 5173
       TRAJECTORY_DATA_DIR: /app/data
       TRAJECTORY_DB_FILE: /app/data/db.sqlite
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://trajectory.apps.jumpingmushroom.com}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}

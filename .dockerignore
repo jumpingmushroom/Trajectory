@@ -31,14 +31,13 @@ Thumbs.db
 .claude/settings.local.json
 
 # Docs that aren't needed inside the image (still on disk for git)
-handoff
-Trajectory-handoff.zip
-BRAINSTORM.md
-DECISIONS.md
-ROADMAP.md
-FUTURE.md
 CLAUDE.md
 README.md
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md
+LICENSE
+docs
 
 # Vite temp files
 vite.config.js.timestamp-*
