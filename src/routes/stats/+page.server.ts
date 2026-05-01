@@ -2,11 +2,12 @@ import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import {
+	achievement,
 	equipment,
 	exercise,
 	set as setTable
 } from '$lib/server/db/schema';
-import { isNull, eq, and, asc } from 'drizzle-orm';
+import { isNull, eq, and, asc, desc } from 'drizzle-orm';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -297,6 +298,20 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		.sort((a, b) => b.lastTs - a.lastTs)
 		.map(({ lastTs: _lastTs, ...card }) => card satisfies MachineCard);
 
+	// Earned achievement keys + unlock timestamps for this user. The
+	// definitions array is the source of truth for visible-locked entries
+	// (rendered client-side); we only ship what the user has actually
+	// unlocked plus the timestamp so the gallery can sort and date.
+	const earnedRows = (await db
+		.select({ badgeKey: achievement.badgeKey, unlockedAt: achievement.unlockedAt })
+		.from(achievement)
+		.where(eq(achievement.userId, locals.user.id))
+		.orderBy(desc(achievement.unlockedAt))) as { badgeKey: string; unlockedAt: Date }[];
+	const earnedAchievements = earnedRows.map((r) => ({
+		badgeKey: r.badgeKey,
+		unlockedAt: r.unlockedAt.getTime()
+	}));
+
 	return {
 		userName: locals.user.name,
 		range,
@@ -304,6 +319,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		groupCounts,
 		groupMax: Math.max(...Object.values(groupCounts), 1),
 		cardioSummary,
-		machineCards
+		machineCards,
+		earnedAchievements
 	};
 };

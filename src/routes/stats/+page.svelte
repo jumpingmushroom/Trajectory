@@ -2,8 +2,10 @@
 	import EquipmentGlyph from '$lib/components/EquipmentGlyph.svelte';
 	import Sparkline from '$lib/components/Sparkline.svelte';
 	import TabBar from '$lib/components/TabBar.svelte';
+	import AchievementBadge from '$lib/components/AchievementBadge.svelte';
 	import type { GlyphKind } from '$lib/components/glyph-kinds';
 	import type { PageData } from './$types';
+	import { BADGE_DEFINITIONS } from '$lib/achievements/definitions';
 
 	let { data }: { data: PageData } = $props();
 
@@ -35,6 +37,25 @@
 	function fmtKm(n: number): string {
 		return `${n.toFixed(1)} km`;
 	}
+
+	const earnedMap = $derived(
+		new Map(data.earnedAchievements.map((a) => [a.badgeKey, a.unlockedAt]))
+	);
+	const earnedDefs = $derived(
+		BADGE_DEFINITIONS.filter((d) => earnedMap.has(d.key)).sort(
+			(a, b) => (earnedMap.get(b.key) ?? 0) - (earnedMap.get(a.key) ?? 0)
+		)
+	);
+	// Locked: every visible (non-hidden) badge the user hasn't earned, plus
+	// any hidden badge they HAVE earned (revealed after unlock). Pure
+	// hidden+locked = invisible until earned.
+	const visibleLockedDefs = $derived(
+		BADGE_DEFINITIONS.filter((d) => !d.hidden && !earnedMap.has(d.key))
+	);
+	const earnedCount = $derived(earnedDefs.length);
+	const totalVisibleCount = $derived(
+		BADGE_DEFINITIONS.filter((d) => !d.hidden || earnedMap.has(d.key)).length
+	);
 </script>
 
 <svelte:head>
@@ -69,7 +90,43 @@
 		</a>
 	</header>
 
-	<nav class="mt-3 flex gap-1.5" aria-label="Time range">
+	{#if earnedDefs.length > 0 || visibleLockedDefs.length > 0}
+		<section class="mt-4 flex flex-col gap-2">
+			<div class="flex items-baseline justify-between">
+				<div
+					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					style="color: var(--color-text-dim-2);"
+				>
+					Achievements · {earnedCount}/{totalVisibleCount}
+				</div>
+				<a
+					href="/stats/achievements"
+					class="text-[11px] font-semibold"
+					style="color: var(--color-amber);"
+				>
+					see all →
+				</a>
+			</div>
+			<div
+				class="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1"
+				style="scrollbar-width: none;"
+			>
+				{#each (earnedDefs.length > 0 ? earnedDefs : visibleLockedDefs).slice(0, 6) as def (def.key)}
+					{@const earned = earnedMap.has(def.key)}
+					<div class="flex-shrink-0">
+						<AchievementBadge
+							{def}
+							{earned}
+							unlockedAt={earnedMap.get(def.key) ?? null}
+							size="sm"
+						/>
+					</div>
+				{/each}
+			</div>
+		</section>
+	{/if}
+
+	<nav class="mt-4 flex gap-1.5" aria-label="Time range">
 		{#each ranges as r (r.key)}
 			{@const active = r.key === data.range}
 			<a
