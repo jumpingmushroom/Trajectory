@@ -43,6 +43,10 @@ jobs:
       - name: Boot dev container
         run: |
           mkdir -p data
+          # Container runs as `node` (UID 1000); the runner is UID 1001,
+          # so without this chown the bind-mounted data/ is read-only to
+          # better-sqlite3 → SQLITE_READONLY_DIRECTORY on WAL setup.
+          sudo chown -R 1000:1000 data
           docker compose up -d
           # Wait up to 90s for the dev server to come online.
           for i in $(seq 1 45); do
