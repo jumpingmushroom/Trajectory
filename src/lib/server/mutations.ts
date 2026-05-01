@@ -8,6 +8,7 @@
 // server validates their format on every call.
 
 import { eq, and, isNull, desc, asc, gte, gt, lt, sql } from 'drizzle-orm';
+import { evaluateAchievements } from './achievements/evaluator';
 import { db } from './db';
 import { startOfUtcDay } from '../dateMode';
 import {
@@ -525,6 +526,9 @@ function resolveSession(
 					.set({ endedAt: new Date(lastTs), updatedAt: new Date() })
 					.where(eq(workoutSession.id, open.id))
 					.run();
+				// Auto-close counts as a session.ended trigger; non-empty
+				// sessions can earn duration/density-based achievements here.
+				evaluateAchievements(tx, userId, 'session.ended', { sessionId: open.id });
 			}
 		}
 
@@ -775,6 +779,14 @@ async function setCreate(
 			}
 		}
 
+		// Evaluate achievement predicates against the just-inserted set.
+		// Runs in the same transaction so awards roll back together with
+		// the set if the parent insert later throws.
+		evaluateAchievements(tx, userId, 'set.created', {
+			setId: payload.id,
+			sessionId: session.sessionId
+		});
+
 		return { session, row };
 	});
 
@@ -927,15 +939,25 @@ async function sessionEnd(
 	if (!target) notFound(`session ${payload.id} not found`);
 	if (target.endedAt != null) return target;
 
-	const now = new Date();
-	await db
-		.update(workoutSession)
-		.set({ endedAt: now, updatedAt: now })
-		.where(eq(workoutSession.id, payload.id));
-	const row = (
-		await db.select().from(workoutSession).where(eq(workoutSession.id, payload.id)).limit(1)
-	)[0];
-	if (!row) notFound(`session ${payload.id} not found after end`);
+	// Wrap the close + achievement evaluation in a single sync transaction
+	// so the evaluator's awards roll back if the update fails. Sync body
+	// required by better-sqlite3 12.x.
+	const row = db.transaction((tx) => {
+		const now = new Date();
+		tx.update(workoutSession)
+			.set({ endedAt: now, updatedAt: now })
+			.where(eq(workoutSession.id, payload.id))
+			.run();
+		evaluateAchievements(tx, userId, 'session.ended', { sessionId: payload.id });
+		const fresh = tx
+			.select()
+			.from(workoutSession)
+			.where(eq(workoutSession.id, payload.id))
+			.limit(1)
+			.get() as WorkoutSession | undefined;
+		if (!fresh) notFound(`session ${payload.id} not found after end`);
+		return fresh;
+	});
 	return row;
 }
 
