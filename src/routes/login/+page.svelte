@@ -68,6 +68,16 @@
 			</div>
 		</div>
 
+		{#if data.redirected}
+			<div
+				role="alert"
+				class="rounded-md border px-3 py-2 text-[12px]"
+				style="background: var(--color-amber-dim); border-color: var(--color-amber-line); color: var(--color-amber);"
+			>
+				Your session expired. Sign in to continue.
+			</div>
+		{/if}
+
 		<label class="flex flex-col gap-1">
 			<span
 				class="text-[10px] font-bold uppercase tracking-[0.14em]"

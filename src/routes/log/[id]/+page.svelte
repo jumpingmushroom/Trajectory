@@ -88,6 +88,26 @@
 		lastLogAt == null ? null : Math.max(0, REST_SECS - Math.floor((now - lastLogAt) / 1000))
 	);
 
+	// One-shot swipe affordance hint: shown until the user actually
+	// swipes (clone/delete) once. Persisted in localStorage so the hint
+	// disappears across sessions.
+	const SWIPE_HINT_KEY = 'trajectory.swipeHintSeen';
+	let swipeHintSeen = $state(false);
+	$effect(() => {
+		if (typeof localStorage === 'undefined') return;
+		swipeHintSeen = localStorage.getItem(SWIPE_HINT_KEY) === '1';
+	});
+	function markSwipeHintSeen() {
+		if (swipeHintSeen) return;
+		swipeHintSeen = true;
+		try {
+			localStorage.setItem(SWIPE_HINT_KEY, '1');
+		} catch {
+			// localStorage unavailable (private mode, quota); the in-memory
+			// flag still hides the hint for this session.
+		}
+	}
+
 	const status = $derived($syncStatus);
 
 	// Optimistic display: include set.create mutations still in the local
@@ -224,6 +244,7 @@
 
 	async function handleClone(s: { weight: number | null; reps: number | null }) {
 		if (s.weight == null || s.reps == null) return;
+		markSwipeHintSeen();
 		try {
 			await mutate('set.create', {
 				id: ulid(),
@@ -239,6 +260,7 @@
 	}
 
 	async function handleDelete(setId: string) {
+		markSwipeHintSeen();
 		try {
 			await mutate('set.delete', { id: setId });
 		} catch (err) {
@@ -708,14 +730,16 @@
 					{/if}
 				{/each}
 			</div>
-			<div
-				class="text-center text-[11px]"
-				style="color: var(--color-text-dim-2);"
-			>
-				{isCardio
-					? '← swipe to delete'
-					: 'tap a set to edit · swipe ← to delete · swipe → to clone'}
-			</div>
+			{#if !swipeHintSeen}
+				<div
+					class="text-center text-[11px]"
+					style="color: var(--color-text-dim-2);"
+				>
+					{isCardio
+						? '← swipe to delete'
+						: 'tap a set to edit · swipe ← to delete · swipe → to clone'}
+				</div>
+			{/if}
 		</section>
 	{/if}
 

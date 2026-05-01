@@ -6,6 +6,7 @@
 import { invalidateAll } from '$app/navigation';
 import { clientId, complete, listPending, recordFailure, pendingCount } from './queue';
 import { syncStatus, refreshPendingCount } from './status';
+import { pushToast } from '$lib/stores/toast';
 
 const BACKOFFS_MS = [1_000, 2_000, 4_000, 8_000, 16_000];
 const STEADY_BACKOFF_MS = 30_000;
@@ -102,6 +103,7 @@ export async function drainNow(): Promise<{ drained: number; remaining: number }
 				// to avoid an infinite loop. Logged loudly so a debug screen
 				// (or `console.error` in DevTools on desktop) surfaces it.
 				console.error(`[sync] ${m.op} ${m.mutationId} rejected (${result.status}): ${result.body}`);
+				pushToast(`Couldn't save ${m.op.replace(/\./g, ' ')} — change discarded.`);
 				await complete(m.mutationId);
 			} else {
 				const delay = backoffFor(m.attempts);

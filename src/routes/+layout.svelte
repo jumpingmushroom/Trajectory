@@ -3,6 +3,7 @@
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import OfflineBanner from '$lib/components/OfflineBanner.svelte';
+	import ToastHost from '$lib/components/ToastHost.svelte';
 	import { startSyncRuntime } from '$lib/sync/sync';
 
 	let { children } = $props();
@@ -26,3 +27,5 @@
 <OfflineBanner />
 
 {@render children()}
+
+<ToastHost />
