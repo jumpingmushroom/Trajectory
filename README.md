@@ -57,12 +57,19 @@ Recommended shape:
 
 **Use SQLite's `.backup` API, never `cp`** (per D6 — `cp` of a live SQLite file can copy a torn page).
 
+`scripts/backup.sh` takes a snapshot via the running container (uses `better-sqlite3`'s online backup API, no `sqlite3` CLI required), drops it under `data/backups/db-<ts>.sqlite`, and prunes old snapshots. Retention: every snapshot from the last 14 days, plus the newest snapshot per ISO week for the 8 most recent weeks beyond. Pre-migration snapshots (`data/db.sqlite.pre-migration-*`) trim to the 5 most recent.
+
 ```sh
-docker exec trajectory sqlite3 /app/data/db.sqlite \
-  ".backup /app/data/backup-$(date -Iseconds).sqlite"
+# one-shot
+./scripts/backup.sh
+
+# daily 04:00 UTC via host crontab
+0 4 * * * /srv/trajectory/scripts/backup.sh >> /var/log/trajectory-backup.log 2>&1
 ```
 
-For automated backups, schedule that command via cron on the host. Restic / borg / rsync over the entire `data/` directory (which includes equipment photos under `data/uploads/`) is `FUTURE.md` territory.
+Override the defaults via env vars: `TRAJECTORY_CONTAINER` (default `trajectory`), `TRAJECTORY_DATA_DIR` (default `<repo>/data`).
+
+This script writes snapshots **inside the same `data/` volume** — it protects against in-app data corruption (bad migration, bad write) but NOT against host disk loss. For off-host protection, schedule restic / borg / rsync of the whole `data/` directory separately. That covers `db.sqlite`, the snapshots under `data/backups/`, and equipment photos under `data/uploads/`.
 
 You can also export everything as CSV from inside the app: Stats screen → "Export everyone's data as CSV". Useful for portability + spreadsheet analysis; not a substitute for binary backups (the CSV doesn't include equipment photos or DB-internal state like the mutation_log).
 

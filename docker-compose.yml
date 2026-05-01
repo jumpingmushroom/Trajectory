@@ -27,6 +27,8 @@ services:
       - ./src:/app/src
       - ./static:/app/static
       - ./drizzle:/app/drizzle
+      - ./scripts:/app/scripts
+      - ./tests:/app/tests
       - ./svelte.config.js:/app/svelte.config.js
       - ./vite.config.ts:/app/vite.config.ts
       - ./drizzle.config.ts:/app/drizzle.config.ts

@@ -138,11 +138,15 @@ Deployment shape:
 
 **Always use SQLite's `.backup` API, never `cp`** (per D6 — `cp` of a live file can copy a torn page).
 
+`scripts/backup.sh` is the entry point. Invokes `better-sqlite3.backup()` inside the running container, writes to `data/backups/db-<ts>.sqlite`, prunes to 14 dailies + 8 weeklies (plus the 5 most-recent pre-migration snapshots).
+
 ```bash
-docker exec trajectory sqlite3 /app/data/db.sqlite ".backup /app/data/backup-$(date -Iseconds).sqlite"
+./scripts/backup.sh
+# host crontab:
+# 0 4 * * * /srv/trajectory/scripts/backup.sh >> /var/log/trajectory-backup.log 2>&1
 ```
 
-For automated backups, schedule that command via cron on the host. Restic / borg / rsync of the entire `data/` directory is FUTURE.
+This protects against in-app corruption only — snapshots live in the same `data/` volume. Off-host protection (restic / borg / rsync of the whole `data/` directory) is FUTURE and must be configured separately.
 
 ## Conventions
 
