@@ -43,16 +43,18 @@
 		>
 			{def.title}
 		</div>
+		<div
+			class="max-w-[140px] text-center text-[10px] leading-snug"
+			style="color: var(--color-text-dim-2);"
+		>
+			{def.description}
+		</div>
 		{#if earned && unlockedAt}
-			<div class="text-[10px]" style="color: var(--color-text-dim-2);">
-				{fmtDate(unlockedAt)}
-			</div>
-		{:else if !earned}
 			<div
-				class="max-w-[140px] text-center text-[10px] leading-snug"
-				style="color: var(--color-text-dim-2);"
+				class="text-[10px] font-medium tabular-nums"
+				style="color: var(--color-amber);"
 			>
-				{def.description}
+				{fmtDate(unlockedAt)}
 			</div>
 		{/if}
 	{/if}
