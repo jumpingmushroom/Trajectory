@@ -7,7 +7,7 @@
 // ULIDs in payloads are minted client-side (per DECISIONS D4). The
 // server validates their format on every call.
 
-import { eq, and, isNull, desc, asc, gte, gt, lt } from 'drizzle-orm';
+import { eq, and, isNull, desc, asc, gte, gt, lt, sql } from 'drizzle-orm';
 import { db } from './db';
 import { startOfUtcDay } from '../dateMode';
 import {
@@ -384,16 +384,18 @@ async function equipmentDelete(payload: {
 	const now = Date.now();
 	// Atomic: if the cascade fails, the equipment row stays live too. Otherwise
 	// a crash mid-cascade leaves orphaned exercises that join cleanly through
-	// to a tombstoned equipment.
-	await db.transaction(async (tx) => {
-		await tx
+	// to a tombstoned equipment. Sync body required by better-sqlite3 12.x.
+	db.transaction((tx) => {
+		tx
 			.update(equipment)
 			.set({ deletedAt: new Date(now), updatedAt: new Date(now) })
-			.where(eq(equipment.id, payload.id));
-		await tx
+			.where(eq(equipment.id, payload.id))
+			.run();
+		tx
 			.update(exercise)
 			.set({ deletedAt: new Date(now), updatedAt: new Date(now) })
-			.where(eq(exercise.equipmentId, payload.id));
+			.where(eq(exercise.equipmentId, payload.id))
+			.run();
 	});
 	return { id: payload.id, deletedAt: now };
 }
@@ -459,12 +461,16 @@ const EMPTY_SESSION_ATTACH_MS = 6 * 60 * 60 * 1000;
 // types directly.
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-async function resolveSession(
+// Sync because better-sqlite3 12.x rejects async transaction bodies
+// ("Transaction function cannot return a promise"). Drizzle's better-sqlite3
+// driver runs queries synchronously; we use `.get()`/`.run()` to execute
+// without going through the async wrapper.
+function resolveSession(
 	tx: Tx,
 	userId: string,
 	gymId: string,
 	tsMs: number
-): Promise<{ sessionId: string; isNew: boolean; isBackdated: boolean }> {
+): { sessionId: string; isNew: boolean; isBackdated: boolean } {
 	// A set is "live" when its ts is within one extension window of now.
 	// Anything older is a backdated entry and must not touch the user's
 	// current open session — that's the whole reason this branch exists.
@@ -472,24 +478,22 @@ async function resolveSession(
 
 	if (isLive) {
 		// Look at the user's most recent open session.
-		const open = (
-			await tx
-				.select()
-				.from(workoutSession)
-				.where(and(eq(workoutSession.userId, userId), isNull(workoutSession.endedAt)))
-				.orderBy(desc(workoutSession.startedAt))
-				.limit(1)
-		)[0] as WorkoutSession | undefined;
+		const open = tx
+			.select()
+			.from(workoutSession)
+			.where(and(eq(workoutSession.userId, userId), isNull(workoutSession.endedAt)))
+			.orderBy(desc(workoutSession.startedAt))
+			.limit(1)
+			.get() as WorkoutSession | undefined;
 
 		if (open) {
-			const lastSet = (
-				await tx
-					.select({ ts: setTable.ts })
-					.from(setTable)
-					.where(and(eq(setTable.workoutSessionId, open.id), isNull(setTable.deletedAt)))
-					.orderBy(desc(setTable.ts))
-					.limit(1)
-			)[0] as { ts: Date } | undefined;
+			const lastSet = tx
+				.select({ ts: setTable.ts })
+				.from(setTable)
+				.where(and(eq(setTable.workoutSessionId, open.id), isNull(setTable.deletedAt)))
+				.orderBy(desc(setTable.ts))
+				.limit(1)
+				.get() as { ts: Date } | undefined;
 
 			if (!lastSet) {
 				// Empty open session — typically a manual start before any sets,
@@ -503,10 +507,11 @@ async function resolveSession(
 				if (delta >= 0 && delta <= EMPTY_SESSION_ATTACH_MS) {
 					return { sessionId: open.id, isNew: false, isBackdated: false };
 				}
-				await tx
+				tx
 					.update(workoutSession)
 					.set({ endedAt: open.startedAt, updatedAt: new Date() })
-					.where(eq(workoutSession.id, open.id));
+					.where(eq(workoutSession.id, open.id))
+					.run();
 			} else {
 				const lastTs = lastSet.ts.getTime();
 				const shouldExtend = tsMs - lastTs <= SESSION_EXTEND_MS && tsMs - lastTs >= 0;
@@ -515,20 +520,23 @@ async function resolveSession(
 				}
 				// Close the stale open session. endedAt pinned to last activity
 				// (not the new set's tsMs) — gap is downtime, not workout time.
-				await tx
+				tx
 					.update(workoutSession)
 					.set({ endedAt: new Date(lastTs), updatedAt: new Date() })
-					.where(eq(workoutSession.id, open.id));
+					.where(eq(workoutSession.id, open.id))
+					.run();
 			}
 		}
 
 		const sessionId = newUlid();
-		await tx.insert(workoutSession).values({
-			id: sessionId,
-			userId,
-			gymId,
-			startedAt: new Date(tsMs)
-		});
+		tx.insert(workoutSession)
+			.values({
+				id: sessionId,
+				userId,
+				gymId,
+				startedAt: new Date(tsMs)
+			})
+			.run();
 		return { sessionId, isNew: true, isBackdated: false };
 	}
 
@@ -539,45 +547,97 @@ async function resolveSession(
 	const dayStart = startOfUtcDay(tsMs);
 	const dayEnd = dayStart + 86_400_000;
 
-	const candidate = (
-		await tx
-			.select()
-			.from(workoutSession)
-			.where(
-				and(
-					eq(workoutSession.userId, userId),
-					eq(workoutSession.gymId, gymId),
-					gte(workoutSession.startedAt, new Date(dayStart)),
-					lt(workoutSession.startedAt, new Date(dayEnd))
-				)
+	const candidate = tx
+		.select()
+		.from(workoutSession)
+		.where(
+			and(
+				eq(workoutSession.userId, userId),
+				eq(workoutSession.gymId, gymId),
+				gte(workoutSession.startedAt, new Date(dayStart)),
+				lt(workoutSession.startedAt, new Date(dayEnd))
 			)
-			.orderBy(asc(workoutSession.startedAt))
-			.limit(1)
-	)[0] as WorkoutSession | undefined;
+		)
+		.orderBy(asc(workoutSession.startedAt))
+		.limit(1)
+		.get() as WorkoutSession | undefined;
 
 	if (candidate) {
 		// If the new set predates the current startedAt, push the start
 		// back. endedAt is recomputed by the caller after the set inserts.
 		if (tsMs < candidate.startedAt.getTime()) {
-			await tx
+			tx
 				.update(workoutSession)
 				.set({ startedAt: new Date(tsMs), updatedAt: new Date() })
-				.where(eq(workoutSession.id, candidate.id));
+				.where(eq(workoutSession.id, candidate.id))
+				.run();
 		}
 		return { sessionId: candidate.id, isNew: false, isBackdated: true };
 	}
 
 	const sessionId = newUlid();
-	await tx.insert(workoutSession).values({
-		id: sessionId,
-		userId,
-		gymId,
-		startedAt: new Date(tsMs),
-		// Provisional close at tsMs; the caller's MAX(set.ts) update keeps
-		// this honest if more sets later land in this same session.
-		endedAt: new Date(tsMs)
-	});
+	tx.insert(workoutSession)
+		.values({
+			id: sessionId,
+			userId,
+			gymId,
+			startedAt: new Date(tsMs),
+			// Provisional close at tsMs; the caller's MAX(set.ts) update keeps
+			// this honest if more sets later land in this same session.
+			endedAt: new Date(tsMs)
+		})
+		.run();
 	return { sessionId, isNew: true, isBackdated: true };
+}
+
+// Returns true when the about-to-insert set strictly beats the user's
+// prior best for the same exercise. Strength compares MAX(weight); cardio
+// compares MAX(extras.distance). First-ever qualifying set is also a PR.
+// Sets with weight=0 (strength) or no distance (cardio) never PR.
+async function evaluatePr(
+	userId: string,
+	exerciseId: string,
+	isCardio: boolean,
+	weight: number | null,
+	extras: Record<string, number> | null
+): Promise<boolean> {
+	if (isCardio) {
+		const distance = extras?.distance;
+		if (typeof distance !== 'number' || !Number.isFinite(distance) || distance <= 0) {
+			return false;
+		}
+		const row = (
+			await db
+				.select({ max: sql<number | null>`MAX(json_extract(${setTable.extras}, '$.distance'))` })
+				.from(setTable)
+				.where(
+					and(
+						eq(setTable.userId, userId),
+						eq(setTable.exerciseId, exerciseId),
+						isNull(setTable.deletedAt)
+					)
+				)
+		)[0];
+		const prior = row?.max ?? null;
+		return prior == null || distance > prior;
+	}
+	if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0) {
+		return false;
+	}
+	const row = (
+		await db
+			.select({ max: sql<number | null>`MAX(${setTable.weight})` })
+			.from(setTable)
+			.where(
+				and(
+					eq(setTable.userId, userId),
+					eq(setTable.exerciseId, exerciseId),
+					isNull(setTable.deletedAt)
+				)
+			)
+	)[0];
+	const prior = row?.max ?? null;
+	return prior == null || weight > prior;
 }
 
 async function setCreate(
@@ -652,14 +712,21 @@ async function setCreate(
 		reps = payload.reps;
 	}
 
+	// PR evaluation: strength compares against MAX(weight); cardio against
+	// MAX(extras.distance). Strict greater-than only — ties don't count.
+	// Computed inside the transaction below so a concurrent set.create from
+	// the same user can't both see the same prior max and both flag PR.
+	const isPr = await evaluatePr(userId, payload.exerciseId, isCardio, weight, extras);
+
 	// Resolve session + insert the set in one transaction. Two concurrent
 	// set.create calls from the same user (e.g. queue drain firing twice)
 	// would otherwise each see "no open session" and create duplicates.
 	// SQLite WAL serialises BEGIN IMMEDIATE writers, so the second caller
 	// blocks until the first commits and then sees the open session.
-	const { session, row } = await db.transaction(async (tx) => {
-		const session = await resolveSession(tx, userId, eqRow.gymId, ts);
-		await tx
+	// Sync body required by better-sqlite3 12.x.
+	const { session, row } = db.transaction((tx) => {
+		const session = resolveSession(tx, userId, eqRow.gymId, ts);
+		tx
 			.insert(setTable)
 			.values({
 				id: payload.id,
@@ -670,36 +737,41 @@ async function setCreate(
 				reps,
 				durationMin,
 				extras,
+				isPr,
 				ts: new Date(ts)
 			})
-			.onConflictDoNothing();
-		const row = (
-			await tx.select().from(setTable).where(eq(setTable.id, payload.id)).limit(1)
-		)[0];
+			.onConflictDoNothing()
+			.run();
+		const row = tx
+			.select()
+			.from(setTable)
+			.where(eq(setTable.id, payload.id))
+			.limit(1)
+			.get() as SetRow | undefined;
 		if (!row) notFound(`set ${payload.id} not found after insert`);
 
 		// Backdated sessions stay closed; pin endedAt to the latest set ts
 		// so History/Stats see a coherent (startedAt..endedAt) range no
 		// matter what order sets arrive in.
 		if (session.isBackdated) {
-			const latest = (
-				await tx
-					.select({ ts: setTable.ts })
-					.from(setTable)
-					.where(
-						and(
-							eq(setTable.workoutSessionId, session.sessionId),
-							isNull(setTable.deletedAt)
-						)
+			const latest = tx
+				.select({ ts: setTable.ts })
+				.from(setTable)
+				.where(
+					and(
+						eq(setTable.workoutSessionId, session.sessionId),
+						isNull(setTable.deletedAt)
 					)
-					.orderBy(desc(setTable.ts))
-					.limit(1)
-			)[0] as { ts: Date } | undefined;
+				)
+				.orderBy(desc(setTable.ts))
+				.limit(1)
+				.get() as { ts: Date } | undefined;
 			if (latest) {
-				await tx
+				tx
 					.update(workoutSession)
 					.set({ endedAt: latest.ts, updatedAt: new Date() })
-					.where(eq(workoutSession.id, session.sessionId));
+					.where(eq(workoutSession.id, session.sessionId))
+					.run();
 			}
 		}
 

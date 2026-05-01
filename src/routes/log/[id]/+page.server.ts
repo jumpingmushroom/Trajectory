@@ -19,6 +19,10 @@ export interface ExerciseContext {
 	lastDurationMin: number | null;
 	commonWeights: number[];
 	sparklineSeries: number[];
+	// Current PR for this exercise & user. Strength: MAX(weight). Cardio:
+	// MAX(extras.distance). Null when no qualifying prior set exists.
+	// Used by the client for optimistic "New PR" feedback at log time.
+	prValue: number | null;
 }
 
 export const load: PageServerLoad = async ({ locals, params, url }) => {
@@ -121,6 +125,22 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			.filter((v): v is number => typeof v === 'number')
 			.slice(-10);
 
+		let prValue: number | null = null;
+		if (eqRow.type === 'cardio') {
+			for (const s of own) {
+				const d = s.extras?.distance;
+				if (typeof d === 'number' && Number.isFinite(d) && d > 0) {
+					if (prValue == null || d > prValue) prValue = d;
+				}
+			}
+		} else {
+			for (const s of own) {
+				if (typeof s.weight === 'number' && s.weight > 0) {
+					if (prValue == null || s.weight > prValue) prValue = s.weight;
+				}
+			}
+		}
+
 		return {
 			id: ex.id,
 			name: ex.name,
@@ -129,7 +149,8 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			lastReps: last?.reps ?? null,
 			lastDurationMin: last?.durationMin ?? null,
 			commonWeights,
-			sparklineSeries
+			sparklineSeries,
+			prValue
 		};
 	});
 

@@ -13,6 +13,7 @@
 	import type { GlyphKind } from '$lib/components/glyph-kinds';
 	import { fieldsFor, type CardioField } from '$lib/cardio-templates';
 	import { syncStatus } from '$lib/sync/status';
+	import { pushToast } from '$lib/stores/toast';
 	import { tsForBackdate, withDateMode } from '$lib/dateMode';
 	import type { PageData } from './$types';
 
@@ -69,11 +70,21 @@
 			reps = ctx.lastReps ?? reps;
 			duration = ctx.lastDurationMin ?? duration;
 			lastSetExerciseId = selectedExerciseId;
+			// Reset the PR-celebration baseline when switching exercises so a
+			// PR locked on the previous exercise doesn't suppress one here.
+			lastCelebratedPr = null;
 		}
 	});
 
 	let logging = $state(false);
 	let justSaved = $state(false);
+	let justPr = $state(false);
+	// Highest PR locked in this session — used to suppress duplicate
+	// celebrations when a user fires off several PR-tying or PR-beating
+	// sets in a row before the page reloads. Compared against the live
+	// `ctx.prValue` so a fresh page load (with the new PR baked in)
+	// resets it correctly.
+	let lastCelebratedPr = $state<number | null>(null);
 	let error = $state<string | null>(null);
 	let lastLogAt = $state<number | null>(null);
 	let now = $state(Date.now());
@@ -201,6 +212,9 @@
 		logging = true;
 		try {
 			const id = ulid();
+			let prValue: number | null = null;
+			let prUnit = '';
+			let didPr = false;
 			if (isCardio) {
 				if (duration <= 0) {
 					error = 'Duration must be greater than 0.';
@@ -210,6 +224,15 @@
 				for (const [k, v] of Object.entries(cardioExtras)) {
 					if (typeof v === 'number' && Number.isFinite(v)) extras[k] = v;
 				}
+				const distance = extras.distance;
+				if (typeof distance === 'number' && distance > 0) {
+					const baseline = Math.max(ctx?.prValue ?? 0, lastCelebratedPr ?? 0);
+					if (distance > baseline) {
+						didPr = true;
+						prValue = distance;
+						prUnit = eq.cardioKind === 'rower' ? 'm' : 'km';
+					}
+				}
 				await mutate('set.create', {
 					id,
 					exerciseId: selectedExerciseId,
@@ -218,6 +241,14 @@
 					ts: setTs()
 				});
 			} else {
+				if (weight > 0) {
+					const baseline = Math.max(ctx?.prValue ?? 0, lastCelebratedPr ?? 0);
+					if (weight > baseline) {
+						didPr = true;
+						prValue = weight;
+						prUnit = 'kg';
+					}
+				}
 				await mutate('set.create', {
 					id,
 					exerciseId: selectedExerciseId,
@@ -228,8 +259,16 @@
 				if (setsDone + 1 > targetSets) targetSets = setsDone + 1;
 			}
 			justSaved = true;
+			justPr = didPr;
 			lastLogAt = Date.now();
-			setTimeout(() => (justSaved = false), 700);
+			if (didPr && prValue != null) {
+				lastCelebratedPr = prValue;
+				pushToast(`New PR · ${fmtNum(prValue)} ${prUnit}`, 'info', 4000);
+			}
+			setTimeout(() => {
+				justSaved = false;
+				justPr = false;
+			}, didPr ? 1500 : 700);
 			// mutate() handles invalidation when the queue successfully drains;
 			// when offline it queues silently and the optimistic overlay
 			// covers the UI until reconnect — we explicitly don't call
@@ -294,7 +333,7 @@
 	}
 
 	const buttonLabel = $derived.by(() => {
-		if (justSaved) return 'Logged';
+		if (justSaved) return justPr ? 'New PR · Logged' : 'Logged';
 		if (isCardio) {
 			const parts = [`${fmtNum(duration)} min`];
 			for (const f of cardioFields) {
