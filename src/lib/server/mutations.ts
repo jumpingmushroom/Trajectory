@@ -953,19 +953,36 @@ async function setUpdate(payload: SetUpdate, userId: string): Promise<SetRow> {
 
 	if (Object.keys(updates).length === 1) badRequest('set.update needs at least one field');
 
+	// All three predicates matter: id (target row), userId (tenancy), and
+	// deletedAt IS NULL (don't resurrect a tombstoned set). Without the
+	// deletedAt filter, a "delete then edit" race could write fields onto a
+	// soft-deleted row that History/Stats already hide but which still
+	// counts toward MAX(weight) PR comparisons.
 	await db
 		.update(setTable)
 		.set(updates)
-		.where(and(eq(setTable.id, payload.id), eq(setTable.userId, userId)));
+		.where(
+			and(
+				eq(setTable.id, payload.id),
+				eq(setTable.userId, userId),
+				isNull(setTable.deletedAt)
+			)
+		);
 
-	// SELECT must also filter by userId — otherwise a request that targets
-	// another user's set id would update nothing but still return the row,
-	// leaking weight/reps/ts.
+	// SELECT mirrors the same predicates — a set that's missing, owned by
+	// someone else, or already deleted should all 404 the same way so the
+	// caller can't infer existence from the error code.
 	const row = (
 		await db
 			.select()
 			.from(setTable)
-			.where(and(eq(setTable.id, payload.id), eq(setTable.userId, userId)))
+			.where(
+				and(
+					eq(setTable.id, payload.id),
+					eq(setTable.userId, userId),
+					isNull(setTable.deletedAt)
+				)
+			)
 			.limit(1)
 	)[0];
 	if (!row) notFound(`set ${payload.id} not found`);
@@ -977,6 +994,26 @@ async function setDelete(
 	userId: string
 ): Promise<{ id: string; deletedAt: number }> {
 	assertUlid(payload.id, 'id');
+	// Confirm the row exists and belongs to the caller before tombstoning.
+	// Without this, a misrouted client (wrong id, or another user's set)
+	// silently no-ops and never learns the request was bogus. Aligns this
+	// handler with gymDelete / equipmentDelete / exerciseDelete which all
+	// assert ownership first.
+	const existing = (
+		await db
+			.select({ id: setTable.id })
+			.from(setTable)
+			.where(
+				and(
+					eq(setTable.id, payload.id),
+					eq(setTable.userId, userId),
+					isNull(setTable.deletedAt)
+				)
+			)
+			.limit(1)
+	)[0];
+	if (!existing) notFound(`set ${payload.id} not found`);
+
 	const now = Date.now();
 	await db
 		.update(setTable)
