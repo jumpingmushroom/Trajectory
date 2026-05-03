@@ -36,7 +36,7 @@ export const auth = betterAuth({
 		// it also blocks the server-side `auth.api.signUpEmail` call we use
 		// during admin seed and invite creation. Instead, `hooks.server.ts`
 		// blocks the public POST /api/auth/sign-up/email route.
-		minPasswordLength: 6,
+		minPasswordLength: 8,
 		// Self-service password reset: BA fires this when /request-password-reset
 		// is POSTed with a known email. The `url` argument already includes the
 		// reset token as a query parameter, pointing at the redirectTo we send.
@@ -47,6 +47,32 @@ export const auth = betterAuth({
 	session: {
 		expiresIn: 60 * 60 * 24 * 30, // 30 days
 		updateAge: 60 * 60 * 24 // refresh once per day
+	},
+	// Rate limiting. Better Auth only enables this in production by default,
+	// so dev (`pnpm dev` + smoke tests) is unaffected. Storage is in-memory,
+	// which is fine for the single-container deploy: the table doesn't need
+	// to survive a restart, and there's no second process to share state
+	// with. The global window/max acts as a coarse DoS shield; the explicit
+	// `customRules` cover the credential-attack and email-spam surfaces that
+	// matter most for a public-facing self-hosted instance.
+	rateLimit: {
+		enabled: true,
+		window: 10,
+		max: 100,
+		customRules: {
+			// Credential stuffing: 10 attempts per 5 minutes per IP. Better
+			// Auth's matcher is path-prefix based, so this also catches
+			// /sign-in/email/* if any future variant is added.
+			'/sign-in/email': { window: 300, max: 10 },
+			// Password-reset email spam: 5 requests per hour per IP. Reset
+			// emails are expensive (SMTP round-trip) and the endpoint
+			// silently succeeds on unknown emails, so it's tempting bait.
+			'/request-password-reset': { window: 3600, max: 5 },
+			// Forgot-password verification: same posture as sign-in to
+			// throttle token-guessing if a leaked email lands in an attacker's
+			// hands.
+			'/reset-password': { window: 300, max: 10 }
+		}
 	},
 	advanced: {
 		cookiePrefix: 'trajectory'
