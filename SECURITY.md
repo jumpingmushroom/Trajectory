@@ -22,6 +22,23 @@ Include as much of the following as you can:
 - The Trajectory version you observed it on (the version footer is on the Setup screen).
 - Any logs or stack traces.
 
+## Built-in hardening
+
+- **Rate limiting.** Sign-in, password reset request, and reset confirmation
+  are throttled in production via Better Auth's built-in limiter (in-memory
+  store, scoped to the single container). A reverse proxy can layer
+  additional limits in front if you expose the instance directly to the
+  internet.
+- **Public sign-up disabled.** Accounts are only created through the
+  admin-issued invite flow.
+- **Path-traversal and MIME guards** on `/uploads/<path>`; uploaded images
+  are transcoded by `sharp` (EXIF stripped, re-encoded as WEBP) before they
+  hit disk.
+- **Minimum password length** is 8 characters at the auth layer.
+
+These are baseline measures, not a substitute for keeping the host patched
+and not exposing the instance without TLS.
+
 ## What to expect
 
 - **Acknowledgement** within 7 days.
