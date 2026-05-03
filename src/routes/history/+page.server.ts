@@ -1,13 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import {
-	gym,
-	equipment,
-	exercise,
-	set as setTable,
-	workoutSession
-} from '$lib/server/db/schema';
+import { gym, equipment, exercise, set as setTable, workoutSession } from '$lib/server/db/schema';
 import { isNull, eq, and, desc, asc } from 'drizzle-orm';
 
 export interface HistorySessionSummary {
@@ -146,17 +140,14 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.filter((s) => s.machineCount > 0 || s.endedAt != null);
 
 	// Heatmap: count sessions per day for last 84 days (12 weeks × 7).
-	const heatmap = sessionSummaries.reduce<Record<string, Record<number, number>>>(
-		(acc, s) => {
-			if (s.dayOffset >= 84) return acc;
-			const all = (acc.all ??= {});
-			all[s.dayOffset] = (all[s.dayOffset] ?? 0) + 1;
-			const byGym = (acc[s.gymId] ??= {});
-			byGym[s.dayOffset] = (byGym[s.dayOffset] ?? 0) + 1;
-			return acc;
-		},
-		{}
-	);
+	const heatmap = sessionSummaries.reduce<Record<string, Record<number, number>>>((acc, s) => {
+		if (s.dayOffset >= 84) return acc;
+		const all = (acc.all ??= {});
+		all[s.dayOffset] = (all[s.dayOffset] ?? 0) + 1;
+		const byGym = (acc[s.gymId] ??= {});
+		byGym[s.dayOffset] = (byGym[s.dayOffset] ?? 0) + 1;
+		return acc;
+	}, {});
 
 	return {
 		userName: locals.user.name,

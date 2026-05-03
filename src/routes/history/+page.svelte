@@ -67,13 +67,9 @@
 			const col: HeatmapCell[] = [];
 			for (let r = 0; r < 7; r++) {
 				const cellDate = addDays(colMonday, r);
-				const offsetDays = Math.round(
-					(today.getTime() - cellDate.getTime()) / 86_400_000
-				);
+				const offsetDays = Math.round((today.getTime() - cellDate.getTime()) / 86_400_000);
 				const value =
-					offsetDays >= 0 && offsetDays < heatmapDays.length
-						? heatmapDays[offsetDays] ?? 0
-						: 0;
+					offsetDays >= 0 && offsetDays < heatmapDays.length ? (heatmapDays[offsetDays] ?? 0) : 0;
 				col.push({
 					value,
 					date: cellDate,
@@ -170,12 +166,12 @@
 	<title>History · Trajectory</title>
 </svelte:head>
 
-<main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pb-28 pt-12">
+<main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pt-12 pb-28">
 	<header class="flex flex-col gap-3">
 		<div class="flex items-end gap-3">
 			<div class="flex flex-1 flex-col">
 				<div
-					class="text-[10px] font-bold uppercase tracking-[0.16em]"
+					class="text-[10px] font-bold tracking-[0.16em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					History
@@ -231,7 +227,7 @@
 	>
 		<div class="flex items-baseline justify-between">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Workout frequency
@@ -243,7 +239,7 @@
 		<div class="relative mt-2 h-[14px]" style="padding-left: 32px;">
 			{#each monthLabels as ml (ml.col)}
 				<div
-					class="absolute top-0 text-[9px] font-bold uppercase tracking-[0.12em]"
+					class="absolute top-0 text-[9px] font-bold tracking-[0.12em] uppercase"
 					style="left: calc(32px + {ml.col} * 22px); color: var(--color-text-dim-2);"
 				>
 					{ml.label}
@@ -254,7 +250,7 @@
 			<div class="flex flex-col gap-1 pt-[4px]">
 				{#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as dow (dow)}
 					<div
-						class="flex h-[18px] items-center text-right text-[9px] font-bold uppercase tracking-[0.12em]"
+						class="flex h-[18px] items-center text-right text-[9px] font-bold tracking-[0.12em] uppercase"
 						style="color: var(--color-text-dim-2); width: 24px;"
 					>
 						{dow}
@@ -269,8 +265,7 @@
 								class="h-[18px] w-[18px] rounded-[4px]"
 								style="background: {cell.isFuture
 									? 'rgba(244,237,226,0.025)'
-									: colorFor(cell.value)}; outline: {wi === todayCol &&
-								di === todayRow
+									: colorFor(cell.value)}; outline: {wi === todayCol && di === todayRow
 									? '1px solid var(--color-amber)'
 									: 'none'}; outline-offset: 1px;"
 								title={cell.isFuture
@@ -301,7 +296,10 @@
 			<div class="ml-auto flex items-end gap-2">
 				{#each [0, 1, 2, 3] as n (n)}
 					<div class="flex flex-col items-center gap-0.5">
-						<span class="text-[9px] font-bold uppercase tracking-[0.12em]" style="color: var(--color-text-dim-2);">
+						<span
+							class="text-[9px] font-bold tracking-[0.12em] uppercase"
+							style="color: var(--color-text-dim-2);"
+						>
 							{n === 3 ? '3+' : n}
 						</span>
 						<span class="h-[10px] w-[10px] rounded-[2px]" style="background: {colorFor(n)};"></span>
@@ -316,7 +314,7 @@
 
 	<div class="mt-5 px-1 pb-2">
 		<div
-			class="text-[10px] font-bold uppercase tracking-[0.14em]"
+			class="text-[10px] font-bold tracking-[0.14em] uppercase"
 			style="color: var(--color-text-dim-2);"
 		>
 			Recent sessions
@@ -345,16 +343,15 @@
 							style="background: var(--color-surface-2); border-color: var(--color-line-2);"
 						>
 							<span
-								class="font-bold leading-none {badge.secondary === '' ? 'text-[12px]' : 'text-[15px]'}"
+								class="leading-none font-bold {badge.secondary === ''
+									? 'text-[12px]'
+									: 'text-[15px]'}"
 								style="color: var(--color-text);"
 							>
 								{badge.primary}
 							</span>
 							{#if badge.secondary}
-								<span
-									class="mt-0.5 text-[9px]"
-									style="color: var(--color-text-dim-2);"
-								>
+								<span class="mt-0.5 text-[9px]" style="color: var(--color-text-dim-2);">
 									{badge.secondary}
 								</span>
 							{/if}
@@ -372,11 +369,21 @@
 									{s.gymName} ·
 								{/if}
 								{s.machineCount} machine{s.machineCount === 1 ? '' : 's'} · {s.durationMin} min{#if s.totalVolume > 0}
-									 · {formatVol(s.totalVolume)} vol{/if}
+									· {formatVol(s.totalVolume)} vol{/if}
 							</div>
 						</div>
-						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-dim-2);">
-							<path d="M9 6l6 6-6 6"/>
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.75"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							style="color: var(--color-text-dim-2);"
+						>
+							<path d="M9 6l6 6-6 6" />
 						</svg>
 					</a>
 				</li>

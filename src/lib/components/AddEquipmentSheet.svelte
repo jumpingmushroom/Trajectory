@@ -54,13 +54,9 @@
 		mode === 'edit' ? (editTarget!.type as EquipmentType) : 'machine'
 	);
 	let cardioKind = $state<CardioKind>(
-		mode === 'edit'
-			? ((editTarget!.cardioKind as CardioKind | null) ?? 'treadmill')
-			: 'treadmill'
+		mode === 'edit' ? ((editTarget!.cardioKind as CardioKind | null) ?? 'treadmill') : 'treadmill'
 	);
-	let group = $state<MuscleGroup>(
-		mode === 'edit' ? (editTarget!.group as MuscleGroup) : 'push'
-	);
+	let group = $state<MuscleGroup>(mode === 'edit' ? (editTarget!.group as MuscleGroup) : 'push');
 	let notes = $state<string>(mode === 'edit' ? (editTarget!.notes ?? '') : '');
 	let photoFile = $state<File | null>(null);
 	let photoPreview = $state<string | null>(initialPhotoSrc);
@@ -76,8 +72,7 @@
 		group: mode === 'edit' ? (editTarget!.group as MuscleGroup) : 'push',
 		glyph: mode === 'edit' ? ((editTarget!.glyph as GlyphKind) ?? 'bench') : 'bench',
 		tint: mode === 'edit' ? editTarget!.tint : '#1c2026',
-		cardioKind:
-			mode === 'edit' ? (editTarget!.cardioKind as CardioKind | null) : null,
+		cardioKind: mode === 'edit' ? (editTarget!.cardioKind as CardioKind | null) : null,
 		notes: mode === 'edit' ? (editTarget!.notes ?? '') : '',
 		photoPath: mode === 'edit' ? editTarget!.photoPath : null
 	};
@@ -88,9 +83,7 @@
 		const q = glyphSearch.trim().toLowerCase();
 		if (!q) return null;
 		return GLYPHS.filter(
-			(g) =>
-				g.label.toLowerCase().includes(q) ||
-				g.aliases.some((a) => a.toLowerCase().includes(q))
+			(g) => g.label.toLowerCase().includes(q) || g.aliases.some((a) => a.toLowerCase().includes(q))
 		);
 	});
 
@@ -369,7 +362,7 @@
 
 		<div class="mt-1 flex flex-col gap-2">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Glyph
@@ -388,7 +381,7 @@
 				{#each groupedGlyphs as section (section.category)}
 					<div class="mt-2 flex flex-col gap-2">
 						<div
-							class="text-[10px] font-bold uppercase tracking-[0.14em]"
+							class="text-[10px] font-bold tracking-[0.14em] uppercase"
 							style="color: var(--color-text-dim-2);"
 						>
 							{section.label}
@@ -419,11 +412,9 @@
 				{/each}
 			{:else if filteredGlyphs.length === 0}
 				<div class="mt-2 flex flex-col gap-2">
-					<div
-						class="text-[12px]"
-						style="color: var(--color-text-dim);"
-					>
-						No glyph matches "{glyphSearch}". Pick <span style="color: var(--color-text);">Generic</span> and name it whatever you like.
+					<div class="text-[12px]" style="color: var(--color-text-dim);">
+						No glyph matches "{glyphSearch}". Pick
+						<span style="color: var(--color-text);">Generic</span> and name it whatever you like.
 					</div>
 					<div class="grid grid-cols-4 gap-2">
 						<button
@@ -478,7 +469,7 @@
 	<div class="flex flex-col gap-4">
 		<label class="flex flex-col gap-1">
 			<span
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Name
@@ -496,7 +487,7 @@
 
 		<div class="flex flex-col gap-1">
 			<span
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Type
@@ -525,7 +516,7 @@
 		{#if type === 'cardio'}
 			<div class="flex flex-col gap-1">
 				<span
-					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					Cardio kind
@@ -556,10 +547,7 @@
 
 {#snippet groupSection()}
 	<div class="flex flex-col gap-3">
-		<div
-			class="text-[12px]"
-			style="color: var(--color-text-dim);"
-		>
+		<div class="text-[12px]" style="color: var(--color-text-dim);">
 			Used by Stats screen for the muscle-group distribution bars.
 		</div>
 		<div class="flex flex-wrap gap-2">
@@ -606,7 +594,7 @@
 			<div class="flex flex-1 flex-col">
 				{#if mode === 'add'}
 					<div
-						class="text-[10px] font-bold uppercase tracking-[0.14em]"
+						class="text-[10px] font-bold tracking-[0.14em] uppercase"
 						style="color: var(--color-text-dim-2);"
 					>
 						Step {step + 1} of 3
@@ -619,7 +607,7 @@
 					</div>
 				{:else}
 					<div
-						class="text-[10px] font-bold uppercase tracking-[0.14em]"
+						class="text-[10px] font-bold tracking-[0.14em] uppercase"
 						style="color: var(--color-text-dim-2);"
 					>
 						Edit
@@ -639,8 +627,16 @@
 				onclick={onClose}
 				aria-label="Close"
 			>
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
-					<path d="M6 6l12 12M18 6L6 18"/>
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.75"
+					stroke-linecap="round"
+				>
+					<path d="M6 6l12 12M18 6L6 18" />
 				</svg>
 			</button>
 		</div>
@@ -657,7 +653,7 @@
 			<div class="flex flex-col gap-6">
 				<section class="flex flex-col gap-2">
 					<div
-						class="text-[10px] font-bold uppercase tracking-[0.14em]"
+						class="text-[10px] font-bold tracking-[0.14em] uppercase"
 						style="color: var(--color-text-dim-2);"
 					>
 						Photo & glyph
@@ -666,7 +662,7 @@
 				</section>
 				<section class="flex flex-col gap-2">
 					<div
-						class="text-[10px] font-bold uppercase tracking-[0.14em]"
+						class="text-[10px] font-bold tracking-[0.14em] uppercase"
 						style="color: var(--color-text-dim-2);"
 					>
 						Name & type
@@ -675,7 +671,7 @@
 				</section>
 				<section class="flex flex-col gap-2">
 					<div
-						class="text-[10px] font-bold uppercase tracking-[0.14em]"
+						class="text-[10px] font-bold tracking-[0.14em] uppercase"
 						style="color: var(--color-text-dim-2);"
 					>
 						Muscle group
@@ -684,7 +680,7 @@
 				</section>
 				<section class="flex flex-col gap-2">
 					<div
-						class="text-[10px] font-bold uppercase tracking-[0.14em]"
+						class="text-[10px] font-bold tracking-[0.14em] uppercase"
 						style="color: var(--color-text-dim-2);"
 					>
 						Notes

@@ -31,7 +31,9 @@
 
 	const path = $derived.by(() => {
 		if (!points || points.length === 0) return '';
-		return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+		return points
+			.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+			.join(' ');
 	});
 
 	const fillPath = $derived.by(() => {
@@ -46,6 +48,13 @@
 		{#if fill}
 			<path d={fillPath} fill={color} opacity="0.14" />
 		{/if}
-		<path d={path} stroke={color} stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+		<path
+			d={path}
+			stroke={color}
+			stroke-width="1.5"
+			fill="none"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		/>
 	</svg>
 {/if}

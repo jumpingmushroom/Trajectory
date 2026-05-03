@@ -35,7 +35,11 @@ function backoffFor(attempts: number): number {
 	return STEADY_BACKOFF_MS;
 }
 
-async function postOne(op: string, payload: unknown, mutationId: string): Promise<{
+async function postOne(
+	op: string,
+	payload: unknown,
+	mutationId: string
+): Promise<{
 	ok: boolean;
 	status: number;
 	body: string;

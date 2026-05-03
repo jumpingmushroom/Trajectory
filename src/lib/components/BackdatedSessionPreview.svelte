@@ -32,26 +32,48 @@
 				class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full"
 				style="background: var(--color-amber); color: #1b0a00;"
 			>
-				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<svg
+					width="18"
+					height="18"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
 					<rect x="3" y="5" width="18" height="16" rx="2" />
 					<path d="M16 3v4M8 3v4M3 11h18" />
 				</svg>
 			</div>
 			<div class="flex min-w-0 flex-1 flex-col">
 				<div
-					class="truncate text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="truncate text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-amber);"
 				>
 					Logging for {label}
 				</div>
-				<div class="truncate text-[13px] font-semibold tracking-[-0.01em]" style="color: var(--color-text);">
+				<div
+					class="truncate text-[13px] font-semibold tracking-[-0.01em]"
+					style="color: var(--color-text);"
+				>
 					{session.setCount} set{session.setCount === 1 ? '' : 's'} on file
 					{#if session.lastEquipmentName}
 						· last on {session.lastEquipmentName}
 					{/if}
 				</div>
 			</div>
-			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-amber);">
+			<svg
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				style="color: var(--color-amber);"
+			>
 				<path d="M9 6l6 6-6 6" />
 			</svg>
 		</div>
@@ -69,14 +91,23 @@
 				class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full"
 				style="background: var(--color-amber); color: #1b0a00;"
 			>
-				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<svg
+					width="18"
+					height="18"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
 					<rect x="3" y="5" width="18" height="16" rx="2" />
 					<path d="M16 3v4M8 3v4M3 11h18" />
 				</svg>
 			</div>
 			<div class="flex min-w-0 flex-1 flex-col">
 				<div
-					class="truncate text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="truncate text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-amber);"
 				>
 					Logging for {label}

@@ -74,7 +74,11 @@
 	}
 
 	async function removeUser(userId: string, email: string) {
-		if (!confirm(`Remove ${email}? This deletes their account and all their workout data. Cannot be undone.`)) {
+		if (
+			!confirm(
+				`Remove ${email}? This deletes their account and all their workout data. Cannot be undone.`
+			)
+		) {
 			return;
 		}
 		actionBusy = userId;
@@ -101,15 +105,12 @@
 	<header class="flex items-center justify-between gap-3 pb-5">
 		<div class="flex flex-col gap-1">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.16em]"
+				class="text-[10px] font-bold tracking-[0.16em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Admin
 			</div>
-			<h1
-				class="text-[24px] font-bold tracking-[-0.02em]"
-				style="color: var(--color-text);"
-			>
+			<h1 class="text-[24px] font-bold tracking-[-0.02em]" style="color: var(--color-text);">
 				Users ({data.users.length})
 			</h1>
 		</div>
@@ -140,7 +141,7 @@
 			style="background: var(--color-surface); border-color: var(--color-line);"
 		>
 			<div
-				class="text-[11px] font-bold uppercase tracking-[0.14em]"
+				class="text-[11px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				New user
@@ -148,7 +149,7 @@
 			<div class="grid gap-3 sm:grid-cols-2">
 				<label class="flex flex-col gap-1">
 					<span
-						class="text-[10px] font-bold uppercase tracking-[0.14em]"
+						class="text-[10px] font-bold tracking-[0.14em] uppercase"
 						style="color: var(--color-text-dim-2);"
 					>
 						Email
@@ -166,7 +167,7 @@
 				</label>
 				<label class="flex flex-col gap-1">
 					<span
-						class="text-[10px] font-bold uppercase tracking-[0.14em]"
+						class="text-[10px] font-bold tracking-[0.14em] uppercase"
 						style="color: var(--color-text-dim-2);"
 					>
 						Name
@@ -209,11 +210,11 @@
 		<table class="w-full text-left text-[13px]">
 			<thead style="color: var(--color-text-dim-2);">
 				<tr class="border-b" style="border-color: var(--color-line);">
-					<th class="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em]">Email</th>
-					<th class="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em]">Name</th>
-					<th class="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em]">Status</th>
-					<th class="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em]">Created</th>
-					<th class="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-[0.14em]">
+					<th class="px-4 py-3 text-[10px] font-bold tracking-[0.14em] uppercase">Email</th>
+					<th class="px-4 py-3 text-[10px] font-bold tracking-[0.14em] uppercase">Name</th>
+					<th class="px-4 py-3 text-[10px] font-bold tracking-[0.14em] uppercase">Status</th>
+					<th class="px-4 py-3 text-[10px] font-bold tracking-[0.14em] uppercase">Created</th>
+					<th class="px-4 py-3 text-right text-[10px] font-bold tracking-[0.14em] uppercase">
 						Actions
 					</th>
 				</tr>
@@ -226,7 +227,7 @@
 								<span>{u.email}</span>
 								{#if u.role === 'admin'}
 									<span
-										class="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em]"
+										class="rounded-full px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] uppercase"
 										style="background: var(--color-amber-dim); color: var(--color-amber);"
 									>
 										admin

@@ -67,7 +67,7 @@
 		<div class="flex items-start gap-3">
 			<div class="flex flex-1 flex-col">
 				<div
-					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					Log for a past day
@@ -86,7 +86,15 @@
 				onclick={onClose}
 				aria-label="Close"
 			>
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.75"
+					stroke-linecap="round"
+				>
 					<path d="M6 6l12 12M18 6L6 18" />
 				</svg>
 			</button>
@@ -109,7 +117,17 @@
 								{fmt(today)} · log in real time
 							</span>
 						</span>
-						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-dim-2);">
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.75"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							style="color: var(--color-text-dim-2);"
+						>
 							<path d="M9 6l6 6-6 6" />
 						</svg>
 					</button>
@@ -130,7 +148,17 @@
 							{fmt(yesterdayMid)}
 						</span>
 					</span>
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-dim-2);">
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.75"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						style="color: var(--color-text-dim-2);"
+					>
 						<path d="M9 6l6 6-6 6" />
 					</svg>
 				</button>
@@ -150,7 +178,17 @@
 							{fmt(twoDaysMid)}
 						</span>
 					</span>
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-dim-2);">
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.75"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						style="color: var(--color-text-dim-2);"
+					>
 						<path d="M9 6l6 6-6 6" />
 					</svg>
 				</button>
@@ -164,9 +202,7 @@
 						<span class="text-[14px] font-semibold" style="color: var(--color-text);">
 							Pick a date…
 						</span>
-						<span class="text-[11px]" style="color: var(--color-text-dim);">
-							Any past date
-						</span>
+						<span class="text-[11px]" style="color: var(--color-text-dim);"> Any past date </span>
 					</span>
 					<input
 						type="date"

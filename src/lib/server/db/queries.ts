@@ -14,10 +14,7 @@ import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
  *   db.select().from(equipment).where(notDeleted(equipment.deletedAt))
  *   db.select().from(equipment).where(notDeleted(equipment.deletedAt, eq(equipment.gymId, gymId)))
  */
-export function notDeleted(
-	deletedAtColumn: AnySQLiteColumn,
-	...extras: (SQL | undefined)[]
-): SQL {
+export function notDeleted(deletedAtColumn: AnySQLiteColumn, ...extras: (SQL | undefined)[]): SQL {
 	const filters: (SQL | undefined)[] = [isNull(deletedAtColumn), ...extras];
 	const composed = and(...filters);
 	if (!composed) {

@@ -24,7 +24,9 @@ export const load: PageServerLoad = async ({ url }) => {
 export const actions: Actions = {
 	request: async ({ request, url }) => {
 		const data = await request.formData();
-		const email = String(data.get('email') ?? '').trim().toLowerCase();
+		const email = String(data.get('email') ?? '')
+			.trim()
+			.toLowerCase();
 		if (!email || !email.includes('@')) {
 			return fail(400, { error: 'Enter a valid email.', email });
 		}

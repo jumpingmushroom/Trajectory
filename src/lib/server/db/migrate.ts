@@ -20,9 +20,9 @@ function hasPendingMigrations(): boolean {
 	try {
 		const sqlite = new Database(dbFile, { readonly: true });
 		try {
-			const row = sqlite
-				.prepare(`SELECT COUNT(*) as n FROM __drizzle_migrations`)
-				.get() as { n: number };
+			const row = sqlite.prepare(`SELECT COUNT(*) as n FROM __drizzle_migrations`).get() as {
+				n: number;
+			};
 			return row.n < sqlFiles.length;
 		} finally {
 			sqlite.close();

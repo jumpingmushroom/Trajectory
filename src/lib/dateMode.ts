@@ -94,7 +94,12 @@ export function endOfUtcDay(ts: number): number {
 export function projectNowOntoDate(targetDayStartLocal: Date, now: number = Date.now()): number {
 	const nowDate = new Date(now);
 	const t = new Date(targetDayStartLocal);
-	t.setHours(nowDate.getHours(), nowDate.getMinutes(), nowDate.getSeconds(), nowDate.getMilliseconds());
+	t.setHours(
+		nowDate.getHours(),
+		nowDate.getMinutes(),
+		nowDate.getSeconds(),
+		nowDate.getMilliseconds()
+	);
 	return t.getTime();
 }
 

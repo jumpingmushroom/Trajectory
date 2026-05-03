@@ -1,55 +1,55 @@
 {
-  "version": "7",
-  "dialect": "sqlite",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "6",
-      "when": 1777466631624,
-      "tag": "0000_init",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1777470426025,
-      "tag": "0001_equipment_first_schema",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1777472551588,
-      "tag": "0002_equipment_notes",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1777645221314,
-      "tag": "0003_shiny_miracleman",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1777659580818,
-      "tag": "0004_acoustic_victor_mancha",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1777662396635,
-      "tag": "0005_multiuser",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1777663800000,
-      "tag": "0006_fix_gym_user_cascade",
-      "breakpoints": true
-    }
-  ]
+	"version": "7",
+	"dialect": "sqlite",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "6",
+			"when": 1777466631624,
+			"tag": "0000_init",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "6",
+			"when": 1777470426025,
+			"tag": "0001_equipment_first_schema",
+			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "6",
+			"when": 1777472551588,
+			"tag": "0002_equipment_notes",
+			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "6",
+			"when": 1777645221314,
+			"tag": "0003_shiny_miracleman",
+			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "6",
+			"when": 1777659580818,
+			"tag": "0004_acoustic_victor_mancha",
+			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "6",
+			"when": 1777662396635,
+			"tag": "0005_multiuser",
+			"breakpoints": true
+		},
+		{
+			"idx": 6,
+			"version": "6",
+			"when": 1777663800000,
+			"tag": "0006_fix_gym_user_cascade",
+			"breakpoints": true
+		}
+	]
 }

@@ -14,9 +14,7 @@ export const load: PageServerLoad = async ({ url }) => {
 	// shape minimally (presence of '@') so we don't echo arbitrary input.
 	const emailParam = url.searchParams.get('email');
 	const emailPrefill =
-		emailParam && emailParam.includes('@') && emailParam.length <= 200
-			? emailParam
-			: null;
+		emailParam && emailParam.includes('@') && emailParam.length <= 200 ? emailParam : null;
 	const fresh = url.searchParams.get('fresh') === '1';
 	const reset = url.searchParams.get('reset') === '1';
 

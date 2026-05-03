@@ -57,15 +57,12 @@
 	>
 		<div class="flex flex-col gap-1">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.16em]"
+				class="text-[10px] font-bold tracking-[0.16em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Trajectory
 			</div>
-			<div
-				class="text-[22px] font-bold tracking-[-0.02em]"
-				style="color: var(--color-text);"
-			>
+			<div class="text-[22px] font-bold tracking-[-0.02em]" style="color: var(--color-text);">
 				Sign in
 			</div>
 		</div>
@@ -98,7 +95,7 @@
 
 		<label class="flex flex-col gap-1">
 			<span
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Email
@@ -118,7 +115,7 @@
 
 		<label class="flex flex-col gap-1">
 			<span
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Password

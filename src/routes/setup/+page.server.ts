@@ -41,9 +41,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 				})
 				.from(setTable)
 				.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
-				.where(
-					and(isNull(setTable.deletedAt), inArray(exercise.equipmentId, equipmentIds))
-				)
+				.where(and(isNull(setTable.deletedAt), inArray(exercise.equipmentId, equipmentIds)))
 				.groupBy(exercise.equipmentId)) as { equipmentId: string; count: number }[])
 		: [];
 

@@ -38,7 +38,7 @@
 	</div>
 	{#if size === 'lg'}
 		<div
-			class="mt-1 max-w-[120px] text-center text-[11px] font-semibold leading-tight"
+			class="mt-1 max-w-[120px] text-center text-[11px] leading-tight font-semibold"
 			style="color: {earned ? 'var(--color-text)' : 'var(--color-text-dim-2)'};"
 		>
 			{def.title}
@@ -50,10 +50,7 @@
 			{def.description}
 		</div>
 		{#if earned && unlockedAt}
-			<div
-				class="text-[10px] font-medium tabular-nums"
-				style="color: var(--color-amber);"
-			>
+			<div class="text-[10px] font-medium tabular-nums" style="color: var(--color-amber);">
 				{fmtDate(unlockedAt)}
 			</div>
 		{/if}

@@ -15,8 +15,7 @@
 	// $effect fires after each `$page.data` update — including post-drain
 	// invalidations.
 	$effect(() => {
-		const list = ($page.data as { achievementQueue?: QueuedAchievement[] })
-			.achievementQueue;
+		const list = ($page.data as { achievementQueue?: QueuedAchievement[] }).achievementQueue;
 		if (Array.isArray(list)) {
 			achievementQueue.set(list);
 		}
@@ -64,7 +63,17 @@
 			class="flex h-32 w-32 items-center justify-center rounded-full border-2"
 			style="background: var(--color-amber-dim); border-color: var(--color-amber); color: var(--color-amber); box-shadow: 0 0 60px var(--color-amber-glow);"
 		>
-			<svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<svg
+				width="60"
+				height="60"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.5"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
 				<path d="M8 21h8" />
 				<path d="M12 17v4" />
 				<path d="M7 4h10v5a5 5 0 0 1-10 0V4z" />
@@ -73,7 +82,7 @@
 			</svg>
 		</div>
 		<div
-			class="mt-8 text-[11px] font-bold uppercase tracking-[0.24em]"
+			class="mt-8 text-[11px] font-bold tracking-[0.24em] uppercase"
 			style="color: var(--color-amber);"
 		>
 			Achievement unlocked
@@ -84,16 +93,10 @@
 		>
 			{def.title}
 		</div>
-		<div
-			class="mt-2 max-w-[320px] text-center text-[14px]"
-			style="color: var(--color-text-dim);"
-		>
+		<div class="mt-2 max-w-[320px] text-center text-[14px]" style="color: var(--color-text-dim);">
 			{def.description}
 		</div>
-		<div
-			class="mt-10 text-[11px]"
-			style="color: var(--color-text-dim-2);"
-		>
+		<div class="mt-10 text-[11px]" style="color: var(--color-text-dim-2);">
 			tap anywhere to dismiss
 		</div>
 	</button>

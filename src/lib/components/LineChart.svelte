@@ -103,7 +103,14 @@
 
 		<!-- area + line -->
 		<path d={layout.fillPath} fill={color} opacity="0.12" />
-		<path d={layout.path} stroke={color} stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+		<path
+			d={layout.path}
+			stroke={color}
+			stroke-width="2"
+			fill="none"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		/>
 
 		<!-- last point dot + value -->
 		<circle cx={layout.lastPoint.x} cy={layout.lastPoint.y} r="3.5" fill={color} />

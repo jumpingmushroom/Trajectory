@@ -17,8 +17,7 @@ import { ulid } from 'ulid';
 
 const BASE = process.env.TRAJECTORY_URL ?? 'http://localhost:5173';
 const STAMP = Date.now();
-const SMOKE_EMAIL =
-	process.env.SMOKE_EMAIL ?? process.env.ADMIN_EMAIL ?? 'admin@trajectory.local';
+const SMOKE_EMAIL = process.env.SMOKE_EMAIL ?? process.env.ADMIN_EMAIL ?? 'admin@trajectory.local';
 const SMOKE_PASSWORD =
 	process.env.SMOKE_PASSWORD ?? process.env.ADMIN_PASSWORD ?? 'change-me-on-first-login';
 
@@ -182,11 +181,21 @@ async function main() {
 	};
 	const a = await callJson('/api/mutate', {
 		method: 'POST',
-		body: JSON.stringify({ clientId, mutationId: replayMutationId, op: 'set.create', payload: replayPayload })
+		body: JSON.stringify({
+			clientId,
+			mutationId: replayMutationId,
+			op: 'set.create',
+			payload: replayPayload
+		})
 	});
 	const b = await callJson('/api/mutate', {
 		method: 'POST',
-		body: JSON.stringify({ clientId, mutationId: replayMutationId, op: 'set.create', payload: replayPayload })
+		body: JSON.stringify({
+			clientId,
+			mutationId: replayMutationId,
+			op: 'set.create',
+			payload: replayPayload
+		})
 	});
 	assert(a.ok && b.ok, 'both mutate calls return 2xx');
 	assert(b.body?.replayed === true, 'second call flagged as replayed');

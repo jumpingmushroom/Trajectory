@@ -1,12 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import {
-	equipment,
-	exercise,
-	gym,
-	set as setTable
-} from '$lib/server/db/schema';
+import { equipment, exercise, gym, set as setTable } from '$lib/server/db/schema';
 import { isNull, eq, and, asc, inArray } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ locals, params }) => {

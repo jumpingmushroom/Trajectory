@@ -18,16 +18,14 @@
 			(a, b) => (earnedMap.get(b.key) ?? 0) - (earnedMap.get(a.key) ?? 0)
 		)
 	);
-	const lockedList = $derived(
-		BADGE_DEFINITIONS.filter((d) => !d.hidden && !earnedMap.has(d.key))
-	);
+	const lockedList = $derived(BADGE_DEFINITIONS.filter((d) => !d.hidden && !earnedMap.has(d.key)));
 </script>
 
 <svelte:head>
 	<title>Achievements · Trajectory</title>
 </svelte:head>
 
-<main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pb-28 pt-12">
+<main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pt-12 pb-28">
 	<header class="flex items-end gap-3">
 		<a
 			href="/stats"
@@ -35,13 +33,22 @@
 			style="background: var(--color-surface); border-color: var(--color-line-2); color: var(--color-text-dim);"
 			aria-label="Back to Stats"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
 				<path d="M15 6l-6 6 6 6" />
 			</svg>
 		</a>
 		<div class="flex flex-1 flex-col">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.16em]"
+				class="text-[10px] font-bold tracking-[0.16em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Collection
@@ -63,19 +70,14 @@
 	{#if earnedList.length > 0}
 		<section class="mt-5 flex flex-col gap-3">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Earned
 			</div>
 			<div class="grid grid-cols-3 gap-3 sm:grid-cols-4">
 				{#each earnedList as def (def.key)}
-					<AchievementBadge
-						{def}
-						earned={true}
-						unlockedAt={earnedMap.get(def.key)}
-						size="lg"
-					/>
+					<AchievementBadge {def} earned={true} unlockedAt={earnedMap.get(def.key)} size="lg" />
 				{/each}
 			</div>
 		</section>
@@ -84,7 +86,7 @@
 	{#if lockedList.length > 0}
 		<section class="mt-6 flex flex-col gap-3">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Locked
@@ -99,9 +101,7 @@
 
 	{#if earnedList.length === 0 && lockedList.length === 0}
 		<section class="mt-10 flex flex-col items-center gap-3 text-center">
-			<div class="text-[14px]" style="color: var(--color-text-dim);">
-				No achievements yet.
-			</div>
+			<div class="text-[14px]" style="color: var(--color-text-dim);">No achievements yet.</div>
 			<div class="text-[12px]" style="color: var(--color-text-dim-2);">
 				Log a set to start earning badges.
 			</div>

@@ -1,13 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import {
-	equipment,
-	exercise,
-	gym,
-	set as setTable,
-	workoutSession
-} from '$lib/server/db/schema';
+import { equipment, exercise, gym, set as setTable, workoutSession } from '$lib/server/db/schema';
 import { isNull, eq, and, asc, desc, inArray, gte, lt } from 'drizzle-orm';
 import { parseAsOfTs, startOfUtcDay, endOfUtcDay } from '$lib/dateMode';
 
@@ -85,7 +79,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		setFilters.push(lt(setTable.ts, new Date(endOfUtcDay(asOfTs))));
 	}
 
-	const sets = ((await db
+	const sets = (await db
 		.select({
 			id: setTable.id,
 			workoutSessionId: setTable.workoutSessionId,
@@ -107,7 +101,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		durationMin: number | null;
 		extras: Record<string, number> | null;
 		ts: Date;
-	}[]);
+	}[];
 
 	// Per-exercise context: last values, common weights, top-set series.
 	const contexts: ExerciseContext[] = exercises.map((ex) => {

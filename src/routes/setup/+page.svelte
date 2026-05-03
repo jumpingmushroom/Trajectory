@@ -145,11 +145,11 @@
 	<title>Setup · Trajectory</title>
 </svelte:head>
 
-<main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-6 pb-28 pt-14">
+<main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-6 pt-14 pb-28">
 	<header class="flex items-start gap-3">
 		<div class="flex flex-1 flex-col">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.16em]"
+				class="text-[10px] font-bold tracking-[0.16em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Setup
@@ -179,13 +179,23 @@
 			class="flex h-10 w-10 items-center justify-center rounded-full"
 			style="background: var(--color-amber-dim); color: var(--color-amber);"
 		>
-			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M5 12l5 5L20 7"/>
+			<svg
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M5 12l5 5L20 7" />
 			</svg>
 		</div>
 		<div class="flex flex-1 flex-col">
 			<div class="text-[14px] font-semibold" style="color: var(--color-text);">
-				{data.gyms.length} {data.gyms.length === 1 ? 'gym' : 'gyms'} · {data.equipments.length}
+				{data.gyms.length}
+				{data.gyms.length === 1 ? 'gym' : 'gyms'} · {data.equipments.length}
 				{data.equipments.length === 1 ? 'machine' : 'machines'}
 			</div>
 			<div class="text-[12px]" style="color: var(--color-text-dim);">
@@ -216,10 +226,7 @@
 							ariaLabel="Rename gym"
 							textClass="text-[15px] font-semibold tracking-[-0.01em]"
 						/>
-						<div
-							class="mt-0.5 text-[12px] tabular-nums"
-							style="color: var(--color-text-dim);"
-						>
+						<div class="mt-0.5 text-[12px] tabular-nums" style="color: var(--color-text-dim);">
 							{g.city ?? 'No city'} · {equipments.length}
 							{equipments.length === 1 ? 'machine' : 'machines'}
 						</div>
@@ -242,14 +249,14 @@
 							class="transition-transform"
 							style="color: var(--color-text-dim-2); transform: rotate({isOpen ? 180 : 0}deg);"
 						>
-							<path d="M6 9l6 6 6-6"/>
+							<path d="M6 9l6 6 6-6" />
 						</svg>
 					</button>
 				</div>
 
 				{#if isOpen}
 					<div
-						class="flex flex-col gap-2 border-t px-3 pb-3 pt-3"
+						class="flex flex-col gap-2 border-t px-3 pt-3 pb-3"
 						style="border-color: var(--color-line);"
 					>
 						{#each equipments as eq (eq.id)}
@@ -288,7 +295,16 @@
 									aria-label="Edit equipment photo, glyph, and tint"
 									title="Edit photo & glyph"
 								>
-									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.75"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
 										<path d="M12 20h9" />
 										<path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z" />
 									</svg>
@@ -302,7 +318,16 @@
 										aria-label="Manage exercises"
 										title="Manage exercises"
 									>
-										<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+										<svg
+											width="16"
+											height="16"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.75"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+										>
 											<line x1="8" y1="6" x2="21" y2="6" />
 											<line x1="8" y1="12" x2="21" y2="12" />
 											<line x1="8" y1="18" x2="21" y2="18" />
@@ -320,8 +345,19 @@
 									aria-label="Delete equipment"
 									title="Delete equipment"
 								>
-									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-										<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13M9 7V4h6v3"/>
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="1.75"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<path
+											d="M4 7h16M10 11v6M14 11v6M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13M9 7V4h6v3"
+										/>
 									</svg>
 								</button>
 							</div>
@@ -333,8 +369,17 @@
 							style="border-color: var(--color-line-2); color: var(--color-amber);"
 							onclick={() => (addingEqForGym = g.id)}
 						>
-							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-								<path d="M12 5v14M5 12h14"/>
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.75"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M12 5v14M5 12h14" />
 							</svg>
 							Add equipment to {g.name}
 						</button>
@@ -342,12 +387,23 @@
 						{#if data.gyms.length > 1}
 							<button
 								type="button"
-								class="mt-1 inline-flex items-center justify-center gap-2 self-start rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em]"
+								class="mt-1 inline-flex items-center justify-center gap-2 self-start rounded-full border px-3 py-1.5 text-[11px] font-semibold tracking-[0.12em] uppercase"
 								style="border-color: rgba(255,128,128,0.3); color: #ff8080;"
 								onclick={() => (pendingGymDelete = g)}
 							>
-								<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-									<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13M9 7V4h6v3"/>
+								<svg
+									width="13"
+									height="13"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="1.75"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<path
+										d="M4 7h16M10 11v6M14 11v6M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13M9 7V4h6v3"
+									/>
 								</svg>
 								Remove this gym
 							</button>
@@ -364,8 +420,17 @@
 				style="border-color: var(--color-line-2); color: var(--color-amber);"
 				onclick={() => (addingGym = true)}
 			>
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-					<path d="M12 5v14M5 12h14"/>
+				<svg
+					width="16"
+					height="16"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.75"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M12 5v14M5 12h14" />
 				</svg>
 				Add another gym
 			</button>
@@ -379,7 +444,7 @@
 				}}
 			>
 				<div
-					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-amber);"
 				>
 					New gym
@@ -446,18 +511,11 @@
 </main>
 
 {#if addingEqForGym}
-	<AddEquipmentSheet
-		gymId={addingEqForGym}
-		onClose={() => (addingEqForGym = null)}
-	/>
+	<AddEquipmentSheet gymId={addingEqForGym} onClose={() => (addingEqForGym = null)} />
 {/if}
 
 {#if editingEq}
-	<AddEquipmentSheet
-		mode="edit"
-		equipment={editingEq}
-		onClose={() => (editingEq = null)}
-	/>
+	<AddEquipmentSheet mode="edit" equipment={editingEq} onClose={() => (editingEq = null)} />
 {/if}
 
 {#if managingExercisesFor}

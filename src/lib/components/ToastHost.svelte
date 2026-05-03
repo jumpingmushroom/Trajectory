@@ -17,7 +17,9 @@
 					? 'rgba(40,12,12,0.96)'
 					: 'rgba(13,15,18,0.96)'}; border-color: {t.kind === 'error'
 					? 'rgba(255,90,90,0.45)'
-					: 'var(--color-line-2)'}; color: {t.kind === 'error' ? '#ffb3b3' : 'var(--color-text)'}; backdrop-filter: blur(6px);"
+					: 'var(--color-line-2)'}; color: {t.kind === 'error'
+					? '#ffb3b3'
+					: 'var(--color-text)'}; backdrop-filter: blur(6px);"
 			>
 				<span
 					class="mt-1 inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full"
@@ -25,7 +27,7 @@
 				></span>
 				<span class="flex-1">{t.message}</span>
 				<span
-					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					Dismiss

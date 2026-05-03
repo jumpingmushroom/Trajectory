@@ -20,9 +20,7 @@ export async function resolveActiveGym(
 			await db
 				.select()
 				.from(gym)
-				.where(
-					and(eq(gym.id, cookieValue), eq(gym.userId, userId), isNull(gym.deletedAt))
-				)
+				.where(and(eq(gym.id, cookieValue), eq(gym.userId, userId), isNull(gym.deletedAt)))
 				.limit(1)
 		)[0];
 		if (fromCookie) return fromCookie;

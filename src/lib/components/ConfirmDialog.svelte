@@ -46,10 +46,7 @@
 		role="presentation"
 	>
 		<div class="flex flex-col gap-1">
-			<div
-				class="text-[16px] font-semibold tracking-[-0.01em]"
-				style="color: var(--color-text);"
-			>
+			<div class="text-[16px] font-semibold tracking-[-0.01em]" style="color: var(--color-text);">
 				{title}
 			</div>
 			{#if description}
@@ -71,9 +68,9 @@
 			<button
 				type="button"
 				class="flex-1 rounded-full py-3 text-[14px] font-bold disabled:opacity-50"
-				style="background: {danger
-					? '#c44545'
-					: 'var(--color-amber)'}; color: {danger ? '#fff' : '#1b0a00'};"
+				style="background: {danger ? '#c44545' : 'var(--color-amber)'}; color: {danger
+					? '#fff'
+					: '#1b0a00'};"
 				onclick={confirm}
 				disabled={working}
 			>

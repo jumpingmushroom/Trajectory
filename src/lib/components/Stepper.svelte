@@ -51,7 +51,7 @@
 <div class="flex flex-col gap-2">
 	<div class="flex items-baseline justify-between">
 		<span
-			class="text-[10px] font-bold uppercase tracking-[0.16em]"
+			class="text-[10px] font-bold tracking-[0.16em] uppercase"
 			style="color: var(--color-text-dim-2);"
 		>
 			{label}
@@ -71,13 +71,21 @@
 			use:holdRepeat={{ onTick: () => nudge(-1) }}
 			aria-label="Decrease"
 		>
-			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-				<path d="M5 12h14"/>
+			<svg
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+			>
+				<path d="M5 12h14" />
 			</svg>
 		</button>
 		<div class="flex flex-1 items-baseline justify-center gap-2">
 			<span
-				class="text-[40px] font-bold tabular-nums tracking-[-0.04em]"
+				class="text-[40px] font-bold tracking-[-0.04em] tabular-nums"
 				style="color: var(--color-text);"
 			>
 				{fmt(value)}
@@ -93,15 +101,21 @@
 			use:holdRepeat={{ onTick: () => nudge(1) }}
 			aria-label="Increase"
 		>
-			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-				<path d="M12 5v14M5 12h14"/>
+			<svg
+				width="20"
+				height="20"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+			>
+				<path d="M12 5v14M5 12h14" />
 			</svg>
 		</button>
 	</div>
-	<div
-		class="px-1 text-[10px]"
-		style="color: var(--color-text-dim-2);"
-	>
-		Tap +/− to nudge by {fmt(step)} {unit} · hold to scroll fast
+	<div class="px-1 text-[10px]" style="color: var(--color-text-dim-2);">
+		Tap +/− to nudge by {fmt(step)}
+		{unit} · hold to scroll fast
 	</div>
 </div>
