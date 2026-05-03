@@ -18,7 +18,10 @@ const OUT_DIR = 'static/icons';
 
 async function rasterize(input, size, outPath, opts = {}) {
 	const buf = await sharp(input)
-		.resize(size, size, { fit: 'contain', background: opts.bg ?? { r: 13, g: 15, b: 18, alpha: 1 } })
+		.resize(size, size, {
+			fit: 'contain',
+			background: opts.bg ?? { r: 13, g: 15, b: 18, alpha: 1 }
+		})
 		.png({ compressionLevel: 9 })
 		.toBuffer();
 	await writeFile(outPath, buf);

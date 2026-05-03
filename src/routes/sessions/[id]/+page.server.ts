@@ -41,9 +41,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	)[0];
 	if (!session) throw error(404, 'session not found');
 
-	const gymRow = (
-		await db.select().from(gym).where(eq(gym.id, session.gymId)).limit(1)
-	)[0];
+	const gymRow = (await db.select().from(gym).where(eq(gym.id, session.gymId)).limit(1))[0];
 
 	const sets = (await db
 		.select({
@@ -130,10 +128,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	todayStart.setHours(0, 0, 0, 0);
 	const sessionDay = new Date(startedAt);
 	sessionDay.setHours(0, 0, 0, 0);
-	const dayOffset = Math.max(
-		0,
-		Math.round((todayStart.getTime() - sessionDay.getTime()) / DAY_MS)
-	);
+	const dayOffset = Math.max(0, Math.round((todayStart.getTime() - sessionDay.getTime()) / DAY_MS));
 
 	return {
 		session: {

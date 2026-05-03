@@ -33,12 +33,7 @@
 
 	function formatLast(): { primary: string; secondary: string } {
 		if (daysSince == null) return { primary: 'Never logged', secondary: '' };
-		const ago =
-			daysSince === 0
-				? 'today'
-				: daysSince === 1
-					? '1d ago'
-					: `${daysSince}d ago`;
+		const ago = daysSince === 0 ? 'today' : daysSince === 1 ? '1d ago' : `${daysSince}d ago`;
 		if (isCardio) {
 			if (lastDurationMin != null) {
 				return { primary: `${formatNum(lastDurationMin)} min`, secondary: ago };
@@ -85,7 +80,7 @@
 	</div>
 
 	<div
-		class="flex flex-col gap-0.5 px-3 pb-3 pt-2"
+		class="flex flex-col gap-0.5 px-3 pt-2 pb-3"
 		style="background: rgba(13,15,18,0.75); backdrop-filter: blur(6px);"
 	>
 		<div

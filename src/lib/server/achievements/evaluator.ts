@@ -73,12 +73,9 @@ function loadState(tx: Tx, ctx: EvalContext): EvalState {
 
 	if (ctx.setId) {
 		set =
-			(tx
-				.select()
-				.from(setTable)
-				.where(eq(setTable.id, ctx.setId))
-				.limit(1)
-				.get() as SetRow | undefined) ?? null;
+			(tx.select().from(setTable).where(eq(setTable.id, ctx.setId)).limit(1).get() as
+				| SetRow
+				| undefined) ?? null;
 
 		if (set) {
 			const eqRow = tx
@@ -91,9 +88,7 @@ function loadState(tx: Tx, ctx: EvalContext): EvalState {
 				.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
 				.where(eq(exercise.id, set.exerciseId))
 				.limit(1)
-				.get() as
-				| { type: string; group: string; cardioKind: string | null }
-				| undefined;
+				.get() as { type: string; group: string; cardioKind: string | null } | undefined;
 			if (eqRow) {
 				setEquipmentType = eqRow.type;
 				setEquipmentGroup = eqRow.group;
@@ -158,8 +153,7 @@ function matches(tx: Tx, userId: string, predicate: Predicate, state: EvalState)
 				return false;
 			}
 			// Rower distance is metres; everyone else is km.
-			const threshold =
-				state.setCardioKind === 'rower' ? predicate.km * 1000 : predicate.km;
+			const threshold = state.setCardioKind === 'rower' ? predicate.km * 1000 : predicate.km;
 			return distance >= threshold;
 		}
 
@@ -193,12 +187,7 @@ function matches(tx: Tx, userId: string, predicate: Predicate, state: EvalState)
 			const prior = tx
 				.select()
 				.from(workoutSession)
-				.where(
-					and(
-						eq(workoutSession.userId, userId),
-						lt(workoutSession.startedAt, cur.startedAt)
-					)
-				)
+				.where(and(eq(workoutSession.userId, userId), lt(workoutSession.startedAt, cur.startedAt)))
 				.orderBy(desc(workoutSession.startedAt))
 				.limit(1)
 				.get() as WorkoutSessionRow | undefined;
@@ -215,11 +204,7 @@ function matches(tx: Tx, userId: string, predicate: Predicate, state: EvalState)
 				.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
 				.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
 				.where(
-					and(
-						eq(setTable.userId, userId),
-						isNull(setTable.deletedAt),
-						eq(equipment.type, 'cardio')
-					)
+					and(eq(setTable.userId, userId), isNull(setTable.deletedAt), eq(equipment.type, 'cardio'))
 				)
 				.get() as { kinds: number } | undefined;
 			return (row?.kinds ?? 0) >= 4;

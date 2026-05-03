@@ -75,21 +75,27 @@
 			style="border-color: var(--color-line-2); color: var(--color-text-dim);"
 			aria-label="Back"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M15 6l-6 6 6 6"/>
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M15 6l-6 6 6 6" />
 			</svg>
 		</a>
 		<div class="flex flex-col">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.16em]"
+				class="text-[10px] font-bold tracking-[0.16em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Profile
 			</div>
-			<div
-				class="text-[22px] font-bold tracking-[-0.02em]"
-				style="color: var(--color-text);"
-			>
+			<div class="text-[22px] font-bold tracking-[-0.02em]" style="color: var(--color-text);">
 				{data.userName}
 			</div>
 		</div>
@@ -110,15 +116,24 @@
 					class="h-full w-full object-cover"
 				/>
 			{:else}
-				<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-					<circle cx="12" cy="9" r="3.5"/>
-					<path d="M5 19c1.5-3 4-4.5 7-4.5s5.5 1.5 7 4.5"/>
+				<svg
+					width="28"
+					height="28"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.75"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<circle cx="12" cy="9" r="3.5" />
+					<path d="M5 19c1.5-3 4-4.5 7-4.5s5.5 1.5 7 4.5" />
 				</svg>
 			{/if}
 		</div>
 		<div class="flex flex-1 flex-col gap-1">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Avatar
@@ -164,7 +179,7 @@
 	>
 		<div class="flex items-center justify-between">
 			<span
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Email
@@ -180,8 +195,18 @@
 			style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
 		>
 			<span class="text-[14px]">Change password</span>
-			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-dim-2);">
-				<path d="M9 6l6 6-6 6"/>
+			<svg
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				style="color: var(--color-text-dim-2);"
+			>
+				<path d="M9 6l6 6-6 6" />
 			</svg>
 		</a>
 
@@ -194,14 +219,24 @@
 				<span class="flex items-center gap-2 text-[14px]">
 					Manage users
 					<span
-						class="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em]"
+						class="rounded-full px-2 py-0.5 text-[10px] font-bold tracking-[0.12em] uppercase"
 						style="background: var(--color-amber-dim); color: var(--color-amber);"
 					>
 						admin
 					</span>
 				</span>
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-dim-2);">
-					<path d="M9 6l6 6-6 6"/>
+				<svg
+					width="16"
+					height="16"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.75"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					style="color: var(--color-text-dim-2);"
+				>
+					<path d="M9 6l6 6-6 6" />
 				</svg>
 			</a>
 		{/if}

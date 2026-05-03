@@ -24,8 +24,11 @@ export interface MutationResult<T = unknown> {
  * resolves, either the mutation made it to the server (queued: false)
  * or it's safely sitting in IndexedDB waiting to retry (queued: true).
  */
-export async function mutate<T = unknown>(op: string, payload: unknown): Promise<MutationResult<T>> {
-	const entry = await enqueue(op, payload);
+export async function mutate<T = unknown>(
+	op: string,
+	payload: unknown
+): Promise<MutationResult<T>> {
+	await enqueue(op, payload);
 	await refreshPendingCount();
 	const drainResult = await drainNow();
 	if (drainResult.drained === 0 && drainResult.remaining > 0) {

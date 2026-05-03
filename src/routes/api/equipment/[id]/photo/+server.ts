@@ -35,13 +35,7 @@ export const POST: RequestHandler = async ({ request, params, locals }) => {
 			.select({ id: equipment.id })
 			.from(equipment)
 			.innerJoin(gym, eq(gym.id, equipment.gymId))
-			.where(
-				and(
-					eq(equipment.id, id),
-					eq(gym.userId, locals.user.id),
-					isNull(gym.deletedAt)
-				)
-			)
+			.where(and(eq(equipment.id, id), eq(gym.userId, locals.user.id), isNull(gym.deletedAt)))
 			.limit(1)
 	)[0];
 	if (!existing) throw error(404, 'equipment not found');
@@ -87,13 +81,7 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 			.select({ id: equipment.id })
 			.from(equipment)
 			.innerJoin(gym, eq(gym.id, equipment.gymId))
-			.where(
-				and(
-					eq(equipment.id, id),
-					eq(gym.userId, locals.user.id),
-					isNull(gym.deletedAt)
-				)
-			)
+			.where(and(eq(equipment.id, id), eq(gym.userId, locals.user.id), isNull(gym.deletedAt)))
 			.limit(1)
 	)[0];
 	if (!owned) throw error(404, 'equipment not found');

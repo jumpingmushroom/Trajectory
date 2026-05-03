@@ -57,22 +57,19 @@
 	>
 		<div class="flex flex-col gap-1">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.16em]"
+				class="text-[10px] font-bold tracking-[0.16em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				{data.userName}
 			</div>
-			<div
-				class="text-[20px] font-bold tracking-[-0.02em]"
-				style="color: var(--color-text);"
-			>
+			<div class="text-[20px] font-bold tracking-[-0.02em]" style="color: var(--color-text);">
 				Change password
 			</div>
 		</div>
 
 		<label class="flex flex-col gap-1">
 			<span
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Current password
@@ -90,7 +87,7 @@
 
 		<label class="flex flex-col gap-1">
 			<span
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				New password
@@ -109,7 +106,7 @@
 
 		<label class="flex flex-col gap-1">
 			<span
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Confirm new password

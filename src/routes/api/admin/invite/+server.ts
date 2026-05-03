@@ -26,9 +26,10 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const POST: RequestHandler = async ({ request, locals, url }) => {
 	if (!locals.user || locals.user.role !== 'admin') throw error(403, 'admin only');
 
-	const body = (await request.json().catch(() => null)) as
-		| { email?: unknown; name?: unknown }
-		| null;
+	const body = (await request.json().catch(() => null)) as {
+		email?: unknown;
+		name?: unknown;
+	} | null;
 	const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
 	const name = typeof body?.name === 'string' ? body.name.trim() : '';
 
@@ -39,7 +40,9 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 		throw error(400, 'name required (max 80 chars)');
 	}
 
-	const existing = (await db.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1))[0];
+	const existing = (
+		await db.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1)
+	)[0];
 	if (existing) throw error(409, 'a user with that email already exists');
 
 	// 256-bit random initial password the recipient never learns. They will
@@ -55,7 +58,9 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
 		throw error(500, 'could not create user');
 	}
 
-	const created = (await db.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1))[0];
+	const created = (
+		await db.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1)
+	)[0];
 	if (!created) throw error(500, 'user vanished after sign-up');
 
 	const { token } = await createInvite(created.id);

@@ -87,13 +87,22 @@
 			class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full"
 			style="background: var(--color-amber); color: #1b0a00;"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M12 3v13M6 11l6 6 6-6M4 21h16"/>
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M12 3v13M6 11l6 6 6-6M4 21h16" />
 			</svg>
 		</div>
 		<div class="flex flex-1 flex-col">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-amber);"
 			>
 				Install Trajectory
@@ -118,8 +127,16 @@
 			onclick={dismiss}
 			aria-label="Dismiss install prompt"
 		>
-			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
-				<path d="M6 6l12 12M18 6L6 18"/>
+			<svg
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+			>
+				<path d="M6 6l12 12M18 6L6 18" />
 			</svg>
 		</button>
 	</div>
@@ -132,13 +149,22 @@
 			class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full"
 			style="background: var(--color-amber-dim); color: var(--color-amber);"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M12 16V4M6 10l6-6 6 6M4 21h16"/>
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M12 16V4M6 10l6-6 6 6M4 21h16" />
 			</svg>
 		</div>
 		<div class="flex flex-1 flex-col">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Add to Home Screen
@@ -155,8 +181,16 @@
 			onclick={dismiss}
 			aria-label="Dismiss install hint"
 		>
-			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
-				<path d="M6 6l12 12M18 6L6 18"/>
+			<svg
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+			>
+				<path d="M6 6l12 12M18 6L6 18" />
 			</svg>
 		</button>
 	</div>

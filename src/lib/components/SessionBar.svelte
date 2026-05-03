@@ -63,19 +63,31 @@
 			class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full"
 			style="background: var(--color-amber); color: #1b0a00;"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<circle cx="12" cy="12" r="10"/>
-				<path d="M12 7v5l3 2"/>
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<circle cx="12" cy="12" r="10" />
+				<path d="M12 7v5l3 2" />
 			</svg>
 		</div>
 		<div class="flex min-w-0 flex-1 flex-col">
 			<div
-				class="truncate text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="truncate text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-amber);"
 			>
 				Active session · {elapsedLabel}
 			</div>
-			<div class="truncate text-[13px] font-semibold tracking-[-0.01em]" style="color: var(--color-text);">
+			<div
+				class="truncate text-[13px] font-semibold tracking-[-0.01em]"
+				style="color: var(--color-text);"
+			>
 				{#if setCount === 0}
 					No sets logged yet · tap to manage
 				{:else}
@@ -95,8 +107,18 @@
 				<span class="text-[14px]">{fmtRest(restRemaining)}</span>
 			</div>
 		{:else}
-			<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-amber);">
-				<path d="M9 6l6 6-6 6"/>
+			<svg
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				style="color: var(--color-amber);"
+			>
+				<path d="M9 6l6 6-6 6" />
 			</svg>
 		{/if}
 	</div>

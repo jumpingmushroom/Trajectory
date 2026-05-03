@@ -19,20 +19,17 @@
 				style="background: var(--color-surface); border-color: var(--color-line);"
 			>
 				<div
-					class="text-[10px] font-bold uppercase tracking-[0.16em]"
+					class="text-[10px] font-bold tracking-[0.16em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					Trajectory
 				</div>
-				<div
-					class="text-[20px] font-bold tracking-[-0.02em]"
-					style="color: var(--color-text);"
-				>
+				<div class="text-[20px] font-bold tracking-[-0.02em]" style="color: var(--color-text);">
 					Check your email
 				</div>
 				<p class="text-[13px]" style="color: var(--color-text-dim);">
-					If an account exists for {form.email}, a reset link is on its way. The
-					link expires shortly — open it on the same browser you're using now.
+					If an account exists for {form.email}, a reset link is on its way. The link expires
+					shortly — open it on the same browser you're using now.
 				</p>
 				<a
 					href="/login"
@@ -58,15 +55,12 @@
 			>
 				<div class="flex flex-col gap-1">
 					<div
-						class="text-[10px] font-bold uppercase tracking-[0.16em]"
+						class="text-[10px] font-bold tracking-[0.16em] uppercase"
 						style="color: var(--color-text-dim-2);"
 					>
 						Trajectory
 					</div>
-					<div
-						class="text-[22px] font-bold tracking-[-0.02em]"
-						style="color: var(--color-text);"
-					>
+					<div class="text-[22px] font-bold tracking-[-0.02em]" style="color: var(--color-text);">
 						Reset password
 					</div>
 					<div class="mt-1 text-[12px]" style="color: var(--color-text-dim);">
@@ -76,7 +70,7 @@
 
 				<label class="flex flex-col gap-1">
 					<span
-						class="text-[10px] font-bold uppercase tracking-[0.14em]"
+						class="text-[10px] font-bold tracking-[0.14em] uppercase"
 						style="color: var(--color-text-dim-2);"
 					>
 						Email
@@ -138,22 +132,19 @@
 
 			<div class="flex flex-col gap-1">
 				<div
-					class="text-[10px] font-bold uppercase tracking-[0.16em]"
+					class="text-[10px] font-bold tracking-[0.16em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					Trajectory
 				</div>
-				<div
-					class="text-[22px] font-bold tracking-[-0.02em]"
-					style="color: var(--color-text);"
-				>
+				<div class="text-[22px] font-bold tracking-[-0.02em]" style="color: var(--color-text);">
 					Choose a new password
 				</div>
 			</div>
 
 			<label class="flex flex-col gap-1">
 				<span
-					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					New password
@@ -171,7 +162,7 @@
 
 			<label class="flex flex-col gap-1">
 				<span
-					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					Confirm password

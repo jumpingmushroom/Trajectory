@@ -127,10 +127,7 @@ export async function sendInviteEmail(args: {
 	});
 }
 
-export async function sendResetPasswordEmail(args: {
-	to: string;
-	url: string;
-}): Promise<void> {
+export async function sendResetPasswordEmail(args: { to: string; url: string }): Promise<void> {
 	const { html, text } = template({
 		heading: 'Reset your Trajectory password',
 		body: 'We received a request to reset your password. Click the button below to choose a new one. If you did not request this, you can safely ignore this email.',

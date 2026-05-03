@@ -1,5 +1,5 @@
 import type { PageServerLoad } from './$types';
-import { desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { desc, isNotNull, isNull } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { account, invite, user } from '$lib/server/db/schema';
 

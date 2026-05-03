@@ -68,12 +68,15 @@
 		<div class="flex items-start gap-3">
 			<div class="flex flex-1 flex-col">
 				<div
-					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					Switch gym
 				</div>
-				<div class="mt-0.5 text-[18px] font-bold tracking-[-0.01em]" style="color: var(--color-text);">
+				<div
+					class="mt-0.5 text-[18px] font-bold tracking-[-0.01em]"
+					style="color: var(--color-text);"
+				>
 					Where are you?
 				</div>
 			</div>
@@ -84,8 +87,16 @@
 				onclick={onClose}
 				aria-label="Close"
 			>
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
-					<path d="M6 6l12 12M18 6L6 18"/>
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.75"
+					stroke-linecap="round"
+				>
+					<path d="M6 6l12 12M18 6L6 18" />
 				</svg>
 			</button>
 		</div>
@@ -96,18 +107,27 @@
 					<button
 						type="button"
 						class="flex w-full items-center gap-3 rounded-xl border p-3 text-left disabled:opacity-50"
-						style="background: linear-gradient(135deg, {g.tint}, var(--color-bg)); border-color: {g.id === activeGymId ? 'var(--color-amber-line)' : 'var(--color-line-2)'};"
+						style="background: linear-gradient(135deg, {g.tint}, var(--color-bg)); border-color: {g.id ===
+						activeGymId
+							? 'var(--color-amber-line)'
+							: 'var(--color-line-2)'};"
 						onclick={() => pick(g)}
 						disabled={switching}
 					>
 						<span
 							class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border text-[13px] font-bold"
-							style="background: var(--color-surface-2); border-color: var(--color-line-2); color: {g.id === activeGymId ? 'var(--color-amber)' : 'var(--color-text-dim)'};"
+							style="background: var(--color-surface-2); border-color: var(--color-line-2); color: {g.id ===
+							activeGymId
+								? 'var(--color-amber)'
+								: 'var(--color-text-dim)'};"
 						>
 							{initials(g.name)}
 						</span>
 						<span class="flex flex-1 flex-col">
-							<span class="text-[14px] font-semibold tracking-[-0.01em]" style="color: var(--color-text);">
+							<span
+								class="text-[14px] font-semibold tracking-[-0.01em]"
+								style="color: var(--color-text);"
+							>
 								{g.name}
 							</span>
 							<span class="text-[11px]" style="color: var(--color-text-dim);">
@@ -116,7 +136,7 @@
 						</span>
 						{#if g.id === activeGymId}
 							<span
-								class="rounded-md px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em]"
+								class="rounded-md px-2 py-0.5 text-[9px] font-bold tracking-[0.14em] uppercase"
 								style="background: var(--color-amber-dim); color: var(--color-amber);"
 							>
 								Active
@@ -132,8 +152,17 @@
 			class="flex items-center justify-center gap-2 rounded-full border-2 border-dashed py-2.5 text-[13px] font-semibold"
 			style="border-color: var(--color-line-2); color: var(--color-amber);"
 		>
-			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M12 5v14M5 12h14"/>
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M12 5v14M5 12h14" />
 			</svg>
 			Manage gyms in Setup
 		</a>

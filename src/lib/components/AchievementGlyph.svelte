@@ -5,7 +5,17 @@
 	let { kind, size = 48 }: { kind: string; size?: number } = $props();
 </script>
 
-<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+<svg
+	width={size}
+	height={size}
+	viewBox="0 0 24 24"
+	fill="none"
+	stroke="currentColor"
+	stroke-width="1.5"
+	stroke-linecap="round"
+	stroke-linejoin="round"
+	aria-hidden="true"
+>
 	{#if kind === 'medal'}
 		<circle cx="12" cy="14" r="6" />
 		<path d="M8 8 6 3l2 1 2-1 2 4" />
@@ -17,16 +27,22 @@
 		<rect x="16" y="10" width="3" height="4" />
 		<rect x="9" y="11" width="6" height="2" />
 	{:else if kind === 'heart'}
-		<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z" />
+		<path
+			d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"
+		/>
 	{:else if kind === 'distance'}
 		<path d="M3 12h4l3-8 4 16 3-8h4" />
 	{:else if kind === 'stopwatch'}
 		<circle cx="12" cy="13" r="8" />
 		<path d="M12 9v4l2.5 2M9 2h6" />
 	{:else if kind === 'flame'}
-		<path d="M8.5 14.5A2.5 2.5 0 0 0 11 17c2 0 3-1 3.5-2 .5-2-1-4-1-4-1 .5-2.5 1-3.5 0s-.5-2 0-3c-2 .5-4 2-4 5a4.5 4.5 0 0 0 2.5 4Z" />
+		<path
+			d="M8.5 14.5A2.5 2.5 0 0 0 11 17c2 0 3-1 3.5-2 .5-2-1-4-1-4-1 .5-2.5 1-3.5 0s-.5-2 0-3c-2 .5-4 2-4 5a4.5 4.5 0 0 0 2.5 4Z"
+		/>
 	{:else if kind === 'sparkle'}
-		<path d="M12 3v3M12 18v3M5 12H2M22 12h-3M5.6 5.6 7.7 7.7M16.3 16.3l2.1 2.1M5.6 18.4 7.7 16.3M16.3 7.7l2.1-2.1" />
+		<path
+			d="M12 3v3M12 18v3M5 12H2M22 12h-3M5.6 5.6 7.7 7.7M16.3 16.3l2.1 2.1M5.6 18.4 7.7 16.3M16.3 7.7l2.1-2.1"
+		/>
 		<circle cx="12" cy="12" r="3" />
 	{:else if kind === 'compass'}
 		<circle cx="12" cy="12" r="10" />

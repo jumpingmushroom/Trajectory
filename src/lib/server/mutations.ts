@@ -297,9 +297,7 @@ async function equipmentCreate(
 			sortOrder
 		})
 		.onConflictDoNothing();
-	const row = (
-		await db.select().from(equipment).where(eq(equipment.id, payload.id)).limit(1)
-	)[0];
+	const row = (await db.select().from(equipment).where(eq(equipment.id, payload.id)).limit(1))[0];
 	if (!row) notFound(`equipment ${payload.id} not found after insert`);
 
 	// Auto-create the hidden exercise for machines/cables/cardio so all sets
@@ -328,10 +326,7 @@ async function equipmentCreate(
 
 // Resolve an equipment row and assert it belongs to the caller (via the
 // owning gym). Returns the row when authorised, throws notFound otherwise.
-async function assertEquipmentOwned(
-	equipmentId: string,
-	userId: string
-): Promise<Equipment> {
+async function assertEquipmentOwned(equipmentId: string, userId: string): Promise<Equipment> {
 	const row = (
 		await db
 			.select({
@@ -352,13 +347,7 @@ async function assertEquipmentOwned(
 			})
 			.from(equipment)
 			.innerJoin(gym, eq(gym.id, equipment.gymId))
-			.where(
-				and(
-					eq(equipment.id, equipmentId),
-					eq(gym.userId, userId),
-					isNull(gym.deletedAt)
-				)
-			)
+			.where(and(eq(equipment.id, equipmentId), eq(gym.userId, userId), isNull(gym.deletedAt)))
 			.limit(1)
 	)[0] as Equipment | undefined;
 	if (!row) notFound(`equipment ${equipmentId} not found`);
@@ -476,9 +465,7 @@ async function equipmentUpdate(payload: EquipmentUpdate, userId: string): Promis
 			.where(and(eq(exercise.id, hiddenId), eq(exercise.isHidden, true)));
 	}
 
-	const row = (
-		await db.select().from(equipment).where(eq(equipment.id, payload.id)).limit(1)
-	)[0];
+	const row = (await db.select().from(equipment).where(eq(equipment.id, payload.id)).limit(1))[0];
 	if (!row) notFound(`equipment ${payload.id} not found`);
 	return row;
 }
@@ -494,13 +481,11 @@ async function equipmentDelete(
 	// a crash mid-cascade leaves orphaned exercises that join cleanly through
 	// to a tombstoned equipment. Sync body required by better-sqlite3 12.x.
 	db.transaction((tx) => {
-		tx
-			.update(equipment)
+		tx.update(equipment)
 			.set({ deletedAt: new Date(now), updatedAt: new Date(now) })
 			.where(eq(equipment.id, payload.id))
 			.run();
-		tx
-			.update(exercise)
+		tx.update(exercise)
 			.set({ deletedAt: new Date(now), updatedAt: new Date(now) })
 			.where(eq(exercise.equipmentId, payload.id))
 			.run();
@@ -619,8 +604,7 @@ function resolveSession(
 				if (delta >= 0 && delta <= EMPTY_SESSION_ATTACH_MS) {
 					return { sessionId: open.id, isNew: false, isBackdated: false };
 				}
-				tx
-					.update(workoutSession)
+				tx.update(workoutSession)
 					.set({ endedAt: open.startedAt, updatedAt: new Date() })
 					.where(eq(workoutSession.id, open.id))
 					.run();
@@ -632,8 +616,7 @@ function resolveSession(
 				}
 				// Close the stale open session. endedAt pinned to last activity
 				// (not the new set's tsMs) — gap is downtime, not workout time.
-				tx
-					.update(workoutSession)
+				tx.update(workoutSession)
 					.set({ endedAt: new Date(lastTs), updatedAt: new Date() })
 					.where(eq(workoutSession.id, open.id))
 					.run();
@@ -681,8 +664,7 @@ function resolveSession(
 		// If the new set predates the current startedAt, push the start
 		// back. endedAt is recomputed by the caller after the set inserts.
 		if (tsMs < candidate.startedAt.getTime()) {
-			tx
-				.update(workoutSession)
+			tx.update(workoutSession)
 				.set({ startedAt: new Date(tsMs), updatedAt: new Date() })
 				.where(eq(workoutSession.id, candidate.id))
 				.run();
@@ -846,8 +828,7 @@ async function setCreate(
 	// Sync body required by better-sqlite3 12.x.
 	const { session, row } = db.transaction((tx) => {
 		const session = resolveSession(tx, userId, eqRow.gymId, ts);
-		tx
-			.insert(setTable)
+		tx.insert(setTable)
 			.values({
 				id: payload.id,
 				userId,
@@ -862,12 +843,9 @@ async function setCreate(
 			})
 			.onConflictDoNothing()
 			.run();
-		const row = tx
-			.select()
-			.from(setTable)
-			.where(eq(setTable.id, payload.id))
-			.limit(1)
-			.get() as SetRow | undefined;
+		const row = tx.select().from(setTable).where(eq(setTable.id, payload.id)).limit(1).get() as
+			| SetRow
+			| undefined;
 		if (!row) notFound(`set ${payload.id} not found after insert`);
 
 		// Backdated sessions stay closed; pin endedAt to the latest set ts
@@ -877,18 +855,12 @@ async function setCreate(
 			const latest = tx
 				.select({ ts: setTable.ts })
 				.from(setTable)
-				.where(
-					and(
-						eq(setTable.workoutSessionId, session.sessionId),
-						isNull(setTable.deletedAt)
-					)
-				)
+				.where(and(eq(setTable.workoutSessionId, session.sessionId), isNull(setTable.deletedAt)))
 				.orderBy(desc(setTable.ts))
 				.limit(1)
 				.get() as { ts: Date } | undefined;
 			if (latest) {
-				tx
-					.update(workoutSession)
+				tx.update(workoutSession)
 					.set({ endedAt: latest.ts, updatedAt: new Date() })
 					.where(eq(workoutSession.id, session.sessionId))
 					.run();
@@ -962,11 +934,7 @@ async function setUpdate(payload: SetUpdate, userId: string): Promise<SetRow> {
 		.update(setTable)
 		.set(updates)
 		.where(
-			and(
-				eq(setTable.id, payload.id),
-				eq(setTable.userId, userId),
-				isNull(setTable.deletedAt)
-			)
+			and(eq(setTable.id, payload.id), eq(setTable.userId, userId), isNull(setTable.deletedAt))
 		);
 
 	// SELECT mirrors the same predicates — a set that's missing, owned by
@@ -977,11 +945,7 @@ async function setUpdate(payload: SetUpdate, userId: string): Promise<SetRow> {
 			.select()
 			.from(setTable)
 			.where(
-				and(
-					eq(setTable.id, payload.id),
-					eq(setTable.userId, userId),
-					isNull(setTable.deletedAt)
-				)
+				and(eq(setTable.id, payload.id), eq(setTable.userId, userId), isNull(setTable.deletedAt))
 			)
 			.limit(1)
 	)[0];
@@ -1004,11 +968,7 @@ async function setDelete(
 			.select({ id: setTable.id })
 			.from(setTable)
 			.where(
-				and(
-					eq(setTable.id, payload.id),
-					eq(setTable.userId, userId),
-					isNull(setTable.deletedAt)
-				)
+				and(eq(setTable.id, payload.id), eq(setTable.userId, userId), isNull(setTable.deletedAt))
 			)
 			.limit(1)
 	)[0];
@@ -1024,10 +984,7 @@ async function setDelete(
 
 // ─── session handlers (manual start/end) ──────────────────────────────
 
-async function sessionStart(
-	payload: SessionStart,
-	userId: string
-): Promise<WorkoutSession> {
+async function sessionStart(payload: SessionStart, userId: string): Promise<WorkoutSession> {
 	assertUlid(payload.id, 'id');
 	assertUlid(payload.gymId, 'gymId');
 
@@ -1070,10 +1027,7 @@ async function sessionStart(
 	return row;
 }
 
-async function sessionEnd(
-	payload: { id: string },
-	userId: string
-): Promise<WorkoutSession> {
+async function sessionEnd(payload: { id: string }, userId: string): Promise<WorkoutSession> {
 	assertUlid(payload.id, 'id');
 	const target = (
 		await db
@@ -1107,10 +1061,7 @@ async function sessionEnd(
 	return row;
 }
 
-async function sessionEndUndo(
-	payload: { id: string },
-	userId: string
-): Promise<WorkoutSession> {
+async function sessionEndUndo(payload: { id: string }, userId: string): Promise<WorkoutSession> {
 	assertUlid(payload.id, 'id');
 	const target = (
 		await db
@@ -1129,12 +1080,7 @@ async function sessionEndUndo(
 		await db
 			.select({ id: workoutSession.id })
 			.from(workoutSession)
-			.where(
-				and(
-					eq(workoutSession.userId, userId),
-					gt(workoutSession.startedAt, target.startedAt)
-				)
-			)
+			.where(and(eq(workoutSession.userId, userId), gt(workoutSession.startedAt, target.startedAt)))
 			.limit(1)
 	)[0];
 	if (newer) badRequest('cannot undo: a newer session exists');
@@ -1168,9 +1114,7 @@ async function sessionDelete(
 		await db
 			.select({ id: setTable.id })
 			.from(setTable)
-			.where(
-				and(eq(setTable.workoutSessionId, payload.id), isNull(setTable.deletedAt))
-			)
+			.where(and(eq(setTable.workoutSessionId, payload.id), isNull(setTable.deletedAt)))
 			.limit(1)
 	)[0];
 	if (anySet) badRequest('cannot delete a session with sets');

@@ -4,7 +4,7 @@
 // honest even when no sync events fire.
 
 import { writable, get } from 'svelte/store';
-import { pendingCount, listPending, type PendingMutation } from './queue';
+import { listPending, type PendingMutation } from './queue';
 
 export interface SyncSnapshot {
 	online: boolean;

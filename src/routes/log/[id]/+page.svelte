@@ -41,18 +41,14 @@
 
 	// Pick the default exercise: most-recent visible if any, else the
 	// (single) hidden auto-exercise.
-	const defaultExerciseId = $derived(
-		visibleExercises[0]?.id ?? allExercises[0]?.id ?? ''
-	);
+	const defaultExerciseId = $derived(visibleExercises[0]?.id ?? allExercises[0]?.id ?? '');
 
 	let selectedExerciseId = $state('');
 	$effect(() => {
 		if (!selectedExerciseId && defaultExerciseId) selectedExerciseId = defaultExerciseId;
 	});
 
-	const ctx = $derived(
-		data.contexts.find((c) => c.id === selectedExerciseId) ?? data.contexts[0]
-	);
+	const ctx = $derived(data.contexts.find((c) => c.id === selectedExerciseId) ?? data.contexts[0]);
 
 	// Strength state
 	let weight = $state(60);
@@ -265,10 +261,13 @@
 				lastCelebratedPr = prValue;
 				pushToast(`New PR · ${fmtNum(prValue)} ${prUnit}`, 'info', 4000);
 			}
-			setTimeout(() => {
-				justSaved = false;
-				justPr = false;
-			}, didPr ? 1500 : 700);
+			setTimeout(
+				() => {
+					justSaved = false;
+					justPr = false;
+				},
+				didPr ? 1500 : 700
+			);
 			// mutate() handles invalidation when the queue successfully drains;
 			// when offline it queues silently and the optimistic overlay
 			// covers the UI until reconnect — we explicitly don't call
@@ -363,7 +362,7 @@
 	<title>Log {eq.name} · Trajectory</title>
 </svelte:head>
 
-<main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pb-32 pt-12">
+<main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pt-12 pb-32">
 	<header class="flex items-start gap-3">
 		<a
 			href={withDateMode('/', asOfTs)}
@@ -371,13 +370,22 @@
 			style="background: var(--color-surface); border-color: var(--color-line-2); color: var(--color-text-dim);"
 			aria-label="Back"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M15 6l-6 6 6 6"/>
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M15 6l-6 6 6 6" />
 			</svg>
 		</a>
 		<div class="flex flex-1 flex-col">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.16em]"
+				class="text-[10px] font-bold tracking-[0.16em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				{isCardio ? 'CARDIO' : 'LOGGING'}
@@ -400,7 +408,17 @@
 			style="background: var(--color-surface); border-color: var(--color-line-2); color: var(--color-text-dim);"
 			aria-label="Equipment detail"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
 				<path d="M3 17l5-5 4 4 8-9" />
 				<path d="M14 7h7v7" />
 			</svg>
@@ -420,7 +438,7 @@
 		{/if}
 		{#if ctx && ctx.sparklineSeries.length >= 2}
 			<div
-				class="absolute bottom-2 right-2 flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
+				class="absolute right-2 bottom-2 flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
 				style="background: rgba(13,15,18,0.8); border-color: var(--color-line-2); backdrop-filter: blur(6px);"
 			>
 				<Sparkline data={ctx.sparklineSeries} width={70} height={20} />
@@ -438,10 +456,7 @@
 		{/if}
 	</section>
 
-	<div
-		class="mt-3 flex items-center gap-2 text-[12px]"
-		style="color: var(--color-text-dim-2);"
-	>
+	<div class="mt-3 flex items-center gap-2 text-[12px]" style="color: var(--color-text-dim-2);">
 		<span class="h-1.5 w-1.5 rounded-full" style="background: var(--color-text-dim-2);"></span>
 		Last time: <span style="color: var(--color-text-dim);">{lastSummary()}</span>
 	</div>
@@ -449,7 +464,7 @@
 	{#if showsExercisePicker}
 		<section class="mt-4 flex flex-col gap-2">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Exercise
@@ -485,7 +500,9 @@
 				min={1}
 				label="DURATION"
 				unit="min"
-				hint={ctx?.lastDurationMin != null ? `Previous: ${fmtNum(ctx.lastDurationMin)} min` : undefined}
+				hint={ctx?.lastDurationMin != null
+					? `Previous: ${fmtNum(ctx.lastDurationMin)} min`
+					: undefined}
 			/>
 		</section>
 
@@ -493,7 +510,7 @@
 			<section class="mt-4 flex flex-col gap-2">
 				<div class="flex items-baseline justify-between">
 					<div
-						class="text-[10px] font-bold uppercase tracking-[0.14em]"
+						class="text-[10px] font-bold tracking-[0.14em] uppercase"
 						style="color: var(--color-text-dim-2);"
 					>
 						Details · optional
@@ -511,7 +528,7 @@
 							>
 								<div class="flex items-center justify-between">
 									<span
-										class="text-[9px] font-bold uppercase tracking-[0.14em]"
+										class="text-[9px] font-bold tracking-[0.14em] uppercase"
 										style="color: var(--color-amber);"
 									>
 										{f.label}
@@ -523,8 +540,16 @@
 										onclick={() => clearExtra(f.id)}
 										aria-label="Remove {f.label}"
 									>
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
-											<path d="M6 6l12 12M18 6L6 18"/>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.75"
+											stroke-linecap="round"
+										>
+											<path d="M6 6l12 12M18 6L6 18" />
 										</svg>
 									</button>
 								</div>
@@ -536,8 +561,16 @@
 										use:holdRepeat={{ onTick: () => bumpExtra(f.id, -1) }}
 										aria-label="Decrease {f.label.toLowerCase()}"
 									>
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-											<path d="M5 12h14"/>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+										>
+											<path d="M5 12h14" />
 										</svg>
 									</button>
 									<div class="flex flex-1 items-baseline justify-center gap-1">
@@ -560,8 +593,16 @@
 										use:holdRepeat={{ onTick: () => bumpExtra(f.id, 1) }}
 										aria-label="Increase {f.label.toLowerCase()}"
 									>
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-											<path d="M12 5v14M5 12h14"/>
+										<svg
+											width="14"
+											height="14"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+										>
+											<path d="M12 5v14M5 12h14" />
 										</svg>
 									</button>
 								</div>
@@ -573,8 +614,16 @@
 								style="border-color: var(--color-line-2); color: var(--color-text-dim);"
 								onclick={() => activateExtra(f)}
 							>
-								<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-									<path d="M12 5v14M5 12h14"/>
+								<svg
+									width="12"
+									height="12"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+								>
+									<path d="M12 5v14M5 12h14" />
 								</svg>
 								{f.label.toLowerCase()}
 							</button>
@@ -589,11 +638,24 @@
 				class="mt-3 flex items-center gap-3 rounded-xl border px-3 py-2.5"
 				style="background: var(--color-surface); border-color: var(--color-line);"
 			>
-				<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-dim-2);">
-					<path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/>
+				<svg
+					width="14"
+					height="14"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.75"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					style="color: var(--color-text-dim-2);"
+				>
+					<path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" />
 				</svg>
 				<div class="flex flex-col">
-					<div class="text-[9px] font-bold uppercase tracking-[0.14em]" style="color: var(--color-text-dim-2);">
+					<div
+						class="text-[9px] font-bold tracking-[0.14em] uppercase"
+						style="color: var(--color-text-dim-2);"
+					>
 						Avg speed
 					</div>
 					<div class="text-[14px] font-bold tabular-nums" style="color: var(--color-text);">
@@ -601,9 +663,12 @@
 						<span class="text-[10px] font-medium" style="color: var(--color-text-dim);">km/h</span>
 					</div>
 				</div>
-				<div class="self-stretch w-px" style="background: var(--color-line);"></div>
+				<div class="w-px self-stretch" style="background: var(--color-line);"></div>
 				<div class="flex flex-col">
-					<div class="text-[9px] font-bold uppercase tracking-[0.14em]" style="color: var(--color-text-dim-2);">
+					<div
+						class="text-[9px] font-bold tracking-[0.14em] uppercase"
+						style="color: var(--color-text-dim-2);"
+					>
 						Pace
 					</div>
 					<div class="text-[14px] font-bold tabular-nums" style="color: var(--color-text);">
@@ -629,7 +694,7 @@
 		{#if ctx && ctx.commonWeights.length > 0}
 			<section class="mt-4 flex flex-col gap-2">
 				<div
-					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					Your usual
@@ -656,13 +721,7 @@
 		{/if}
 
 		<section class="mt-4 grid grid-cols-2 gap-2">
-			<SmallStepper
-				value={reps}
-				onChange={(v) => (reps = v)}
-				min={1}
-				max={50}
-				label="REPS"
-			/>
+			<SmallStepper value={reps} onChange={(v) => (reps = v)} min={1} max={50} label="REPS" />
 			<SmallStepper
 				value={targetSets}
 				onChange={(v) => (targetSets = v)}
@@ -700,10 +759,7 @@
 					</div>
 				{/each}
 			</div>
-			<div
-				class="text-[12px] font-medium tabular-nums"
-				style="color: var(--color-text-dim);"
-			>
+			<div class="text-[12px] font-medium tabular-nums" style="color: var(--color-text-dim);">
 				{setsDone}<span style="color: var(--color-text-dim-2);"> / {targetSets}</span>
 			</div>
 		</section>
@@ -719,7 +775,7 @@
 		<section class="mt-4 flex flex-col gap-2">
 			<div class="flex items-baseline justify-between">
 				<div
-					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					This session · {sessionSetsForExercise.length}
@@ -736,9 +792,18 @@
 						class="flex items-center gap-1.5 text-[12px] font-semibold tabular-nums"
 						style="color: var(--color-amber);"
 					>
-						<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-							<circle cx="12" cy="13" r="8"/>
-							<path d="M12 9v4l2.5 2M9 2h6"/>
+						<svg
+							width="14"
+							height="14"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<circle cx="12" cy="13" r="8" />
+							<path d="M12 9v4l2.5 2M9 2h6" />
 						</svg>
 						rest {fmtRest(restRemaining)}
 					</div>
@@ -770,10 +835,7 @@
 				{/each}
 			</div>
 			{#if !swipeHintSeen}
-				<div
-					class="text-center text-[11px]"
-					style="color: var(--color-text-dim-2);"
-				>
+				<div class="text-center text-[11px]" style="color: var(--color-text-dim-2);">
 					{isCardio
 						? '← swipe to delete'
 						: 'tap a set to edit · swipe ← to delete · swipe → to clone'}
@@ -793,7 +855,7 @@
 </main>
 
 <div
-	class="fixed inset-x-0 bottom-0 z-30 px-4 pb-6 pt-3"
+	class="fixed inset-x-0 bottom-0 z-30 px-4 pt-3 pb-6"
 	style="background: linear-gradient(180deg, transparent 0%, rgba(13,15,18,0.92) 30%, rgba(13,15,18,1) 60%);"
 >
 	<div class="mx-auto w-full max-w-[448px]">
@@ -809,8 +871,17 @@
 			disabled={logging}
 		>
 			{#if justSaved}
-				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-					<path d="M5 12l5 5L20 7"/>
+				<svg
+					width="18"
+					height="18"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.5"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<path d="M5 12l5 5L20 7" />
 				</svg>
 			{/if}
 			{buttonLabel}

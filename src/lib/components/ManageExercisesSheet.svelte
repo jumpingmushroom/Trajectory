@@ -95,7 +95,7 @@
 		<div class="flex items-start gap-3">
 			<div class="flex flex-1 flex-col">
 				<div
-					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					{equipmentName}
@@ -114,8 +114,16 @@
 				onclick={onClose}
 				aria-label="Close"
 			>
-				<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
-					<path d="M6 6l12 12M18 6L6 18"/>
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.75"
+					stroke-linecap="round"
+				>
+					<path d="M6 6l12 12M18 6L6 18" />
 				</svg>
 			</button>
 		</div>
@@ -148,8 +156,19 @@
 							onclick={() => (pendingDelete = ex)}
 							aria-label="Delete exercise"
 						>
-							<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-								<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13M9 7V4h6v3"/>
+							<svg
+								width="18"
+								height="18"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.75"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path
+									d="M4 7h16M10 11v6M14 11v6M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13M9 7V4h6v3"
+								/>
 							</svg>
 						</button>
 					</li>
@@ -160,7 +179,7 @@
 		{#if suggestions.length > 0}
 			<div class="flex flex-col gap-2">
 				<div
-					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					Common for {equipmentType}
@@ -183,7 +202,7 @@
 
 		<div class="flex flex-col gap-2">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Custom

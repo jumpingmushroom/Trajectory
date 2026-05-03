@@ -34,7 +34,7 @@
 	style="background: var(--color-surface); border-color: var(--color-line);"
 >
 	<span
-		class="text-[10px] font-bold uppercase tracking-[0.14em]"
+		class="text-[10px] font-bold tracking-[0.14em] uppercase"
 		style="color: var(--color-text-dim-2);"
 	>
 		{label}
@@ -47,8 +47,16 @@
 			use:holdRepeat={{ onTick: () => nudge(-1) }}
 			aria-label="Decrease {label.toLowerCase()}"
 		>
-			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-				<path d="M5 12h14"/>
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+			>
+				<path d="M5 12h14" />
 			</svg>
 		</button>
 		<span
@@ -64,8 +72,16 @@
 			use:holdRepeat={{ onTick: () => nudge(1) }}
 			aria-label="Increase {label.toLowerCase()}"
 		>
-			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-				<path d="M12 5v14M5 12h14"/>
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+			>
+				<path d="M12 5v14M5 12h14" />
 			</svg>
 		</button>
 	</div>

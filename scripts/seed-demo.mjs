@@ -87,7 +87,13 @@ const EQUIPMENT = [
 	{ name: 'Lat Pulldown', type: 'cable', group: 'pull', glyph: 'cable' },
 	{ name: 'Leg Press', type: 'machine', group: 'legs', glyph: 'legpress' },
 	{ name: 'Hack Squat', type: 'machine', group: 'legs', glyph: 'hackquat' },
-	{ name: 'Treadmill', type: 'cardio', group: 'cardio', glyph: 'treadmill', cardioKind: 'treadmill' },
+	{
+		name: 'Treadmill',
+		type: 'cardio',
+		group: 'cardio',
+		glyph: 'treadmill',
+		cardioKind: 'treadmill'
+	},
 	{ name: 'Rower', type: 'cardio', group: 'cardio', glyph: 'rower', cardioKind: 'rower' },
 	{ name: 'Bike', type: 'cardio', group: 'cardio', glyph: 'bike', cardioKind: 'bike' }
 ];
@@ -220,8 +226,7 @@ async function main() {
 
 			// Sessions start at 18:00 ± 30min jitter so the heatmap reads
 			// like a real evening lifter rather than a bot.
-			const sessionStart =
-				dayStart + 18 * 60 * 60 * 1000 + Math.floor(jitter(30 * 60 * 1000));
+			const sessionStart = dayStart + 18 * 60 * 60 * 1000 + Math.floor(jitter(30 * 60 * 1000));
 			let setTs = sessionStart;
 
 			for (const exerciseName of slot.exercises) {
@@ -231,10 +236,7 @@ async function main() {
 				if (slot.kind === 'cardio') {
 					const cb = CARDIO_BASELINES[exerciseName];
 					const distanceKm = roundHalf(cb.baseDistanceKm + cb.perWeekKm * week + jitter(0.4));
-					const durationMin = Math.max(
-						5,
-						Math.round(cb.baseDurationMin + week * 0.5 + jitter(2))
-					);
+					const durationMin = Math.max(5, Math.round(cb.baseDurationMin + week * 0.5 + jitter(2)));
 					const kcal = Math.round(distanceKm * 60 + jitter(20));
 					const hr_avg = Math.round(140 + jitter(10));
 					await mutate('set.create', {

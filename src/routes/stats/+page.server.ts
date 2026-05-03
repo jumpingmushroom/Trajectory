@@ -1,12 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import {
-	achievement,
-	equipment,
-	exercise,
-	set as setTable
-} from '$lib/server/db/schema';
+import { achievement, equipment, exercise, set as setTable } from '$lib/server/db/schema';
 import { isNull, eq, and, asc, desc } from 'drizzle-orm';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -274,9 +269,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				unit = 'kg';
 				pointsMap = row.weightPerSession;
 			}
-			const points = [...pointsMap.values()]
-				.sort((a, b) => a.ts - b.ts)
-				.slice(-30);
+			const points = [...pointsMap.values()].sort((a, b) => a.ts - b.ts).slice(-30);
 			const series = points.map((p) => p.value);
 			const delta = series.length > 1 ? series[series.length - 1] - series[0] : 0;
 			const lastValue = series.length > 0 ? series[series.length - 1] : 0;

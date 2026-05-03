@@ -21,13 +21,7 @@ export const POST: RequestHandler = async ({ request, cookies, locals }) => {
 		await db
 			.select({ id: gym.id })
 			.from(gym)
-			.where(
-				and(
-					eq(gym.id, body.gymId),
-					eq(gym.userId, locals.user.id),
-					isNull(gym.deletedAt)
-				)
-			)
+			.where(and(eq(gym.id, body.gymId), eq(gym.userId, locals.user.id), isNull(gym.deletedAt)))
 			.limit(1)
 	)[0];
 	if (!exists) throw error(404, 'gym not found');

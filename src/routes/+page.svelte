@@ -64,14 +64,14 @@
 </svelte:head>
 
 <main
-	class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pb-32 pt-12"
+	class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pt-12 pb-32"
 	style="background-image: radial-gradient(1200px 600px at 50% 0%, rgba(255,140,66,0.06), transparent 70%);"
 >
 	<header class="flex flex-col gap-3">
 		<div class="flex items-start gap-3">
 			<div class="flex flex-1 flex-col">
 				<div
-					class="text-[10px] font-bold uppercase tracking-[0.16em]"
+					class="text-[10px] font-bold tracking-[0.16em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					Trajectory
@@ -124,8 +124,17 @@
 			disabled={starting}
 			onclick={handleStartSession}
 		>
-			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<polygon points="6 4 20 12 6 20 6 4"/>
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<polygon points="6 4 20 12 6 20 6 4" />
 			</svg>
 			{starting ? 'Starting…' : 'Start session'}
 		</button>
@@ -142,7 +151,7 @@
 			style="border-color: var(--color-line-2);"
 		>
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				{data.activeGym.name}
@@ -188,8 +197,17 @@
 		class="mt-4 flex items-center justify-center gap-2 rounded-full border-2 border-dashed py-3 text-[13px] font-semibold"
 		style="border-color: var(--color-line-2); color: var(--color-amber);"
 	>
-		<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-			<path d="M12 5v14M5 12h14"/>
+		<svg
+			width="14"
+			height="14"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="1.75"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		>
+			<path d="M12 5v14M5 12h14" />
 		</svg>
 		Add equipment
 	</a>

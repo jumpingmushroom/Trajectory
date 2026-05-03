@@ -62,11 +62,11 @@
 	<title>Stats · Trajectory</title>
 </svelte:head>
 
-<main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pb-28 pt-12">
+<main class="mx-auto flex min-h-screen w-full max-w-[480px] flex-col p-4 pt-12 pb-28">
 	<header class="flex items-end gap-3">
 		<div class="flex flex-1 flex-col">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.16em]"
+				class="text-[10px] font-bold tracking-[0.16em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Progression
@@ -83,8 +83,17 @@
 			class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold"
 			style="background: var(--color-surface); border-color: var(--color-line-2); color: var(--color-text);"
 		>
-			<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M12 3v13M6 11l6 6 6-6M4 21h16"/>
+			<svg
+				width="14"
+				height="14"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M12 3v13M6 11l6 6 6-6M4 21h16" />
 			</svg>
 			CSV
 		</a>
@@ -94,7 +103,7 @@
 		<section class="mt-4 flex flex-col gap-2">
 			<div class="flex items-baseline justify-between">
 				<div
-					class="text-[10px] font-bold uppercase tracking-[0.14em]"
+					class="text-[10px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					Achievements · {earnedCount}/{totalVisibleCount}
@@ -107,10 +116,7 @@
 					see all →
 				</a>
 			</div>
-			<div
-				class="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1"
-				style="scrollbar-width: none;"
-			>
+			<div class="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1" style="scrollbar-width: none;">
 				{#each (earnedDefs.length > 0 ? earnedDefs : visibleLockedDefs).slice(0, 6) as def (def.key)}
 					{@const earned = earnedMap.has(def.key)}
 					<div class="flex-shrink-0">
@@ -149,7 +155,7 @@
 		style="background: var(--color-surface); border-color: var(--color-line);"
 	>
 		<div
-			class="text-[10px] font-bold uppercase tracking-[0.14em]"
+			class="text-[10px] font-bold tracking-[0.14em] uppercase"
 			style="color: var(--color-text-dim-2);"
 		>
 			Distribution · {data.rangeLabel}
@@ -187,7 +193,7 @@
 			style="background: var(--color-surface); border-color: var(--color-line);"
 		>
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Cardio · {data.rangeLabel}
@@ -197,21 +203,36 @@
 					class="flex flex-col gap-0.5 rounded-xl border p-2.5"
 					style="background: var(--color-surface-2); border-color: var(--color-line);"
 				>
-					<span class="text-[10px] font-bold uppercase tracking-[0.12em]" style="color: var(--color-text-dim-2);">
+					<span
+						class="text-[10px] font-bold tracking-[0.12em] uppercase"
+						style="color: var(--color-text-dim-2);"
+					>
 						Total time
 					</span>
-					<span class="text-[18px] font-bold tabular-nums tracking-[-0.02em]" style="color: var(--color-text);">
-						{Math.round(data.cardioSummary.totalMin)}<span class="ml-0.5 text-[11px] font-semibold" style="color: var(--color-text-dim);">min</span>
+					<span
+						class="text-[18px] font-bold tracking-[-0.02em] tabular-nums"
+						style="color: var(--color-text);"
+					>
+						{Math.round(data.cardioSummary.totalMin)}<span
+							class="ml-0.5 text-[11px] font-semibold"
+							style="color: var(--color-text-dim);">min</span
+						>
 					</span>
 				</div>
 				<div
 					class="flex flex-col gap-0.5 rounded-xl border p-2.5"
 					style="background: var(--color-surface-2); border-color: var(--color-line);"
 				>
-					<span class="text-[10px] font-bold uppercase tracking-[0.12em]" style="color: var(--color-text-dim-2);">
+					<span
+						class="text-[10px] font-bold tracking-[0.12em] uppercase"
+						style="color: var(--color-text-dim-2);"
+					>
 						Sessions
 					</span>
-					<span class="text-[18px] font-bold tabular-nums tracking-[-0.02em]" style="color: var(--color-text);">
+					<span
+						class="text-[18px] font-bold tracking-[-0.02em] tabular-nums"
+						style="color: var(--color-text);"
+					>
 						{data.cardioSummary.sessions}
 					</span>
 				</div>
@@ -219,11 +240,21 @@
 					class="flex flex-col gap-0.5 rounded-xl border p-2.5"
 					style="background: var(--color-surface-2); border-color: var(--color-line);"
 				>
-					<span class="text-[10px] font-bold uppercase tracking-[0.12em]" style="color: var(--color-text-dim-2);">
+					<span
+						class="text-[10px] font-bold tracking-[0.12em] uppercase"
+						style="color: var(--color-text-dim-2);"
+					>
 						Distance
 					</span>
-					<span class="text-[18px] font-bold tabular-nums tracking-[-0.02em]" style="color: var(--color-text);">
-						{data.cardioSummary.totalKm > 0 ? fmtNum(data.cardioSummary.totalKm) : '—'}<span class="ml-0.5 text-[11px] font-semibold" style="color: var(--color-text-dim);">{data.cardioSummary.totalKm > 0 ? 'km' : ''}</span>
+					<span
+						class="text-[18px] font-bold tracking-[-0.02em] tabular-nums"
+						style="color: var(--color-text);"
+					>
+						{data.cardioSummary.totalKm > 0 ? fmtNum(data.cardioSummary.totalKm) : '—'}<span
+							class="ml-0.5 text-[11px] font-semibold"
+							style="color: var(--color-text-dim);"
+							>{data.cardioSummary.totalKm > 0 ? 'km' : ''}</span
+						>
 					</span>
 				</div>
 			</div>
@@ -241,11 +272,16 @@
 								<EquipmentGlyph kind={r.glyph as GlyphKind} />
 							</div>
 							<div class="flex flex-1 flex-col gap-0.5 overflow-hidden">
-								<span class="truncate text-[13px] font-semibold tracking-[-0.01em]" style="color: var(--color-text);">
+								<span
+									class="truncate text-[13px] font-semibold tracking-[-0.01em]"
+									style="color: var(--color-text);"
+								>
 									{r.name}
 								</span>
 								<span class="text-[11px] tabular-nums" style="color: var(--color-text-dim);">
-									{fmtMin(r.totalMin)} · {r.sessions} session{r.sessions === 1 ? '' : 's'}{r.totalKm > 0 ? ` · ${fmtKm(r.totalKm)}` : ''}
+									{fmtMin(r.totalMin)} · {r.sessions} session{r.sessions === 1
+										? ''
+										: 's'}{r.totalKm > 0 ? ` · ${fmtKm(r.totalKm)}` : ''}
 								</span>
 							</div>
 						</li>
@@ -257,7 +293,7 @@
 
 	<div class="mt-5 px-1 pb-2">
 		<div
-			class="text-[10px] font-bold uppercase tracking-[0.14em]"
+			class="text-[10px] font-bold tracking-[0.14em] uppercase"
 			style="color: var(--color-text-dim-2);"
 		>
 			By machine
@@ -276,7 +312,7 @@
 		{@const cardioCards = data.machineCards.filter((m) => m.type === 'cardio')}
 		{#if strengthCards.length > 0 && cardioCards.length > 0}
 			<div
-				class="mb-2 px-1 text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="mb-2 px-1 text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Strength
@@ -337,7 +373,7 @@
 		</ul>
 		{#if cardioCards.length > 0}
 			<div
-				class="mb-2 mt-4 px-1 text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="mt-4 mb-2 px-1 text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Cardio
@@ -403,8 +439,17 @@
 		class="mt-4 flex items-center justify-center gap-2 rounded-2xl border py-3 text-[14px] font-semibold"
 		style="background: var(--color-surface); border-color: var(--color-line-2); color: var(--color-text);"
 	>
-		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-			<path d="M12 3v13M6 11l6 6 6-6M4 21h16"/>
+		<svg
+			width="16"
+			height="16"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="1.75"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		>
+			<path d="M12 3v13M6 11l6 6 6-6M4 21h16" />
 		</svg>
 		Export your data as CSV
 	</a>

@@ -92,9 +92,7 @@
 		{ label: 'Sessions', value: String(data.sessionsCount) },
 		{
 			label: isCardio ? 'Type' : 'Sets',
-			value: isCardio
-				? capitalizeWord(eq.cardioKind ?? 'Cardio')
-				: String(data.setsCount)
+			value: isCardio ? capitalizeWord(eq.cardioKind ?? 'Cardio') : String(data.setsCount)
 		}
 	]);
 </script>
@@ -111,13 +109,22 @@
 			style="background: var(--color-surface); border-color: var(--color-line-2); color: var(--color-text-dim);"
 			aria-label="Back"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M15 6l-6 6 6 6"/>
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M15 6l-6 6 6 6" />
 			</svg>
 		</a>
 		<div class="flex flex-1 flex-col">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.16em]"
+				class="text-[10px] font-bold tracking-[0.16em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				{isCardio ? 'CARDIO' : 'EQUIPMENT'}
@@ -144,7 +151,7 @@
 		{/if}
 		{#if data.series.length >= 2}
 			<div
-				class="absolute bottom-2 right-2 flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
+				class="absolute right-2 bottom-2 flex items-center gap-2 rounded-lg border px-2.5 py-1.5"
 				style="background: rgba(13,15,18,0.8); border-color: var(--color-line-2); backdrop-filter: blur(6px);"
 			>
 				<Sparkline data={lastSparkline} width={70} height={20} />
@@ -166,16 +173,22 @@
 		class="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-xl text-[15px] font-bold"
 		style="background: var(--color-amber); color: #1b0a00; box-shadow: 0 6px 18px var(--color-amber-glow);"
 	>
-		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
-			<path d="M12 5v14M5 12h14"/>
+		<svg
+			width="16"
+			height="16"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2.25"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+		>
+			<path d="M12 5v14M5 12h14" />
 		</svg>
 		Log a set
 	</a>
 
-	<div
-		class="mt-3 flex items-center gap-2 text-[12px]"
-		style="color: var(--color-text-dim-2);"
-	>
+	<div class="mt-3 flex items-center gap-2 text-[12px]" style="color: var(--color-text-dim-2);">
 		<span class="h-1.5 w-1.5 rounded-full" style="background: var(--color-text-dim-2);"></span>
 		Last time: <span style="color: var(--color-text-dim);">{fmtLast()}</span>
 	</div>
@@ -187,13 +200,13 @@
 				style="background: var(--color-surface); border-color: var(--color-line);"
 			>
 				<div
-					class="text-[9px] font-bold uppercase tracking-[0.14em]"
+					class="text-[9px] font-bold tracking-[0.14em] uppercase"
 					style="color: var(--color-text-dim-2);"
 				>
 					{t.label}
 				</div>
 				<div
-					class="text-[18px] font-bold tabular-nums tracking-[-0.01em]"
+					class="text-[18px] font-bold tracking-[-0.01em] tabular-nums"
 					style="color: var(--color-text);"
 				>
 					{t.value}
@@ -208,7 +221,7 @@
 	>
 		<div class="flex items-baseline justify-between px-1 pb-2">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Top-set progression
@@ -219,12 +232,7 @@
 					: 'No data yet'}
 			</div>
 		</div>
-		<LineChart
-			data={data.series}
-			width={420}
-			height={170}
-			unit={isCardio ? 'min' : 'kg'}
-		/>
+		<LineChart data={data.series} width={420} height={170} unit={isCardio ? 'min' : 'kg'} />
 	</section>
 
 	{#if data.commonWeights.length > 0 && !isCardio}
@@ -233,7 +241,7 @@
 			style="background: var(--color-surface); border-color: var(--color-line);"
 		>
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Weights you actually use
@@ -257,7 +265,7 @@
 	>
 		<div class="flex items-baseline justify-between">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.14em]"
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Notes
