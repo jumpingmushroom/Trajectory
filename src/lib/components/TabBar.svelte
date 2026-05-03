@@ -10,7 +10,12 @@
 		href: string;
 		icon: string;
 	}[] = [
-		{ id: 'home', label: 'Today', href: '/', icon: 'M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-7h-6v7H4a1 1 0 01-1-1v-9z' },
+		{
+			id: 'home',
+			label: 'Today',
+			href: '/',
+			icon: 'M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-7h-6v7H4a1 1 0 01-1-1v-9z'
+		},
 		{
 			id: 'history',
 			label: 'History',
@@ -33,7 +38,7 @@
 </script>
 
 <nav
-	class="fixed inset-x-0 bottom-0 z-20 border-t pb-[max(env(safe-area-inset-bottom),12px)] pt-2"
+	class="fixed inset-x-0 bottom-0 z-20 border-t pt-2 pb-[max(env(safe-area-inset-bottom),12px)]"
 	style="background: rgba(13,15,18,0.92); border-color: var(--color-line); backdrop-filter: blur(8px);"
 	aria-label="Primary"
 >
@@ -45,8 +50,17 @@
 				style="color: {active === t.id ? 'var(--color-amber)' : 'var(--color-text-dim-2)'};"
 				aria-current={active === t.id ? 'page' : undefined}
 			>
-				<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-					{#each t.icon.split(';') as d}
+				<svg
+					width="22"
+					height="22"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="1.6"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					{#each t.icon.split(';') as d (d)}
 						<path {d} />
 					{/each}
 				</svg>

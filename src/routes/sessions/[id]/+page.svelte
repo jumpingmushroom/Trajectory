@@ -4,7 +4,7 @@
 	import type { GlyphKind } from '$lib/components/glyph-kinds';
 	import type { PageData } from './$types';
 	import { mutate } from '$lib/mutate';
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { onDestroy } from 'svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -84,9 +84,7 @@
 		startUndoTicker();
 	}
 
-	const undoRemainingMs = $derived(
-		undoUntil == null ? 0 : Math.max(0, undoUntil - undoNow)
-	);
+	const undoRemainingMs = $derived(undoUntil == null ? 0 : Math.max(0, undoUntil - undoNow));
 
 	async function handleEnd() {
 		if (ending || !s.isOpen) return;
@@ -164,7 +162,8 @@
 		if (!extras) return [];
 		const out: string[] = [];
 		if (typeof extras.distance === 'number') {
-			if (extras.distance >= 200 && Number.isInteger(extras.distance)) out.push(`${extras.distance} m`);
+			if (extras.distance >= 200 && Number.isInteger(extras.distance))
+				out.push(`${extras.distance} m`);
 			else out.push(`${fmtNum(extras.distance)} km`);
 		}
 		if (typeof extras.incline === 'number') out.push(`${fmtNum(extras.incline)}%`);
@@ -190,13 +189,22 @@
 			style="background: var(--color-surface); border-color: var(--color-line-2); color: var(--color-text-dim);"
 			aria-label="Back to history"
 		>
-			<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M15 6l-6 6 6 6"/>
+			<svg
+				width="18"
+				height="18"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="M15 6l-6 6 6 6" />
 			</svg>
 		</a>
 		<div class="flex flex-1 flex-col">
 			<div
-				class="text-[10px] font-bold uppercase tracking-[0.16em]"
+				class="text-[10px] font-bold tracking-[0.16em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				{s.gymName}
@@ -208,7 +216,7 @@
 				{dayLabel(s.dayOffset, s.startedAt)}
 				{#if s.isOpen}
 					<span
-						class="ml-1 align-middle rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em]"
+						class="ml-1 rounded px-1.5 py-0.5 align-middle text-[9px] font-bold tracking-[0.12em] uppercase"
 						style="background: var(--color-amber-dim); color: var(--color-amber);"
 					>
 						Live
@@ -224,13 +232,13 @@
 			style="background: var(--color-surface); border-color: var(--color-line);"
 		>
 			<div
-				class="text-[9px] font-bold uppercase tracking-[0.14em]"
+				class="text-[9px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Duration
 			</div>
 			<div
-				class="text-[18px] font-bold tabular-nums tracking-[-0.01em]"
+				class="text-[18px] font-bold tracking-[-0.01em] tabular-nums"
 				style="color: var(--color-text);"
 			>
 				{s.durationMin} min
@@ -241,13 +249,13 @@
 			style="background: var(--color-surface); border-color: var(--color-line);"
 		>
 			<div
-				class="text-[9px] font-bold uppercase tracking-[0.14em]"
+				class="text-[9px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Machines
 			</div>
 			<div
-				class="text-[18px] font-bold tabular-nums tracking-[-0.01em]"
+				class="text-[18px] font-bold tracking-[-0.01em] tabular-nums"
 				style="color: var(--color-text);"
 			>
 				{s.machineCount}
@@ -258,13 +266,13 @@
 			style="background: var(--color-surface); border-color: var(--color-line);"
 		>
 			<div
-				class="text-[9px] font-bold uppercase tracking-[0.14em]"
+				class="text-[9px] font-bold tracking-[0.14em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
 				Volume
 			</div>
 			<div
-				class="text-[18px] font-bold tabular-nums tracking-[-0.01em]"
+				class="text-[18px] font-bold tracking-[-0.01em] tabular-nums"
 				style="color: var(--color-text);"
 			>
 				{s.totalVolume > 0 ? formatVol(s.totalVolume) : '—'}
@@ -275,13 +283,11 @@
 	<section class="mt-5 flex flex-col gap-4">
 		{#each data.blocks as block (block.equipment.id)}
 			<div class="flex flex-col gap-2">
-				<a
-					href={`/equipment/${block.equipment.id}`}
-					class="flex items-center gap-3 px-1"
-				>
+				<a href={`/equipment/${block.equipment.id}`} class="flex items-center gap-3 px-1">
 					<div
 						class="h-9 w-9 flex-shrink-0 rounded-lg border p-1.5"
-						style="background: linear-gradient(135deg, {block.equipment.tint}, var(--color-bg)); border-color: var(--color-line-2);"
+						style="background: linear-gradient(135deg, {block.equipment
+							.tint}, var(--color-bg)); border-color: var(--color-line-2);"
 					>
 						<EquipmentGlyph kind={block.equipment.glyph as GlyphKind} />
 					</div>
@@ -295,8 +301,18 @@
 								: ''}
 						</div>
 					</div>
-					<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color: var(--color-text-dim-2);">
-						<path d="M9 6l6 6-6 6"/>
+					<svg
+						width="14"
+						height="14"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.75"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						style="color: var(--color-text-dim-2);"
+					>
+						<path d="M9 6l6 6-6 6" />
 					</svg>
 				</a>
 
@@ -313,7 +329,10 @@
 								{i + 1}
 							</div>
 							{#if set.durationMin != null}
-								<div class="flex flex-1 items-baseline gap-2 text-[13px]" style="color: var(--color-text);">
+								<div
+									class="flex flex-1 items-baseline gap-2 text-[13px]"
+									style="color: var(--color-text);"
+								>
 									<span class="font-semibold">{fmtNum(set.durationMin)}</span>
 									<span class="text-[10px]" style="color: var(--color-text-dim-2);">min</span>
 									{#each cardioSummary(set.extras) as bit, k (k)}
@@ -322,7 +341,10 @@
 									{/each}
 								</div>
 							{:else}
-								<div class="flex flex-1 items-baseline gap-2 text-[13px]" style="color: var(--color-text);">
+								<div
+									class="flex flex-1 items-baseline gap-2 text-[13px]"
+									style="color: var(--color-text);"
+								>
 									{#if !set.exerciseIsHidden && set.exerciseName !== block.equipment.name}
 										<span class="text-[10px]" style="color: var(--color-text-dim);">
 											{set.exerciseName}
@@ -402,9 +424,7 @@
 			style="background: var(--color-surface); border-color: var(--color-line-2); backdrop-filter: blur(8px);"
 		>
 			<div class="flex flex-1 flex-col">
-				<div class="text-[13px] font-semibold" style="color: var(--color-text);">
-					Session ended
-				</div>
+				<div class="text-[13px] font-semibold" style="color: var(--color-text);">Session ended</div>
 				<div class="text-[11px]" style="color: var(--color-text-dim-2);">
 					{Math.ceil(undoRemainingMs / 1000)}s to undo
 				</div>

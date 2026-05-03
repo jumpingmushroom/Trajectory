@@ -45,6 +45,9 @@ services:
       - ./eslint.config.js:/app/eslint.config.js
       - ./.prettierrc:/app/.prettierrc
       - ./.prettierignore:/app/.prettierignore
+      # `.gitignore` is loaded by eslint.config.js (via @eslint/compat's
+      # `includeIgnoreFile`) so `pnpm lint` in the container can mirror CI.
+      - ./.gitignore:/app/.gitignore
       # Persistent state — survives `docker compose down`.
       - ./data:/app/data
       # Anonymous volume for node_modules so host doesn't shadow container.

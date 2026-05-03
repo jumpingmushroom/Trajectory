@@ -7,3 +7,15 @@ bun.lockb
 
 # Miscellaneous
 /static/
+
+# Generated / build output
+.svelte-kit/
+build/
+dist/
+.output/
+
+# Runtime data (bind mount)
+data/
+
+# Dependencies
+node_modules/
