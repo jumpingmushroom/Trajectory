@@ -14,7 +14,7 @@ services:
     container_name: trajectory
     image: trajectory:dev
     ports:
-      - "5173:5173"
+      - '5173:5173'
     environment:
       NODE_ENV: development
       TRAJECTORY_DATA_DIR: /app/data

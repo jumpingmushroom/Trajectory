@@ -18,8 +18,7 @@
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
 
 const STAMP = Date.now();
-const EMAIL =
-	process.env.E2E_EMAIL ?? process.env.ADMIN_EMAIL ?? 'admin@trajectory.local';
+const EMAIL = process.env.E2E_EMAIL ?? process.env.ADMIN_EMAIL ?? 'admin@trajectory.local';
 const PASSWORD =
 	process.env.E2E_PASSWORD ?? process.env.ADMIN_PASSWORD ?? 'change-me-on-first-login';
 
@@ -54,7 +53,10 @@ async function addStrengthEquipment(page: Page): Promise<void> {
 	await page.goto('/setup');
 	// On a returning admin the gym name may differ; the Add button
 	// always reads "Add equipment to <gym name>", so anchor on the prefix.
-	await page.getByRole('button', { name: /^Add equipment to / }).first().click();
+	await page
+		.getByRole('button', { name: /^Add equipment to / })
+		.first()
+		.click();
 
 	// Step 1: pick a glyph. We choose 'Chest Press' because its default
 	// type is 'machine' (see src/lib/components/glyph-kinds.ts) — and

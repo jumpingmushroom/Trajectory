@@ -38,6 +38,6 @@ services:
     ports:
       # Bind only to localhost; expose to the public via your reverse
       # proxy (Caddy / Traefik / Nginx) terminating TLS.
-      - "127.0.0.1:5173:5173"
+      - '127.0.0.1:5173:5173'
     volumes:
       - ./data:/app/data

@@ -26,16 +26,16 @@ Trajectory is a workout tracker built around the gym you actually train in. Inst
 
 ## Screenshots
 
-| | |
-|:-:|:-:|
-| ![Home](docs/screenshots/home.png) | ![Setup](docs/screenshots/setup.png) |
-| Tap a piece of equipment | Set up your gym |
-| ![Log strength](docs/screenshots/log-strength.png) | ![Log cardio](docs/screenshots/log-cardio.png) |
-| Log a strength set | Log a cardio session |
-| ![Session detail](docs/screenshots/session-detail.png) | ![History](docs/screenshots/history.png) |
-| Per-session breakdown | 12-week heatmap |
-| ![Stats](docs/screenshots/stats.png) | ![Achievement unlocked](docs/screenshots/achievement.png) |
-| Progression charts | Achievements unlock as you train |
+|                                                        |                                                           |
+| :----------------------------------------------------: | :-------------------------------------------------------: |
+|           ![Home](docs/screenshots/home.png)           |           ![Setup](docs/screenshots/setup.png)            |
+|                Tap a piece of equipment                |                      Set up your gym                      |
+|   ![Log strength](docs/screenshots/log-strength.png)   |      ![Log cardio](docs/screenshots/log-cardio.png)       |
+|                   Log a strength set                   |                   Log a cardio session                    |
+| ![Session detail](docs/screenshots/session-detail.png) |         ![History](docs/screenshots/history.png)          |
+|                 Per-session breakdown                  |                      12-week heatmap                      |
+|          ![Stats](docs/screenshots/stats.png)          | ![Achievement unlocked](docs/screenshots/achievement.png) |
+|                   Progression charts                   |             Achievements unlock as you train              |
 
 ## Quickstart
 
