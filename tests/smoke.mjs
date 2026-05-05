@@ -166,8 +166,8 @@ async function main() {
 	const firstCells = ours[0].split(',');
 	assert(firstCells[0] === setIds[0], 'first set id matches');
 	assert(firstCells[8] === 'Smoke Cable Row', 'equipment name in CSV');
-	assert(firstCells[14] === '60', 'weight in CSV');
-	assert(firstCells[15] === '8', 'reps in CSV');
+	assert(firstCells[15] === '60', 'weight in CSV');
+	assert(firstCells[16] === '8', 'reps in CSV');
 
 	// 4. Idempotency check — replay a mutation and assert no new rows.
 	console.log('step 7 — replay idempotency');
@@ -467,10 +467,11 @@ async function main() {
 	const bwLine = csvBw.split('\n').find((l) => l.startsWith(bwSetId));
 	assert(typeof bwLine === 'string', 'bw set row present in CSV');
 	const bwCells = bwLine.split(',');
-	assert(bwCells[14] === '0', `bw set CSV weight column = 0 (got ${bwCells[14]})`);
-	// otherExtrasJson is column 20 but contains commas inside the JSON;
-	// rejoin from cell 20 to penultimate cell (last is ts).
-	const bwExtrasJsonCsv = bwCells.slice(20, -1).join(',').replace(/^"|"$/g, '').replace(/""/g, '"');
+	assert(bwCells[15] === '0', `bw set CSV weight column = 0 (got ${bwCells[15]})`);
+	// otherExtrasJson is column 21 (after the inputMode insertion) but
+	// contains commas inside the JSON; rejoin from cell 21 to penultimate
+	// (last is ts).
+	const bwExtrasJsonCsv = bwCells.slice(21, -1).join(',').replace(/^"|"$/g, '').replace(/""/g, '"');
 	assert(
 		bwExtrasJsonCsv.includes('"bwLoadKg":26.4') &&
 			bwExtrasJsonCsv.includes('"bwKg":80') &&
@@ -495,6 +496,168 @@ async function main() {
 		oobBw.status >= 400 && oobBw.status < 500,
 		`bodyWeightKg=1000 rejected with 4xx (got ${oobBw.status})`
 	);
+
+	// 18. Input modes: timed, timed_weighted, weight_distance.
+	console.log('step 18 — timed mode (plank): PR on duration');
+	const plankEqId = ulid();
+	const plankCreate = await mutate('equipment.create', {
+		id: plankEqId,
+		gymId,
+		name: 'Smoke Plank',
+		type: 'freeweight',
+		group: 'core',
+		glyph: 'plank',
+		inputMode: 'timed'
+	});
+	const plankExId = plankCreate?.result?.hiddenExercise?.id;
+	assert(typeof plankExId === 'string', 'auto-hidden exercise returned for timed equipment');
+	assert(
+		plankCreate?.result?.equipment?.inputMode === 'timed',
+		'equipment.create persists inputMode=timed'
+	);
+
+	const plank30 = await mutate('set.create', {
+		id: ulid(),
+		exerciseId: plankExId,
+		durationMin: 0.5,
+		ts: Date.now() + 300
+	});
+	assert(plank30?.result?.set?.isPr === true, 'first timed set is a PR');
+	assert(plank30?.result?.set?.durationMin === 0.5, 'timed set durationMin stored');
+	const plank60 = await mutate('set.create', {
+		id: ulid(),
+		exerciseId: plankExId,
+		durationMin: 1,
+		ts: Date.now() + 310
+	});
+	assert(plank60?.result?.set?.isPr === true, '1:00 plank PR-beats 0:30');
+
+	// timed reject-on-weight: must keep the modes hermetic.
+	const timedRejectWeight = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: ulid(),
+			op: 'set.create',
+			payload: {
+				id: ulid(),
+				exerciseId: plankExId,
+				durationMin: 0.5,
+				weight: 5,
+				ts: Date.now() + 320
+			}
+		})
+	});
+	assert(!timedRejectWeight.ok, 'timed set with weight rejected');
+
+	console.log('step 19 — timed_weighted mode: PR on weight');
+	const wPlankEqId = ulid();
+	const wPlankCreate = await mutate('equipment.create', {
+		id: wPlankEqId,
+		gymId,
+		name: 'Smoke Weighted Plank',
+		type: 'freeweight',
+		group: 'core',
+		glyph: 'plank',
+		inputMode: 'timed_weighted'
+	});
+	const wPlankExId = wPlankCreate?.result?.hiddenExercise?.id;
+	assert(typeof wPlankExId === 'string', 'auto-hidden exercise for timed_weighted');
+
+	await mutate('set.create', {
+		id: ulid(),
+		exerciseId: wPlankExId,
+		weight: 0,
+		durationMin: 0.5,
+		ts: Date.now() + 330
+	});
+	const wPlankPr = await mutate('set.create', {
+		id: ulid(),
+		exerciseId: wPlankExId,
+		weight: 5,
+		durationMin: 0.5,
+		ts: Date.now() + 340
+	});
+	assert(wPlankPr?.result?.set?.isPr === true, '5 kg × 30 s plank PR-beats 0 kg × 30 s');
+
+	const twRejectReps = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: ulid(),
+			op: 'set.create',
+			payload: {
+				id: ulid(),
+				exerciseId: wPlankExId,
+				weight: 5,
+				durationMin: 0.5,
+				reps: 1,
+				ts: Date.now() + 345
+			}
+		})
+	});
+	assert(!twRejectReps.ok, 'timed_weighted set with reps rejected');
+
+	console.log('step 20 — weight_distance mode: PR on weight, distance required');
+	const carryEqId = ulid();
+	const carryCreate = await mutate('equipment.create', {
+		id: carryEqId,
+		gymId,
+		name: 'Smoke Farmer Walk',
+		type: 'freeweight',
+		group: 'core',
+		glyph: 'farmer',
+		inputMode: 'weight_distance'
+	});
+	const carryExId = carryCreate?.result?.hiddenExercise?.id;
+	assert(typeof carryExId === 'string', 'auto-hidden exercise for weight_distance');
+
+	const carryRejectNoDist = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: ulid(),
+			op: 'set.create',
+			payload: {
+				id: ulid(),
+				exerciseId: carryExId,
+				weight: 20,
+				ts: Date.now() + 350
+			}
+		})
+	});
+	assert(!carryRejectNoDist.ok, 'weight_distance set without distance rejected');
+
+	await mutate('set.create', {
+		id: ulid(),
+		exerciseId: carryExId,
+		weight: 20,
+		extras: { distance: 20 },
+		ts: Date.now() + 360
+	});
+	const carryPr = await mutate('set.create', {
+		id: ulid(),
+		exerciseId: carryExId,
+		weight: 24,
+		extras: { distance: 20 },
+		ts: Date.now() + 370
+	});
+	assert(carryPr?.result?.set?.isPr === true, '24 kg × 20 m carry PR-beats 20 kg × 20 m');
+
+	console.log('step 21 — achievement coverage for new modes');
+	const achRes2 = await callJson('/api/achievement');
+	const earnedKeys2 = new Set((achRes2.body?.earned ?? []).map((a) => a.badgeKey));
+	assert(earnedKeys2.has('hold.first'), '`hold.first` badge unlocked');
+	assert(earnedKeys2.has('hold.thirty_seconds'), '`hold.thirty_seconds` unlocked (30 s plank)');
+	assert(earnedKeys2.has('hold.minute'), '`hold.minute` unlocked (1:00 plank)');
+	assert(earnedKeys2.has('carry.first'), '`carry.first` badge unlocked');
+
+	console.log('step 22 — CSV inputMode column populated');
+	const csvModes = await (await call('/api/export.csv')).text();
+	const csvLinesNew = csvModes.split('\n').filter((l) => l.includes('Smoke Plank'));
+	assert(csvLinesNew.length >= 1, 'plank rows present in CSV');
+	const plankRow = csvLinesNew[0].split(',');
+	assert(plankRow[11] === 'timed', `plank row inputMode column = "timed" (got "${plankRow[11]}")`);
 
 	console.log('\nall smoke checks passed');
 }

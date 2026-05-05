@@ -188,6 +188,14 @@ export const equipment = sqliteTable(
 		// generic), null otherwise. Determines the optional-fields template
 		// shown by the cardio Log screen.
 		cardioKind: text('cardio_kind'),
+		// inputMode: how sets are logged on this equipment. Replaces the
+		// implicit mode that used to be derived from `type` + `bodyweightPct`.
+		// Values: weighted | bodyweight | distance_time | timed |
+		// timed_weighted | weight_distance. The Log screen branches on this
+		// (via MODE_SHAPE in $lib/input-modes) to pick the right input fields;
+		// the server validator enforces which `set` columns are required vs.
+		// forbidden per mode.
+		inputMode: text('input_mode').default('weighted').notNull(),
 		// sortOrder: reserved for "Walk order" sort; default 0.
 		sortOrder: integer('sort_order').default(0).notNull(),
 		// notes: free text, shared across users (it's a fact about the

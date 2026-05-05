@@ -196,8 +196,114 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
 		triggers: ['set.created'],
 		predicate: {
 			kind: 'variety-groups-in-week',
-			groups: ['push', 'pull', 'legs', 'core']
+			groups: ['push', 'pull', 'legs', 'core'],
+			// Cheap-split rollup: a hip-thrust (group 'glutes') still satisfies
+			// the 'legs' slot; a shoulder press ('shoulders') still satisfies
+			// 'push'; a preacher curl ('arms') still satisfies 'pull'. Without
+			// the rollup, splitting glutes/arms/shoulders out of the original
+			// 5-group enum would have made this badge stricter than before.
+			rollup: {
+				legs: ['legs', 'glutes'],
+				push: ['push', 'shoulders'],
+				pull: ['pull', 'arms']
+			}
 		}
+	},
+
+	// ─── Timed-hold PRs (visible) ────────────────────────────────────
+	{
+		key: 'hold.first',
+		category: 'pr',
+		hidden: false,
+		title: 'First Hold',
+		description: 'Log your first timed hold',
+		icon: 'stopwatch',
+		triggers: ['set.created'],
+		predicate: { kind: 'timed-first' }
+	},
+	{
+		key: 'hold.thirty_seconds',
+		category: 'pr',
+		hidden: false,
+		title: 'Half Minute',
+		description: 'Hold a position for 30 seconds',
+		icon: 'stopwatch',
+		triggers: ['set.created'],
+		predicate: { kind: 'pr-timed-min', minSec: 30 }
+	},
+	{
+		key: 'hold.minute',
+		category: 'pr',
+		hidden: false,
+		title: 'Sixty Seconds',
+		description: 'Hold a position for 1 minute',
+		icon: 'stopwatch',
+		triggers: ['set.created'],
+		predicate: { kind: 'pr-timed-min', minSec: 60 }
+	},
+	{
+		key: 'hold.two_minutes',
+		category: 'pr',
+		hidden: false,
+		title: 'Two Minutes',
+		description: 'Hold a position for 2 minutes',
+		icon: 'stopwatch',
+		triggers: ['set.created'],
+		predicate: { kind: 'pr-timed-min', minSec: 120 }
+	},
+	{
+		key: 'hold.iron',
+		category: 'pr',
+		hidden: false,
+		title: 'Iron Core',
+		description: 'Hold a position for 5 minutes',
+		icon: 'stopwatch',
+		triggers: ['set.created'],
+		predicate: { kind: 'pr-timed-min', minSec: 300 }
+	},
+
+	// ─── Loaded carry PRs (visible) ──────────────────────────────────
+	{
+		key: 'carry.first',
+		category: 'pr',
+		hidden: false,
+		title: 'First Carry',
+		description: 'Log your first loaded carry',
+		icon: 'distance',
+		triggers: ['set.created'],
+		predicate: { kind: 'carry-first' }
+	},
+	{
+		key: 'carry.fifty_meters',
+		category: 'pr',
+		hidden: false,
+		title: 'Fifty Meters',
+		description: 'Carry weight 50 m in a single set',
+		icon: 'distance',
+		triggers: ['set.created'],
+		predicate: { kind: 'pr-carry-min', minDistanceM: 50 }
+	},
+	{
+		key: 'carry.heavy_lift',
+		category: 'pr',
+		hidden: false,
+		title: 'Heavy Carry',
+		description: 'Carry 50+ kg for 10+ m',
+		icon: 'distance',
+		triggers: ['set.created'],
+		predicate: { kind: 'pr-carry-min', minWeightKg: 50, minDistanceM: 10 }
+	},
+
+	// ─── Variety: all input modes used ───────────────────────────────
+	{
+		key: 'variety.all_modes',
+		category: 'variety',
+		hidden: false,
+		title: 'All Modes',
+		description: 'Log a set in every input mode',
+		icon: 'compass',
+		triggers: ['set.created'],
+		predicate: { kind: 'variety-input-modes-all' }
 	},
 
 	// ─── Easter eggs (hidden) ──────────────────────────────────────

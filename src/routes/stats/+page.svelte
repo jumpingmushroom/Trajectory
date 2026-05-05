@@ -9,11 +9,15 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const groupOrder: { id: 'push' | 'pull' | 'legs' | 'core'; label: string }[] = [
+	type DistGroup = 'push' | 'pull' | 'legs' | 'core' | 'arms' | 'shoulders' | 'glutes';
+	const groupOrder: { id: DistGroup; label: string }[] = [
 		{ id: 'push', label: 'Push' },
 		{ id: 'pull', label: 'Pull' },
 		{ id: 'legs', label: 'Legs' },
-		{ id: 'core', label: 'Core' }
+		{ id: 'core', label: 'Core' },
+		{ id: 'arms', label: 'Arms' },
+		{ id: 'shoulders', label: 'Shoulders' },
+		{ id: 'glutes', label: 'Glutes' }
 	];
 
 	const ranges: { key: '7d' | '30d' | '3mo' | '6mo' | '1y' | 'all'; label: string }[] = [
@@ -308,8 +312,8 @@
 			No top-set data yet. Log a few sets and your progression appears here.
 		</div>
 	{:else}
-		{@const strengthCards = data.machineCards.filter((m) => m.type !== 'cardio')}
-		{@const cardioCards = data.machineCards.filter((m) => m.type === 'cardio')}
+		{@const strengthCards = data.machineCards.filter((m) => m.inputMode !== 'distance_time')}
+		{@const cardioCards = data.machineCards.filter((m) => m.inputMode === 'distance_time')}
 		{#if strengthCards.length > 0 && cardioCards.length > 0}
 			<div
 				class="mb-2 px-1 text-[10px] font-bold tracking-[0.14em] uppercase"

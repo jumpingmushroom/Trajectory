@@ -13,7 +13,8 @@
 		max = 1000,
 		label = 'WEIGHT',
 		unit = 'kg',
-		hint
+		hint,
+		formatter
 	}: {
 		value: number;
 		onChange: (next: number) => void;
@@ -23,6 +24,10 @@
 		label?: string;
 		unit?: string;
 		hint?: string;
+		// Optional override for how the value is rendered. Used by the timed
+		// modes (mm:ss display) so the same Stepper can show 0:30 instead of
+		// 0.5. Receives the snapped numeric value; returns the display string.
+		formatter?: (v: number) => string;
 	} = $props();
 
 	function clamp(v: number): number {
@@ -88,7 +93,7 @@
 				class="text-[40px] font-bold tracking-[-0.04em] tabular-nums"
 				style="color: var(--color-text);"
 			>
-				{fmt(value)}
+				{formatter ? formatter(value) : fmt(value)}
 			</span>
 			<span class="text-[14px] font-medium" style="color: var(--color-text-dim);">
 				{unit}
@@ -114,8 +119,10 @@
 			</svg>
 		</button>
 	</div>
-	<div class="px-1 text-[10px]" style="color: var(--color-text-dim-2);">
-		Tap +/− to nudge by {fmt(step)}
-		{unit} · hold to scroll fast
-	</div>
+	{#if !formatter}
+		<div class="px-1 text-[10px]" style="color: var(--color-text-dim-2);">
+			Tap +/− to nudge by {fmt(step)}
+			{unit} · hold to scroll fast
+		</div>
+	{/if}
 </div>

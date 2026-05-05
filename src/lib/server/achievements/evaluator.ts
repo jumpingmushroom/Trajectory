@@ -43,6 +43,7 @@ interface EvalState {
 	setEquipmentType: string | null;
 	setEquipmentGroup: string | null;
 	setCardioKind: string | null;
+	setEquipmentInputMode: string | null;
 	session: WorkoutSessionRow | null;
 }
 
@@ -69,6 +70,7 @@ function loadState(tx: Tx, ctx: EvalContext): EvalState {
 	let setEquipmentType: string | null = null;
 	let setEquipmentGroup: string | null = null;
 	let setCardioKind: string | null = null;
+	let setEquipmentInputMode: string | null = null;
 	let session: WorkoutSessionRow | null = null;
 
 	if (ctx.setId) {
@@ -82,17 +84,21 @@ function loadState(tx: Tx, ctx: EvalContext): EvalState {
 				.select({
 					type: equipment.type,
 					group: equipment.group,
-					cardioKind: equipment.cardioKind
+					cardioKind: equipment.cardioKind,
+					inputMode: equipment.inputMode
 				})
 				.from(exercise)
 				.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
 				.where(eq(exercise.id, set.exerciseId))
 				.limit(1)
-				.get() as { type: string; group: string; cardioKind: string | null } | undefined;
+				.get() as
+				| { type: string; group: string; cardioKind: string | null; inputMode: string }
+				| undefined;
 			if (eqRow) {
 				setEquipmentType = eqRow.type;
 				setEquipmentGroup = eqRow.group;
 				setCardioKind = eqRow.cardioKind;
+				setEquipmentInputMode = eqRow.inputMode;
 			}
 		}
 	}
@@ -115,7 +121,14 @@ function loadState(tx: Tx, ctx: EvalContext): EvalState {
 				.get() as WorkoutSessionRow | undefined) ?? null;
 	}
 
-	return { set, setEquipmentType, setEquipmentGroup, setCardioKind, session };
+	return {
+		set,
+		setEquipmentType,
+		setEquipmentGroup,
+		setCardioKind,
+		setEquipmentInputMode,
+		session
+	};
 }
 
 function award(tx: Tx, userId: string, badgeKey: string, ctx: EvalContext): void {
@@ -137,7 +150,10 @@ function matches(tx: Tx, userId: string, predicate: Predicate, state: EvalState)
 		case 'pr-strength-min': {
 			const set = state.set;
 			if (!set || set.weight == null) return false;
-			if (state.setEquipmentType === 'cardio') return false;
+			// Cardio (distance_time) is the only mode that doesn't carry a
+			// weight axis. Every other mode (weighted, bodyweight,
+			// timed_weighted, weight_distance) counts toward strength PRs.
+			if (state.setEquipmentInputMode === 'distance_time') return false;
 			// minKg === 0 acts as "any PR" — fires on the first is_pr=1 set.
 			if (predicate.minKg === 0) return set.isPr === true;
 			return set.weight >= predicate.minKg;
@@ -146,7 +162,7 @@ function matches(tx: Tx, userId: string, predicate: Predicate, state: EvalState)
 		case 'pr-cardio-distance': {
 			const set = state.set;
 			if (!set) return false;
-			if (state.setEquipmentType !== 'cardio') return false;
+			if (state.setEquipmentInputMode !== 'distance_time') return false;
 			if (predicate.cardioKind && state.setCardioKind !== predicate.cardioKind) return false;
 			const distance = set.extras?.distance;
 			if (typeof distance !== 'number' || !Number.isFinite(distance) || distance <= 0) {
@@ -160,14 +176,44 @@ function matches(tx: Tx, userId: string, predicate: Predicate, state: EvalState)
 		case 'pr-cardio-duration': {
 			const set = state.set;
 			if (!set) return false;
-			if (state.setEquipmentType !== 'cardio') return false;
+			if (state.setEquipmentInputMode !== 'distance_time') return false;
 			if (set.durationMin == null) return false;
 			return set.durationMin >= predicate.durationMin;
 		}
 
 		case 'cardio-first': {
 			if (!state.set) return false;
-			return state.setEquipmentType === 'cardio';
+			return state.setEquipmentInputMode === 'distance_time';
+		}
+
+		case 'pr-timed-min': {
+			const set = state.set;
+			if (!set || set.durationMin == null) return false;
+			const mode = state.setEquipmentInputMode;
+			if (mode !== 'timed' && mode !== 'timed_weighted') return false;
+			return set.durationMin * 60 >= predicate.minSec;
+		}
+
+		case 'timed-first': {
+			if (!state.set) return false;
+			const mode = state.setEquipmentInputMode;
+			return mode === 'timed' || mode === 'timed_weighted';
+		}
+
+		case 'pr-carry-min': {
+			const set = state.set;
+			if (!set) return false;
+			if (state.setEquipmentInputMode !== 'weight_distance') return false;
+			const distance = set.extras?.distance;
+			if (typeof distance !== 'number') return false;
+			if (predicate.minDistanceM != null && distance < predicate.minDistanceM) return false;
+			if (predicate.minWeightKg != null && (set.weight ?? 0) < predicate.minWeightKg) return false;
+			return true;
+		}
+
+		case 'carry-first': {
+			if (!state.set) return false;
+			return state.setEquipmentInputMode === 'weight_distance';
 		}
 
 		case 'session-density': {
@@ -204,10 +250,28 @@ function matches(tx: Tx, userId: string, predicate: Predicate, state: EvalState)
 				.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
 				.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
 				.where(
-					and(eq(setTable.userId, userId), isNull(setTable.deletedAt), eq(equipment.type, 'cardio'))
+					and(
+						eq(setTable.userId, userId),
+						isNull(setTable.deletedAt),
+						eq(equipment.inputMode, 'distance_time')
+					)
 				)
 				.get() as { kinds: number } | undefined;
 			return (row?.kinds ?? 0) >= 4;
+		}
+
+		case 'variety-input-modes-all': {
+			const row = tx
+				.select({ modes: countDistinct(equipment.inputMode) })
+				.from(setTable)
+				.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
+				.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
+				.where(and(eq(setTable.userId, userId), isNull(setTable.deletedAt)))
+				.get() as { modes: number } | undefined;
+			// 6 = MODE_SHAPE size in $lib/input-modes. If you add a mode there,
+			// bump this. Skipped over a constant import to keep the evaluator
+			// dependency-free.
+			return (row?.modes ?? 0) >= 6;
 		}
 
 		case 'variety-equipment-in-week': {
@@ -247,7 +311,13 @@ function matches(tx: Tx, userId: string, predicate: Predicate, state: EvalState)
 				)
 				.all() as { group: string }[];
 			const seen = new Set(rows.map((r) => r.group));
-			return predicate.groups.every((g) => seen.has(g));
+			// Apply rollup: a slot is satisfied if any of its rolled-up groups
+			// appears in `seen`. Slots without a rollup entry only match
+			// themselves (existing behaviour).
+			return predicate.groups.every((g) => {
+				const expanded = predicate.rollup?.[g] ?? [g];
+				return expanded.some((x) => seen.has(x));
+			});
 		}
 
 		case 'easter-time-window': {

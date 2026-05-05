@@ -7,12 +7,14 @@
 	import EquipmentGlyph from './EquipmentGlyph.svelte';
 	import type { GlyphKind } from './glyph-kinds';
 	import type { Equipment } from '$lib/server/db/schema';
+	import { formatDurationMinAsClock } from '$lib/input-modes';
 
 	let {
 		equipment,
 		lastWeight,
 		lastReps,
 		lastDurationMin,
+		lastDistance = null,
 		lastBwLoadKg = null,
 		daysSince,
 		href
@@ -21,6 +23,9 @@
 		lastWeight: number | null;
 		lastReps: number | null;
 		lastDurationMin: number | null;
+		// Distance from the most recent set's extras. Used to render the
+		// last-set summary on weight_distance equipment (carries).
+		lastDistance?: number | null;
 		// Bodyweight contribution snapshotted on the most recent set. Adds
 		// to lastWeight when present so the tile shows effective load.
 		lastBwLoadKg?: number | null;
@@ -28,19 +33,48 @@
 		href: string;
 	} = $props();
 
-	const isCardio = $derived(equipment.type === 'cardio');
+	const mode = $derived(equipment.inputMode ?? 'weighted');
 	const photoSrc = $derived(
 		equipment.photoPath
 			? `/uploads/${equipment.photoPath}?v=${equipment.updatedAt.getTime()}`
 			: null
 	);
 
+	function formatDistance(m: number): string {
+		if (m >= 500 || !Number.isInteger(m)) return `${(m / 1000).toFixed(2)} km`;
+		return `${m} m`;
+	}
+
 	function formatLast(): { primary: string; secondary: string } {
 		if (daysSince == null) return { primary: 'Never logged', secondary: '' };
 		const ago = daysSince === 0 ? 'today' : daysSince === 1 ? '1d ago' : `${daysSince}d ago`;
-		if (isCardio) {
+		if (mode === 'distance_time') {
 			if (lastDurationMin != null) {
 				return { primary: `${formatNum(lastDurationMin)} min`, secondary: ago };
+			}
+			return { primary: 'Logged', secondary: ago };
+		}
+		if (mode === 'timed') {
+			if (lastDurationMin != null) {
+				return { primary: formatDurationMinAsClock(lastDurationMin), secondary: ago };
+			}
+			return { primary: 'Logged', secondary: ago };
+		}
+		if (mode === 'timed_weighted') {
+			if (lastDurationMin != null && lastWeight != null) {
+				return {
+					primary: `${formatDurationMinAsClock(lastDurationMin)} × ${formatNum(lastWeight)} kg`,
+					secondary: ago
+				};
+			}
+			return { primary: 'Logged', secondary: ago };
+		}
+		if (mode === 'weight_distance') {
+			if (lastWeight != null && lastDistance != null) {
+				return {
+					primary: `${formatNum(lastWeight)} kg × ${formatDistance(lastDistance)}`,
+					secondary: ago
+				};
 			}
 			return { primary: 'Logged', secondary: ago };
 		}

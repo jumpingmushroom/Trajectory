@@ -13,6 +13,7 @@
 		type EquipmentType,
 		type MuscleGroup
 	} from './glyph-kinds';
+	import { INPUT_MODES, MODE_LABEL, type InputMode } from '$lib/input-modes';
 
 	type CardioKind = 'treadmill' | 'bike' | 'rower' | 'generic';
 
@@ -58,6 +59,9 @@
 		mode === 'edit' ? ((editTarget!.cardioKind as CardioKind | null) ?? 'treadmill') : 'treadmill'
 	);
 	let group = $state<MuscleGroup>(mode === 'edit' ? (editTarget!.group as MuscleGroup) : 'push');
+	let inputMode = $state<InputMode>(
+		mode === 'edit' ? ((editTarget!.inputMode as InputMode) ?? 'weighted') : 'weighted'
+	);
 	let notes = $state<string>(mode === 'edit' ? (editTarget!.notes ?? '') : '');
 	let photoFile = $state<File | null>(null);
 	let photoPreview = $state<string | null>(initialPhotoSrc);
@@ -76,6 +80,7 @@
 		glyph: mode === 'edit' ? ((editTarget!.glyph as GlyphKind) ?? 'bench') : 'bench',
 		tint: mode === 'edit' ? editTarget!.tint : '#1c2026',
 		cardioKind: mode === 'edit' ? (editTarget!.cardioKind as CardioKind | null) : null,
+		inputMode: mode === 'edit' ? ((editTarget!.inputMode as InputMode) ?? 'weighted') : 'weighted',
 		notes: mode === 'edit' ? (editTarget!.notes ?? '') : '',
 		photoPath: mode === 'edit' ? editTarget!.photoPath : null
 	};
@@ -104,6 +109,11 @@
 			const d = defaultsForGlyph(kind);
 			type = d.type;
 			if (d.group) group = d.group;
+			// Seed inputMode from the glyph default when one is set; otherwise
+			// keep the running value so users tweaking the picker don't lose
+			// their choice. New equipment created from a glyph that doesn't
+			// declare a default lands on 'weighted' from the initial state.
+			if (d.inputMode) inputMode = d.inputMode;
 			if (step === 0) {
 				error = null;
 				step = 1;
@@ -117,8 +127,18 @@
 	}
 
 	const types: EquipmentType[] = ['machine', 'cable', 'barbell', 'freeweight', 'cardio'];
-	const groups: MuscleGroup[] = ['push', 'pull', 'legs', 'core', 'cardio'];
+	const groups: MuscleGroup[] = [
+		'push',
+		'pull',
+		'legs',
+		'core',
+		'cardio',
+		'arms',
+		'shoulders',
+		'glutes'
+	];
 	const cardioKinds: CardioKind[] = ['treadmill', 'bike', 'rower', 'generic'];
+	const inputModes = INPUT_MODES;
 
 	function pickPhoto(e: Event) {
 		const input = e.target as HTMLInputElement;
@@ -193,7 +213,8 @@
 				group,
 				glyph,
 				cardioKind: type === 'cardio' ? cardioKind : null,
-				bodyweightPct: defaultBwPct ?? null
+				bodyweightPct: defaultBwPct ?? null,
+				inputMode
 			});
 			if (photoFile) {
 				const form = new FormData();
@@ -234,6 +255,7 @@
 			glyph?: string;
 			cardioKind?: CardioKind | null;
 			notes?: string | null;
+			inputMode?: InputMode;
 		};
 		const diff: DiffPayload = { id: editTarget.id };
 		let hasFieldDiff = false;
@@ -261,6 +283,10 @@
 		}
 		if (notes !== initial.notes) {
 			diff.notes = notes.length === 0 ? null : notes;
+			hasFieldDiff = true;
+		}
+		if (inputMode !== initial.inputMode) {
+			diff.inputMode = inputMode;
 			hasFieldDiff = true;
 		}
 
@@ -593,6 +619,37 @@
 					{g}
 				</button>
 			{/each}
+		</div>
+
+		<div class="mt-1 flex flex-col gap-2">
+			<span
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
+				style="color: var(--color-text-dim-2);"
+			>
+				Input mode
+			</span>
+			<div class="flex flex-wrap gap-2">
+				{#each inputModes as m (m)}
+					<button
+						type="button"
+						class="rounded-full border px-3 py-2 text-[13px] font-medium"
+						style="background: {inputMode === m
+							? 'var(--color-amber-dim)'
+							: 'var(--color-surface-2)'}; border-color: {inputMode === m
+							? 'var(--color-amber-line)'
+							: 'var(--color-line-2)'}; color: {inputMode === m
+								? 'var(--color-amber)'
+								: 'var(--color-text)'};"
+						onclick={() => (inputMode = m)}
+						aria-pressed={inputMode === m}
+					>
+						{MODE_LABEL[m]}
+					</button>
+				{/each}
+			</div>
+			<span class="text-[11px]" style="color: var(--color-text-dim-2);">
+				How sets are logged on this equipment.
+			</span>
 		</div>
 	</div>
 {/snippet}

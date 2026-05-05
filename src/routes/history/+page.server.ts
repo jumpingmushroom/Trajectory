@@ -50,7 +50,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 					extras: setTable.extras,
 					ts: setTable.ts,
 					equipmentId: exercise.equipmentId,
-					equipmentName: equipment.name
+					equipmentName: equipment.name,
+					equipmentInputMode: equipment.inputMode
 				})
 				.from(setTable)
 				.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
@@ -65,6 +66,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 				ts: Date;
 				equipmentId: string;
 				equipmentName: string;
+				equipmentInputMode: string;
 			}[])
 		: [];
 
@@ -97,7 +99,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 		if (s.reps != null && (s.weight != null || s.extras?.bwLoadKg != null)) {
 			cur.totalVolume += effectiveSetLoad(s) * s.reps;
 		}
-		if (s.durationMin != null) {
+		// Only cardio sessions feed into the "cardio min" headline. Plank / wall
+		// sit (mode = 'timed' or 'timed_weighted') also have a duration but
+		// they're isometric strength work — counting them here would inflate
+		// the cardio readout and make the heatmap misleading.
+		if (s.durationMin != null && s.equipmentInputMode === 'distance_time') {
 			cur.cardioDurationMin += s.durationMin;
 		}
 		const tsMs = s.ts.getTime();

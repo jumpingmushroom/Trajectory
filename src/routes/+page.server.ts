@@ -21,6 +21,7 @@ export interface EquipmentTileMeta {
 	lastWeight: number | null;
 	lastReps: number | null;
 	lastDurationMin: number | null;
+	lastDistance: number | null;
 	lastBwLoadKg: number | null;
 	lastTs: number | null;
 	daysSince: number | null;
@@ -114,11 +115,17 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 		const lastBwRaw = last?.extras?.bwLoadKg;
 		const lastBwLoadKg =
 			typeof lastBwRaw === 'number' && Number.isFinite(lastBwRaw) ? lastBwRaw : null;
+		const lastDistanceRaw = last?.extras?.distance;
+		const lastDistance =
+			typeof lastDistanceRaw === 'number' && Number.isFinite(lastDistanceRaw)
+				? lastDistanceRaw
+				: null;
 		return {
 			equipment: eq,
 			lastWeight: last?.weight ?? null,
 			lastReps: last?.reps ?? null,
 			lastDurationMin: last?.durationMin ?? null,
+			lastDistance,
 			lastBwLoadKg,
 			lastTs: ts,
 			daysSince: ts == null ? null : Math.max(0, Math.floor((referenceTs - ts) / dayMs))

@@ -30,6 +30,7 @@ const COLUMNS = [
 	'equipmentName',
 	'equipmentType',
 	'equipmentGroup',
+	'inputMode',
 	'cardioKind',
 	'exerciseId',
 	'exerciseName',
@@ -100,6 +101,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 			equipmentName: equipment.name,
 			equipmentType: equipment.type,
 			equipmentGroup: equipment.group,
+			inputMode: equipment.inputMode,
 			cardioKind: equipment.cardioKind,
 			exerciseId: exercise.id,
 			exerciseName: exercise.name
@@ -128,6 +130,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		equipmentName: string;
 		equipmentType: string;
 		equipmentGroup: string;
+		inputMode: string;
 		cardioKind: string | null;
 		exerciseId: string;
 		exerciseName: string;
@@ -162,6 +165,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 			r.equipmentName,
 			r.equipmentType,
 			r.equipmentGroup,
+			r.inputMode,
 			r.cardioKind ?? '',
 			r.exerciseId,
 			r.exerciseName,

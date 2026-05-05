@@ -25,6 +25,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 				sortOrder: equipment.sortOrder,
 				notes: equipment.notes,
 				bodyweightPct: equipment.bodyweightPct,
+				inputMode: equipment.inputMode,
 				createdAt: equipment.createdAt,
 				updatedAt: equipment.updatedAt,
 				deletedAt: equipment.deletedAt
@@ -84,14 +85,22 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			}[])
 		: [];
 
-	// Per-session top weight for the LineChart series. Cardio rows feed
-	// duration_min instead of weight so the chart still has a series.
-	// Strength rows on bodyweight equipment use effective load (added +
-	// bwLoadKg) so the chart reflects what the lifter actually lifted.
+	// Per-session top value for the LineChart series. The axis follows the
+	// equipment's inputMode: cardio + timed plot duration; weight_distance
+	// plots distance; everything else plots effective load (weight + bw).
 	const isCardio = eqRow.type === 'cardio';
 	const perSession = new Map<string, { value: number; ts: number }>();
 	for (const s of sets) {
-		const v = isCardio ? (s.durationMin ?? 0) : effectiveSetLoad(s);
+		// Chart axis follows the equipment's PR axis (see evaluatePr in
+		// mutations.ts) so the progression line and the PR badge reflect the
+		// same dimension: cardio + timed plot duration; everything else
+		// (including weight_distance carries) plots effective weight.
+		let v: number;
+		if (eqRow.inputMode === 'distance_time' || eqRow.inputMode === 'timed') {
+			v = s.durationMin ?? 0;
+		} else {
+			v = effectiveSetLoad(s);
+		}
 		if (v <= 0) continue;
 		const cur = perSession.get(s.sessionId);
 		if (!cur || v > cur.value) {
@@ -119,12 +128,24 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		.map(([w]) => w)
 		.sort((a, b) => a - b);
 
-	// Meta tile values. PR uses effective load on bodyweight equipment.
+	// Meta tile PR. The axis follows the equipment's inputMode so the
+	// metaTile shows the right number for each kind of station: minutes for
+	// timed holds, distance for carries, effective load for everything else.
 	const sessionsCount = perSession.size;
 	const setsCount = sets.length;
 	const pr = sets.reduce<number | null>((best, s) => {
-		if (s.weight == null && s.extras?.bwLoadKg == null) return best;
-		const v = effectiveSetLoad(s);
+		let v: number;
+		if (eqRow.inputMode === 'timed') {
+			v = s.durationMin ?? 0;
+		} else if (eqRow.inputMode === 'distance_time') {
+			const d = s.extras?.distance;
+			v = typeof d === 'number' ? d : 0;
+		} else {
+			// weighted | bodyweight | timed_weighted | weight_distance —
+			// effective load (weight + bw snapshot) per evaluatePr.
+			if (s.weight == null && s.extras?.bwLoadKg == null) return best;
+			v = effectiveSetLoad(s);
+		}
 		if (v <= 0) return best;
 		if (best == null || v > best) return v;
 		return best;
@@ -146,6 +167,11 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const lastBwLoadRaw = lastSet?.extras?.bwLoadKg;
 	const lastBwLoadKg =
 		typeof lastBwLoadRaw === 'number' && Number.isFinite(lastBwLoadRaw) ? lastBwLoadRaw : null;
+	const lastDistanceRaw = lastSet?.extras?.distance;
+	const lastDistance =
+		typeof lastDistanceRaw === 'number' && Number.isFinite(lastDistanceRaw)
+			? lastDistanceRaw
+			: null;
 
 	return {
 		userId: locals.user.id,
@@ -159,6 +185,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		lastWeight: lastSet?.weight ?? null,
 		lastReps: lastSet?.reps ?? null,
 		lastDurationMin: lastSet?.durationMin ?? null,
+		lastDistance,
 		lastBwLoadKg,
 		daysSinceLast,
 		bodyWeightKg: profile?.bodyWeightKg ?? null
