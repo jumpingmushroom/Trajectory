@@ -79,6 +79,7 @@ interface EquipmentCreate {
 	cardioKind?: string | null;
 	sortOrder?: number;
 	bodyweightPct?: number | null;
+	inputMode?: string;
 }
 interface EquipmentUpdate {
 	id: string;
@@ -91,6 +92,7 @@ interface EquipmentUpdate {
 	sortOrder?: number;
 	notes?: string | null;
 	bodyweightPct?: number | null;
+	inputMode?: string;
 }
 
 interface UserUpdate {
@@ -134,8 +136,36 @@ interface SetUpdate {
 }
 
 const EQUIPMENT_TYPES = new Set(['barbell', 'machine', 'cable', 'freeweight', 'cardio']);
-const MUSCLE_GROUPS = new Set(['push', 'pull', 'legs', 'core', 'cardio']);
+const MUSCLE_GROUPS = new Set([
+	'push',
+	'pull',
+	'legs',
+	'core',
+	'cardio',
+	'arms',
+	'shoulders',
+	'glutes'
+]);
 const CARDIO_KINDS = new Set(['treadmill', 'bike', 'rower', 'generic']);
+const INPUT_MODES = new Set([
+	'weighted',
+	'bodyweight',
+	'distance_time',
+	'timed',
+	'timed_weighted',
+	'weight_distance'
+]);
+// Modes that don't host user-named child exercises — the equipment row gets
+// one auto-hidden exercise so all sets FK uniformly. The set of such modes is
+// "everything except the canonical free-weight/barbell weighted-reps stations
+// where the user picks named variants from the curated list."
+const AUTO_HIDDEN_MODES = new Set([
+	'distance_time',
+	'bodyweight',
+	'timed',
+	'timed_weighted',
+	'weight_distance'
+]);
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 function badRequest(msg: string): never {
@@ -336,6 +366,19 @@ async function equipmentCreate(
 		payload.bodyweightPct == null
 			? null
 			: assertBodyweightPct(payload.bodyweightPct, 'bodyweightPct');
+	// inputMode falls back to a derivation when the client doesn't send it
+	// (older clients, the smoke test). Cardio → distance_time; bodyweight pct
+	// set → bodyweight; everything else → weighted.
+	let inputMode: string;
+	if (payload.inputMode != null) {
+		inputMode = assertEnum(payload.inputMode, 'inputMode', INPUT_MODES);
+	} else if (type === 'cardio') {
+		inputMode = 'distance_time';
+	} else if (bodyweightPct != null) {
+		inputMode = 'bodyweight';
+	} else {
+		inputMode = 'weighted';
+	}
 
 	await db
 		.insert(equipment)
@@ -349,17 +392,22 @@ async function equipmentCreate(
 			tint,
 			cardioKind,
 			sortOrder,
-			bodyweightPct
+			bodyweightPct,
+			inputMode
 		})
 		.onConflictDoNothing();
 	const row = (await db.select().from(equipment).where(eq(equipment.id, payload.id)).limit(1))[0];
 	if (!row) notFound(`equipment ${payload.id} not found after insert`);
 
-	// Auto-create the hidden exercise for machines/cables/cardio so all sets
-	// always FK to an exercise. Free-weight + barbell stations get exercises
-	// added explicitly by the user via the curated picker.
+	// Auto-create the hidden exercise for any station that doesn't host
+	// user-named variants — i.e. cardio, bodyweight, timed, timed_weighted,
+	// weight_distance, plus the legacy machine/cable types. Free-weight +
+	// barbell weighted-reps stations get user-picked exercises via the
+	// curated picker.
 	let hiddenExercise: Exercise | undefined;
-	if (type === 'machine' || type === 'cable' || type === 'cardio') {
+	const autoHide =
+		type === 'machine' || type === 'cable' || type === 'cardio' || AUTO_HIDDEN_MODES.has(inputMode);
+	if (autoHide) {
 		const hiddenId = derivedExerciseId(payload.id);
 		await db
 			.insert(exercise)
@@ -495,6 +543,10 @@ async function equipmentUpdate(payload: EquipmentUpdate, userId: string): Promis
 			payload.bodyweightPct === null
 				? null
 				: assertBodyweightPct(payload.bodyweightPct, 'bodyweightPct');
+		hasUserField = true;
+	}
+	if (payload.inputMode !== undefined) {
+		updates.inputMode = assertEnum(payload.inputMode, 'inputMode', INPUT_MODES);
 		hasUserField = true;
 	}
 
@@ -751,19 +803,28 @@ function resolveSession(
 }
 
 // Returns true when the about-to-insert set strictly beats the user's
-// prior best for the same exercise. Strength compares MAX(effective load);
-// cardio compares MAX(extras.distance). First-ever qualifying set is also
-// a PR. Sets with effective load ≤ 0 (strength) or no distance (cardio)
-// never PR. "Effective load" = weight + extras.bwLoadKg, so a heavier user
-// or larger bodyweight pct can lock in a higher PR than added weight alone.
+// prior best for the same exercise. The PR axis depends on the equipment's
+// inputMode:
+//
+//   weighted, bodyweight       → MAX(weight + extras.bwLoadKg)
+//   distance_time              → MAX(extras.distance)
+//   timed                      → MAX(durationMin)
+//   timed_weighted             → MAX(weight)   (any duration counts)
+//   weight_distance            → MAX(weight)   (any distance counts)
+//
+// First-ever qualifying set is also a PR. Sets with no measurable axis
+// (e.g. zero or null on the relevant column) never PR. The strength axis
+// uses *effective load* (weight + bwLoadKg snapshot) so a heavier user or
+// larger bodyweight pct can lock in a higher PR than added weight alone.
 async function evaluatePr(
 	userId: string,
 	exerciseId: string,
-	isCardio: boolean,
+	inputMode: string,
 	weight: number | null,
+	durationMin: number | null,
 	extras: Record<string, number> | null
 ): Promise<boolean> {
-	if (isCardio) {
+	if (inputMode === 'distance_time') {
 		const distance = extras?.distance;
 		if (typeof distance !== 'number' || !Number.isFinite(distance) || distance <= 0) {
 			return false;
@@ -783,6 +844,27 @@ async function evaluatePr(
 		const prior = row?.max ?? null;
 		return prior == null || distance > prior;
 	}
+	if (inputMode === 'timed') {
+		if (typeof durationMin !== 'number' || !Number.isFinite(durationMin) || durationMin <= 0) {
+			return false;
+		}
+		const row = (
+			await db
+				.select({ max: sql<number | null>`MAX(${setTable.durationMin})` })
+				.from(setTable)
+				.where(
+					and(
+						eq(setTable.userId, userId),
+						eq(setTable.exerciseId, exerciseId),
+						isNull(setTable.deletedAt)
+					)
+				)
+		)[0];
+		const prior = row?.max ?? null;
+		return prior == null || durationMin > prior;
+	}
+	// All remaining modes (weighted, bodyweight, timed_weighted,
+	// weight_distance) PR on weight (effective load for bodyweight).
 	if (typeof weight !== 'number' || !Number.isFinite(weight)) {
 		return false;
 	}
@@ -829,7 +911,8 @@ async function setCreate(
 				equipmentId: exercise.equipmentId,
 				gymId: equipment.gymId,
 				type: equipment.type,
-				bodyweightPct: equipment.bodyweightPct
+				bodyweightPct: equipment.bodyweightPct,
+				inputMode: equipment.inputMode
 			})
 			.from(exercise)
 			.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
@@ -850,10 +933,10 @@ async function setCreate(
 		id: ex.equipmentId,
 		gymId: ex.gymId,
 		type: ex.type,
-		bodyweightPct: ex.bodyweightPct
+		bodyweightPct: ex.bodyweightPct,
+		inputMode: ex.inputMode
 	};
 
-	const isCardio = eqRow.type === 'cardio';
 	const ts =
 		typeof payload.ts === 'number' && Number.isFinite(payload.ts) && payload.ts > 0
 			? payload.ts
@@ -868,7 +951,12 @@ async function setCreate(
 	let durationMin: number | null = null;
 	let extras: Record<string, number> | null = null;
 
-	if (isCardio) {
+	const mode = eqRow.inputMode;
+
+	// Per-mode validation. Each branch lists which set columns are required
+	// vs forbidden, and which extras keys (if any) are accepted. The general
+	// shape is mirrored in $lib/input-modes.MODE_SHAPE on the client.
+	if (mode === 'distance_time') {
 		if (typeof payload.durationMin !== 'number' || payload.durationMin <= 0) {
 			badRequest('cardio set requires positive durationMin');
 		}
@@ -883,7 +971,62 @@ async function setCreate(
 			}
 			extras = Object.keys(cleaned).length > 0 ? cleaned : null;
 		}
+	} else if (mode === 'timed') {
+		if (typeof payload.durationMin !== 'number' || payload.durationMin <= 0) {
+			badRequest('timed set requires positive durationMin');
+		}
+		if (payload.weight != null && payload.weight !== 0) {
+			badRequest('timed set must not include weight (use timed_weighted for loaded holds)');
+		}
+		if (payload.reps != null) badRequest('timed set must not include reps');
+		durationMin = payload.durationMin;
+		// extras intentionally not allowed for plain timed holds.
+		if (payload.extras != null && Object.keys(payload.extras).length > 0) {
+			badRequest('timed set does not accept extras');
+		}
+	} else if (mode === 'timed_weighted') {
+		if (typeof payload.durationMin !== 'number' || payload.durationMin <= 0) {
+			badRequest('timed_weighted set requires positive durationMin');
+		}
+		if (typeof payload.weight !== 'number' || !Number.isFinite(payload.weight)) {
+			badRequest('timed_weighted set requires numeric weight');
+		}
+		if (payload.weight < 0) badRequest('timed_weighted set requires non-negative weight');
+		if (payload.reps != null) badRequest('timed_weighted set must not include reps');
+		weight = payload.weight;
+		durationMin = payload.durationMin;
+		if (payload.extras != null && Object.keys(payload.extras).length > 0) {
+			badRequest('timed_weighted set does not accept extras');
+		}
+	} else if (mode === 'weight_distance') {
+		if (typeof payload.weight !== 'number' || !Number.isFinite(payload.weight)) {
+			badRequest('weight_distance set requires numeric weight');
+		}
+		if (payload.weight < 0) badRequest('weight_distance set requires non-negative weight');
+		if (payload.reps != null) badRequest('weight_distance set must not include reps');
+		if (payload.durationMin != null) {
+			badRequest('weight_distance set must not include durationMin');
+		}
+		if (
+			payload.extras == null ||
+			typeof payload.extras !== 'object' ||
+			Array.isArray(payload.extras)
+		) {
+			badRequest('weight_distance set requires extras.distance');
+		}
+		const dist = (payload.extras as Record<string, unknown>).distance;
+		if (typeof dist !== 'number' || !Number.isFinite(dist) || dist <= 0) {
+			badRequest('weight_distance set requires positive extras.distance');
+		}
+		const cleaned: Record<string, number> = { distance: dist };
+		// Reject any other key so users don't smuggle cardio extras through.
+		for (const k of Object.keys(payload.extras)) {
+			if (k !== 'distance') badRequest(`unknown extras key for weight_distance set: ${k}`);
+		}
+		weight = payload.weight;
+		extras = cleaned;
 	} else {
+		// weighted | bodyweight (the legacy strength path).
 		if (typeof payload.weight !== 'number') {
 			badRequest('strength set requires numeric weight');
 		}
@@ -924,11 +1067,10 @@ async function setCreate(
 		}
 	}
 
-	// PR evaluation: strength compares against MAX(weight); cardio against
-	// MAX(extras.distance). Strict greater-than only — ties don't count.
-	// Computed inside the transaction below so a concurrent set.create from
-	// the same user can't both see the same prior max and both flag PR.
-	const isPr = await evaluatePr(userId, payload.exerciseId, isCardio, weight, extras);
+	// PR evaluation per inputMode. Strict greater-than only — ties don't
+	// count. Computed inside the transaction below so a concurrent set.create
+	// from the same user can't both see the same prior max and both flag PR.
+	const isPr = await evaluatePr(userId, payload.exerciseId, mode, weight, durationMin, extras);
 
 	// Resolve session + insert the set in one transaction. Two concurrent
 	// set.create calls from the same user (e.g. queue drain firing twice)

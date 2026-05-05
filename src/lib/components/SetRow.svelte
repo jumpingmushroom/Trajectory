@@ -1,14 +1,21 @@
 <script lang="ts">
-	// One row in the in-session set list. Shows index + weight × reps and
-	// reveals delete (left swipe) / clone (right swipe) under the row.
-	// Tap the row body to edit weight/reps in place.
+	// One row in the in-session set list. Shows index + a mode-aware summary
+	// (weight × reps for strength, mm:ss for timed holds, weight × distance
+	// for carries) and reveals delete (left swipe) / clone (right swipe)
+	// under the row. Tap the row body to edit in place — only weighted /
+	// bodyweight modes are editable today; other modes show the summary
+	// without an edit affordance (re-clone via swipe-right works for all).
 
 	import { swipeable } from '$lib/actions/swipe';
+	import { formatDurationMinAsClock, type InputMode } from '$lib/input-modes';
 
 	let {
 		index,
-		weight,
-		reps,
+		weight = 0,
+		reps = 0,
+		durationMin = null,
+		distance = null,
+		mode = 'weighted',
 		bwLoadKg = 0,
 		isLatest,
 		pending = false,
@@ -17,8 +24,11 @@
 		onEdit
 	}: {
 		index: number;
-		weight: number;
-		reps: number;
+		weight?: number;
+		reps?: number;
+		durationMin?: number | null;
+		distance?: number | null;
+		mode?: InputMode;
 		// Bodyweight contribution snapshotted at log time. When > 0 the row
 		// renders effective load (weight + bwLoadKg) as the headline number
 		// and shows the breakdown as a subtitle. Defaults to 0 so non-
@@ -28,6 +38,8 @@
 		pending?: boolean;
 		onDelete: () => void;
 		onClone: () => void;
+		// onEdit only fires for weighted/bodyweight modes. The Log screen
+		// passes undefined for the new modes so the row stays read-only there.
 		onEdit?: (weight: number, reps: number) => void;
 	} = $props();
 
@@ -35,9 +47,19 @@
 		return Number.isInteger(n) ? String(n) : n.toFixed(1);
 	}
 
+	function fmtDistance(m: number): string {
+		// Mirror the rower / cardio rule: integer meters under 500 stay as m,
+		// everything else collapses to km.
+		if (m >= 500 || !Number.isInteger(m)) {
+			return `${(m / 1000).toFixed(2)} km`;
+		}
+		return `${m} m`;
+	}
+
 	const isBodyweight = $derived(bwLoadKg > 0);
 	const effective = $derived(weight + bwLoadKg);
 	const volume = $derived(Math.round(effective * reps));
+	const isStrengthMode = $derived(mode === 'weighted' || mode === 'bodyweight');
 
 	// Breakdown subtitle for bodyweight rows. Three flavours:
 	//   weight === 0: "bodyweight only" (cleanest reading for a pure
@@ -185,16 +207,30 @@
 				class="flex flex-1 flex-col items-start text-left"
 				style="color: var(--color-text);"
 				onclick={startEdit}
-				disabled={pending || !onEdit}
+				disabled={pending || !onEdit || !isStrengthMode}
 				aria-label="Edit set"
 			>
 				<span class="flex items-baseline gap-2 text-[15px]">
-					<span class="font-semibold">{fmt(isBodyweight ? effective : weight)}</span>
-					<span class="text-[11px]" style="color: var(--color-text-dim-2);">kg</span>
-					<span style="color: var(--color-text-dim-2);">×</span>
-					<span class="font-semibold">{reps}</span>
+					{#if mode === 'timed'}
+						<span class="font-semibold">{formatDurationMinAsClock(durationMin ?? 0)}</span>
+					{:else if mode === 'timed_weighted'}
+						<span class="font-semibold">{formatDurationMinAsClock(durationMin ?? 0)}</span>
+						<span style="color: var(--color-text-dim-2);">×</span>
+						<span class="font-semibold">{fmt(weight)}</span>
+						<span class="text-[11px]" style="color: var(--color-text-dim-2);">kg</span>
+					{:else if mode === 'weight_distance'}
+						<span class="font-semibold">{fmt(weight)}</span>
+						<span class="text-[11px]" style="color: var(--color-text-dim-2);">kg</span>
+						<span style="color: var(--color-text-dim-2);">×</span>
+						<span class="font-semibold">{fmtDistance(distance ?? 0)}</span>
+					{:else}
+						<span class="font-semibold">{fmt(isBodyweight ? effective : weight)}</span>
+						<span class="text-[11px]" style="color: var(--color-text-dim-2);">kg</span>
+						<span style="color: var(--color-text-dim-2);">×</span>
+						<span class="font-semibold">{reps}</span>
+					{/if}
 				</span>
-				{#if isBodyweight}
+				{#if isBodyweight && isStrengthMode}
 					<span class="text-[10px]" style="color: var(--color-text-dim-2);">{breakdown}</span>
 				{/if}
 			</button>
@@ -205,7 +241,7 @@
 				>
 					queued
 				</span>
-			{:else}
+			{:else if isStrengthMode}
 				<div class="text-[11px]" style="color: var(--color-text-dim-2);">
 					{volume} kg
 				</div>

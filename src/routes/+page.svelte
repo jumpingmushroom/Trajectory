@@ -329,6 +329,7 @@
 					lastWeight={tile.lastWeight}
 					lastReps={tile.lastReps}
 					lastDurationMin={tile.lastDurationMin}
+					lastDistance={tile.lastDistance}
 					lastBwLoadKg={tile.lastBwLoadKg}
 					daysSince={tile.daysSince}
 					href={withDateMode(`/log/${tile.equipment.id}`, asOfTs)}

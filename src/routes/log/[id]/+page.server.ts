@@ -20,15 +20,20 @@ export interface ExerciseContext {
 	lastWeight: number | null;
 	lastReps: number | null;
 	lastDurationMin: number | null;
+	// Distance from the most-recent set's extras (used by weight_distance
+	// equipment to seed the carry Stepper and the "Last time" summary).
+	lastDistance: number | null;
 	// Bodyweight contribution snapshotted on the most-recent set. Lets the
 	// "Last time: X kg × Y" label render effective load to match the set
 	// list. Null when the last set has no bodyweight snapshot.
 	lastBwLoadKg: number | null;
 	commonWeights: number[];
 	sparklineSeries: number[];
-	// Current PR for this exercise & user. Strength: MAX(weight). Cardio:
-	// MAX(extras.distance). Null when no qualifying prior set exists.
-	// Used by the client for optimistic "New PR" feedback at log time.
+	// Current PR for this exercise & user. Axis depends on the equipment's
+	// inputMode: distance_time → MAX(extras.distance); timed → MAX(durationMin);
+	// timed_weighted / weight_distance → MAX(weight); weighted / bodyweight →
+	// MAX(effective load). Null when no qualifying prior set exists. Used by
+	// the client for optimistic "New PR" feedback at log time.
 	prValue: number | null;
 }
 
@@ -56,6 +61,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				sortOrder: equipment.sortOrder,
 				notes: equipment.notes,
 				bodyweightPct: equipment.bodyweightPct,
+				inputMode: equipment.inputMode,
 				createdAt: equipment.createdAt,
 				updatedAt: equipment.updatedAt,
 				deletedAt: equipment.deletedAt
@@ -134,11 +140,20 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			.map(([w]) => w)
 			.sort((a, b) => a - b);
 
-		// Top-set per session, oldest first, last 10. Bodyweight equipment
-		// charts effective load so adding/removing a weighted vest shows up.
+		// Top-set per session, oldest first, last 10. The axis follows the
+		// equipment's inputMode: cardio + timed plot durationMin; weight_distance
+		// plots distance; everything else plots effective load (weight + bw).
 		const perSession = new Map<string, number>();
 		for (const s of own) {
-			const v = eqRow.type === 'cardio' ? (s.durationMin ?? 0) : effectiveSetLoad(s);
+			let v: number;
+			if (eqRow.inputMode === 'distance_time' || eqRow.inputMode === 'timed') {
+				v = s.durationMin ?? 0;
+			} else if (eqRow.inputMode === 'weight_distance') {
+				const d = s.extras?.distance;
+				v = typeof d === 'number' ? d : 0;
+			} else {
+				v = effectiveSetLoad(s);
+			}
 			if (v <= 0) continue;
 			const cur = perSession.get(s.workoutSessionId) ?? 0;
 			if (v > cur) perSession.set(s.workoutSessionId, v);
@@ -160,11 +175,28 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			.slice(-10);
 
 		let prValue: number | null = null;
-		if (eqRow.type === 'cardio') {
+		if (eqRow.inputMode === 'distance_time') {
 			for (const s of own) {
 				const d = s.extras?.distance;
 				if (typeof d === 'number' && Number.isFinite(d) && d > 0) {
 					if (prValue == null || d > prValue) prValue = d;
+				}
+			}
+		} else if (eqRow.inputMode === 'timed') {
+			for (const s of own) {
+				const d = s.durationMin;
+				if (typeof d === 'number' && Number.isFinite(d) && d > 0) {
+					if (prValue == null || d > prValue) prValue = d;
+				}
+			}
+		} else if (
+			eqRow.inputMode === 'timed_weighted' ||
+			eqRow.inputMode === 'weight_distance'
+		) {
+			for (const s of own) {
+				const w = s.weight;
+				if (typeof w === 'number' && Number.isFinite(w) && w > 0) {
+					if (prValue == null || w > prValue) prValue = w;
 				}
 			}
 		} else {
@@ -177,6 +209,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 		}
 
 		const lastBw = last?.extras?.bwLoadKg;
+		const lastDistanceRaw = last?.extras?.distance;
 		return {
 			id: ex.id,
 			name: ex.name,
@@ -184,6 +217,10 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			lastWeight: last?.weight ?? null,
 			lastReps: last?.reps ?? null,
 			lastDurationMin: last?.durationMin ?? null,
+			lastDistance:
+				typeof lastDistanceRaw === 'number' && Number.isFinite(lastDistanceRaw)
+					? lastDistanceRaw
+					: null,
 			lastBwLoadKg: typeof lastBw === 'number' && Number.isFinite(lastBw) ? lastBw : null,
 			commonWeights,
 			sparklineSeries,

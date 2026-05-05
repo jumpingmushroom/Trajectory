@@ -1,10 +1,21 @@
 // Glyph kinds shared between EquipmentGlyph (the SVG renderer) and the
 // AddEquipmentSheet (the picker grid). Each kind has a label, a
 // category (used to group the picker), search aliases, and a `defaults`
-// pair (type + optional muscle group) applied when picked in add mode.
+// triple (type + optional muscle group + optional input mode) applied
+// when picked in add mode.
+
+import type { InputMode } from '$lib/input-modes';
 
 export type EquipmentType = 'barbell' | 'machine' | 'cable' | 'freeweight' | 'cardio';
-export type MuscleGroup = 'push' | 'pull' | 'legs' | 'core' | 'cardio';
+export type MuscleGroup =
+	| 'push'
+	| 'pull'
+	| 'legs'
+	| 'core'
+	| 'cardio'
+	| 'arms'
+	| 'shoulders'
+	| 'glutes';
 
 export type GlyphKind =
 	| 'bench'
@@ -39,7 +50,10 @@ export type GlyphKind =
 	| 'sled'
 	| 'battleropes'
 	| 'abwheel'
-	| 'mobility';
+	| 'mobility'
+	| 'plank'
+	| 'wallsit'
+	| 'farmer';
 
 export type GlyphCategory = 'push' | 'pull' | 'legs' | 'core' | 'freeweight' | 'cardio' | 'other';
 
@@ -54,7 +68,16 @@ export interface GlyphMeta {
 	// `bodyweightPct` (0..1) seeds equipment.bodyweightPct so the log screen
 	// adds the user's body weight × pct to set.weight. Omitted (or 0) means
 	// the equipment is loaded externally only.
-	defaults: { type: EquipmentType; group?: MuscleGroup; bodyweightPct?: number };
+	// `inputMode` seeds equipment.inputMode. Omitted = 'weighted'. Set this
+	// for any glyph whose canonical mode is something other than weighted
+	// reps (cardio → distance_time, plank → timed, sled → weight_distance,
+	// foam roller → timed, etc.).
+	defaults: {
+		type: EquipmentType;
+		group?: MuscleGroup;
+		bodyweightPct?: number;
+		inputMode?: InputMode;
+	};
 }
 
 // Order here is the order glyphs appear within their category in the
@@ -73,7 +96,7 @@ export const GLYPHS: GlyphMeta[] = [
 		label: 'Shoulder Press',
 		category: 'push',
 		aliases: ['shoulder press', 'overhead press', 'ohp', 'military press'],
-		defaults: { type: 'machine', group: 'push' }
+		defaults: { type: 'machine', group: 'shoulders' }
 	},
 	{
 		kind: 'dipstation',
@@ -81,7 +104,7 @@ export const GLYPHS: GlyphMeta[] = [
 		category: 'push',
 		aliases: ['dip', 'dips', 'parallel bars'],
 		// Whole body suspended on the arms ≈ 100% body weight per rep.
-		defaults: { type: 'freeweight', group: 'push', bodyweightPct: 1.0 }
+		defaults: { type: 'freeweight', group: 'push', bodyweightPct: 1.0, inputMode: 'bodyweight' }
 	},
 	{
 		kind: 'cablecrossover',
@@ -119,14 +142,14 @@ export const GLYPHS: GlyphMeta[] = [
 		category: 'pull',
 		aliases: ['pull-up', 'pullup', 'pull up', 'chin-up', 'chinup'],
 		// Whole body hangs from the bar ≈ 100% body weight per rep.
-		defaults: { type: 'freeweight', group: 'pull', bodyweightPct: 1.0 }
+		defaults: { type: 'freeweight', group: 'pull', bodyweightPct: 1.0, inputMode: 'bodyweight' }
 	},
 	{
 		kind: 'preacher',
 		label: 'Preacher Curl',
 		category: 'pull',
 		aliases: ['preacher curl', 'scott curl', 'biceps curl'],
-		defaults: { type: 'machine', group: 'pull' }
+		defaults: { type: 'machine', group: 'arms' }
 	},
 
 	// legs
@@ -173,11 +196,18 @@ export const GLYPHS: GlyphMeta[] = [
 		defaults: { type: 'machine', group: 'legs' }
 	},
 	{
+		kind: 'wallsit',
+		label: 'Wall Sit',
+		category: 'legs',
+		aliases: ['wall sit', 'wall hold', 'isometric squat'],
+		defaults: { type: 'freeweight', group: 'legs', inputMode: 'timed' }
+	},
+	{
 		kind: 'hipthrust',
 		label: 'Hip Thrust',
 		category: 'legs',
 		aliases: ['hip thrust', 'glute bridge', 'thruster'],
-		defaults: { type: 'machine', group: 'legs' }
+		defaults: { type: 'machine', group: 'glutes' }
 	},
 
 	// core
@@ -189,7 +219,14 @@ export const GLYPHS: GlyphMeta[] = [
 		// Both legs ≈ 33% of body weight (Dempster body-segment data). The
 		// trunk + arms (~67%) are supported by the pads, so they don't load
 		// the rep — only the legs do.
-		defaults: { type: 'machine', group: 'core', bodyweightPct: 0.33 }
+		defaults: { type: 'machine', group: 'core', bodyweightPct: 0.33, inputMode: 'bodyweight' }
+	},
+	{
+		kind: 'plank',
+		label: 'Plank',
+		category: 'core',
+		aliases: ['plank', 'forearm plank', 'side plank', 'hold', 'isometric'],
+		defaults: { type: 'freeweight', group: 'core', inputMode: 'timed' }
 	},
 	{
 		kind: 'abwheel',
@@ -204,7 +241,7 @@ export const GLYPHS: GlyphMeta[] = [
 		category: 'core',
 		aliases: ['hyperextension', 'back extension', 'roman chair', 'glute ham'],
 		// Trunk + head + arms above the pivot ≈ 60% of body weight.
-		defaults: { type: 'machine', group: 'core', bodyweightPct: 0.6 }
+		defaults: { type: 'machine', group: 'core', bodyweightPct: 0.6, inputMode: 'bodyweight' }
 	},
 
 	// freeweight
@@ -250,35 +287,35 @@ export const GLYPHS: GlyphMeta[] = [
 		label: 'Treadmill',
 		category: 'cardio',
 		aliases: ['treadmill', 'tread', 'running'],
-		defaults: { type: 'cardio', group: 'cardio' }
+		defaults: { type: 'cardio', group: 'cardio', inputMode: 'distance_time' }
 	},
 	{
 		kind: 'bike',
 		label: 'Bike',
 		category: 'cardio',
 		aliases: ['bike', 'stationary bike', 'spin bike', 'cycle'],
-		defaults: { type: 'cardio', group: 'cardio' }
+		defaults: { type: 'cardio', group: 'cardio', inputMode: 'distance_time' }
 	},
 	{
 		kind: 'rower',
 		label: 'Rower',
 		category: 'cardio',
 		aliases: ['rower', 'rowing machine', 'erg'],
-		defaults: { type: 'cardio', group: 'cardio' }
+		defaults: { type: 'cardio', group: 'cardio', inputMode: 'distance_time' }
 	},
 	{
 		kind: 'elliptical',
 		label: 'Elliptical',
 		category: 'cardio',
 		aliases: ['elliptical', 'cross trainer'],
-		defaults: { type: 'cardio', group: 'cardio' }
+		defaults: { type: 'cardio', group: 'cardio', inputMode: 'distance_time' }
 	},
 	{
 		kind: 'stairmaster',
 		label: 'Stair Climber',
 		category: 'cardio',
 		aliases: ['stairmaster', 'stair', 'stepper', 'stepmill', 'stair climber'],
-		defaults: { type: 'cardio', group: 'cardio' }
+		defaults: { type: 'cardio', group: 'cardio', inputMode: 'distance_time' }
 	},
 
 	// other
@@ -287,21 +324,28 @@ export const GLYPHS: GlyphMeta[] = [
 		label: 'Sled',
 		category: 'other',
 		aliases: ['sled', 'prowler', 'push sled'],
-		defaults: { type: 'freeweight', group: 'legs' }
+		defaults: { type: 'freeweight', group: 'legs', inputMode: 'weight_distance' }
+	},
+	{
+		kind: 'farmer',
+		label: "Farmer's Walk",
+		category: 'other',
+		aliases: ['farmer', "farmer's walk", 'farmers walk', 'carry', 'suitcase carry'],
+		defaults: { type: 'freeweight', group: 'core', inputMode: 'weight_distance' }
 	},
 	{
 		kind: 'battleropes',
 		label: 'Battle Ropes',
 		category: 'other',
 		aliases: ['battle ropes', 'ropes'],
-		defaults: { type: 'freeweight' }
+		defaults: { type: 'freeweight', inputMode: 'timed' }
 	},
 	{
 		kind: 'mobility',
 		label: 'Foam Roller',
 		category: 'other',
 		aliases: ['foam roller', 'mobility', 'roller', 'stretch'],
-		defaults: { type: 'freeweight' }
+		defaults: { type: 'freeweight', inputMode: 'timed' }
 	},
 	{
 		kind: 'generic',
@@ -336,7 +380,12 @@ export const CATEGORY_LABEL: Record<GlyphCategory, string> = {
 // Derived for back-compat with any consumer that just wants the kinds.
 export const GLYPH_KINDS: GlyphKind[] = GLYPHS.map((g) => g.kind);
 
-type GlyphDefaults = { type: EquipmentType; group?: MuscleGroup; bodyweightPct?: number };
+type GlyphDefaults = {
+	type: EquipmentType;
+	group?: MuscleGroup;
+	bodyweightPct?: number;
+	inputMode?: InputMode;
+};
 
 const DEFAULTS_BY_KIND: Record<GlyphKind, GlyphDefaults> = Object.fromEntries(
 	GLYPHS.map((g) => [g.kind, g.defaults])

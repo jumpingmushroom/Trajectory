@@ -77,35 +77,99 @@ async function mutate(op, payload) {
 
 // Equipment definitions. All non-freeweight types so the server auto-
 // creates the hidden exercise — keeps the script a single pass with no
-// curated-exercise bookkeeping. Ten pieces split push / pull / legs /
-// cardio so the muscle-group distribution chart actually has data.
+// curated-exercise bookkeeping. Demo set spans every input mode and every
+// muscle group so the Stats charts, the achievement gallery, and the
+// equipment-detail screens all land on populated data after seeding.
 const EQUIPMENT = [
-	{ name: 'Bench Press', type: 'machine', group: 'push', glyph: 'bench' },
-	{ name: 'Chest Fly', type: 'machine', group: 'push', glyph: 'machine' },
-	{ name: 'Tricep Pushdown', type: 'cable', group: 'push', glyph: 'cable' },
-	{ name: 'Cable Row', type: 'cable', group: 'pull', glyph: 'cable' },
-	{ name: 'Lat Pulldown', type: 'cable', group: 'pull', glyph: 'cable' },
-	{ name: 'Leg Press', type: 'machine', group: 'legs', glyph: 'legpress' },
-	{ name: 'Hack Squat', type: 'machine', group: 'legs', glyph: 'hackquat' },
+	// push / pull / legs strength
+	{ name: 'Bench Press', type: 'machine', group: 'push', glyph: 'bench', inputMode: 'weighted' },
+	{ name: 'Chest Fly', type: 'machine', group: 'push', glyph: 'chestpress', inputMode: 'weighted' },
+	{
+		name: 'Tricep Pushdown',
+		type: 'cable',
+		group: 'arms',
+		glyph: 'cable',
+		inputMode: 'weighted'
+	},
+	{ name: 'Cable Row', type: 'cable', group: 'pull', glyph: 'cable', inputMode: 'weighted' },
+	{ name: 'Lat Pulldown', type: 'cable', group: 'pull', glyph: 'pulldown', inputMode: 'weighted' },
+	{ name: 'Leg Press', type: 'machine', group: 'legs', glyph: 'legpress', inputMode: 'weighted' },
+	{ name: 'Hack Squat', type: 'machine', group: 'legs', glyph: 'hackquat', inputMode: 'weighted' },
+	// New-mode + new-group equipment.
+	{
+		name: 'Hip Thrust',
+		type: 'machine',
+		group: 'glutes',
+		glyph: 'hipthrust',
+		inputMode: 'weighted'
+	},
+	{
+		name: 'Preacher Curl',
+		type: 'machine',
+		group: 'arms',
+		glyph: 'preacher',
+		inputMode: 'weighted'
+	},
+	{
+		name: 'Shoulder Press',
+		type: 'machine',
+		group: 'shoulders',
+		glyph: 'shoulderpress',
+		inputMode: 'weighted'
+	},
+	{
+		name: 'Plank Mat',
+		type: 'freeweight',
+		group: 'core',
+		glyph: 'plank',
+		inputMode: 'timed'
+	},
+	{
+		name: 'Farmer Walk',
+		type: 'freeweight',
+		group: 'core',
+		glyph: 'farmer',
+		inputMode: 'weight_distance'
+	},
+	// Cardio.
 	{
 		name: 'Treadmill',
 		type: 'cardio',
 		group: 'cardio',
 		glyph: 'treadmill',
-		cardioKind: 'treadmill'
+		cardioKind: 'treadmill',
+		inputMode: 'distance_time'
 	},
-	{ name: 'Rower', type: 'cardio', group: 'cardio', glyph: 'rower', cardioKind: 'rower' },
-	{ name: 'Bike', type: 'cardio', group: 'cardio', glyph: 'bike', cardioKind: 'bike' }
+	{
+		name: 'Rower',
+		type: 'cardio',
+		group: 'cardio',
+		glyph: 'rower',
+		cardioKind: 'rower',
+		inputMode: 'distance_time'
+	},
+	{
+		name: 'Bike',
+		type: 'cardio',
+		group: 'cardio',
+		glyph: 'bike',
+		cardioKind: 'bike',
+		inputMode: 'distance_time'
+	}
 ];
 
-// Weekly split: push / pull / legs strength days plus one cardio day.
-// Empty arrays = rest day. Day index 0 = Monday.
+// Weekly split: push / pull / legs / core strength days plus two cardio
+// days. The core day exists to host plank + farmer carry so timed and
+// weight_distance modes both have natural cadence. Day index 0 = Monday.
 const WEEKLY_SCHEDULE = [
-	{ kind: 'push', exercises: ['Bench Press', 'Chest Fly', 'Tricep Pushdown'] },
+	{
+		kind: 'push',
+		exercises: ['Bench Press', 'Shoulder Press', 'Chest Fly', 'Tricep Pushdown']
+	},
 	{ kind: 'cardio', exercises: ['Treadmill'] },
-	{ kind: 'pull', exercises: ['Cable Row', 'Lat Pulldown'] },
-	null, // Thu rest
-	{ kind: 'legs', exercises: ['Leg Press', 'Hack Squat'] },
+	{ kind: 'pull', exercises: ['Cable Row', 'Lat Pulldown', 'Preacher Curl'] },
+	{ kind: 'core', exercises: ['Plank Mat', 'Farmer Walk'] }, // Thu (was rest)
+	{ kind: 'legs', exercises: ['Leg Press', 'Hack Squat', 'Hip Thrust'] },
 	{ kind: 'cardio', exercises: ['Rower'] },
 	null // Sun rest
 ];
@@ -120,7 +184,25 @@ const STRENGTH_BASELINES = {
 	'Cable Row': { baseKg: 50, perWeekKg: 1.0, baseReps: 10 },
 	'Lat Pulldown': { baseKg: 55, perWeekKg: 1.0, baseReps: 10 },
 	'Leg Press': { baseKg: 120, perWeekKg: 5, baseReps: 8 },
-	'Hack Squat': { baseKg: 70, perWeekKg: 2.5, baseReps: 8 }
+	'Hack Squat': { baseKg: 70, perWeekKg: 2.5, baseReps: 8 },
+	'Hip Thrust': { baseKg: 80, perWeekKg: 2.5, baseReps: 10 },
+	'Preacher Curl': { baseKg: 25, perWeekKg: 0.5, baseReps: 10 },
+	'Shoulder Press': { baseKg: 30, perWeekKg: 0.75, baseReps: 10 }
+};
+
+// Timed-hold progression (mode = 'timed'). Stored as durationMin; baseSec /
+// perWeekSec are friendlier to author and convert at use site. Three sets,
+// 60 s rest between, drifting from 30 s up to ~50 s over 8 weeks.
+const TIMED_BASELINES = {
+	'Plank Mat': { baseSec: 30, perWeekSec: 2.5, sets: 3, restSec: 60 }
+};
+
+// Loaded-carry progression (mode = 'weight_distance'). Per-hand kg + a
+// fixed distance. Four sets per session, 90 s rest. The distance stays
+// constant (20 m) so the chart highlights weight progression — bumping
+// distance instead is an equally valid pattern but harder to read.
+const CARRY_BASELINES = {
+	'Farmer Walk': { baseKg: 16, perWeekKg: 0.5, distanceM: 20, sets: 4, restSec: 90 }
 };
 
 // Cardio progression. Distance + duration creep up modestly week to week;
@@ -189,7 +271,8 @@ async function main() {
 			type: def.type,
 			group: def.group,
 			glyph: def.glyph,
-			...(def.cardioKind ? { cardioKind: def.cardioKind } : {})
+			...(def.cardioKind ? { cardioKind: def.cardioKind } : {}),
+			...(def.inputMode ? { inputMode: def.inputMode } : {})
 		});
 		const exerciseId = result?.result?.hiddenExercise?.id;
 		if (!exerciseId) {
@@ -248,6 +331,44 @@ async function main() {
 					});
 					setTs += (durationMin + 5) * 60 * 1000;
 					setsCreated++;
+				} else if (slot.kind === 'core') {
+					// Dispatch on the equipment's input mode so the same core
+					// day cleanly hosts plank (timed) + farmer carry
+					// (weight_distance) without requiring per-exercise branches
+					// in the schedule itself.
+					const mode = ent.def.inputMode;
+					if (mode === 'timed') {
+						const tb = TIMED_BASELINES[exerciseName];
+						for (let s = 0; s < tb.sets; s++) {
+							const sec = Math.max(15, Math.round(tb.baseSec + tb.perWeekSec * week + jitter(5)));
+							await mutate('set.create', {
+								id: ulid(),
+								exerciseId: ent.exerciseId,
+								durationMin: sec / 60,
+								ts: setTs
+							});
+							setTs += (sec + tb.restSec) * 1000;
+							setsCreated++;
+						}
+						setTs += 2 * 60 * 1000;
+					} else if (mode === 'weight_distance') {
+						const cb = CARRY_BASELINES[exerciseName];
+						for (let s = 0; s < cb.sets; s++) {
+							const weight = Math.max(0, roundHalf(cb.baseKg + cb.perWeekKg * week + jitter(1)));
+							await mutate('set.create', {
+								id: ulid(),
+								exerciseId: ent.exerciseId,
+								weight,
+								extras: { distance: cb.distanceM },
+								ts: setTs
+							});
+							// Carries take ~30 s + rest. Pad enough that all 4 sets
+							// don't crowd the same minute.
+							setTs += (30 + cb.restSec) * 1000;
+							setsCreated++;
+						}
+						setTs += 2 * 60 * 1000;
+					}
 				} else {
 					const sb = STRENGTH_BASELINES[exerciseName];
 					for (let s = 0; s < SETS_PER_EXERCISE; s++) {

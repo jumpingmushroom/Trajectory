@@ -261,5 +261,31 @@
 		<path d="M40 32v6" {stroke} stroke-width={sw} />
 		<path d="M50 32v6" {stroke} stroke-width={sw} />
 		<path d="M58 32v6" {stroke} stroke-width={sw} />
+	{:else if kind === 'plank'}
+		<!-- Floor + horizontal plank silhouette: forearms-down body line + head. -->
+		<path d="M8 52h64" {stroke} stroke-width={sw} />
+		<circle cx="16" cy="32" r="4" {stroke} stroke-width={sw} />
+		<path d="M20 34h44" stroke={accent} stroke-width={aSw} />
+		<path d="M22 34v14" {stroke} stroke-width={sw} />
+		<path d="M14 34v14" {stroke} stroke-width={sw} />
+		<path d="M62 34v14" {stroke} stroke-width={sw} />
+	{:else if kind === 'wallsit'}
+		<!-- Wall sit: vertical wall on right, L-shape body. -->
+		<path d="M8 52h64" {stroke} stroke-width={sw} />
+		<path d="M64 12v40" {stroke} stroke-width={sw} />
+		<circle cx="48" cy="22" r="4" {stroke} stroke-width={sw} />
+		<path d="M48 26v14" stroke={accent} stroke-width={aSw} />
+		<path d="M48 40h14" stroke={accent} stroke-width={aSw} />
+		<path d="M48 40l-22 12" stroke={accent} stroke-width={aSw} />
+	{:else if kind === 'farmer'}
+		<!-- Farmer carry: standing figure + two side weights. -->
+		<path d="M8 52h64" {stroke} stroke-width={sw} />
+		<circle cx="40" cy="14" r="4" {stroke} stroke-width={sw} />
+		<path d="M40 18v22" stroke={accent} stroke-width={aSw} />
+		<path d="M30 24h20" {stroke} stroke-width={sw} />
+		<path d="M40 40l-6 12" {stroke} stroke-width={sw} />
+		<path d="M40 40l6 12" {stroke} stroke-width={sw} />
+		<rect x="22" y="22" width="10" height="10" rx="1.5" stroke={accent} stroke-width={aSw} />
+		<rect x="48" y="22" width="10" height="10" rx="1.5" stroke={accent} stroke-width={aSw} />
 	{/if}
 </svg>

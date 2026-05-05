@@ -14,6 +14,15 @@
 
 	const eq = $derived(data.equipment);
 	const isCardio = $derived(eq.type === 'cardio');
+	const mode = $derived(eq.inputMode ?? 'weighted');
+	const isTimedMode = $derived(mode === 'timed' || mode === 'timed_weighted');
+	const isCarryMode = $derived(mode === 'weight_distance');
+	// Display unit for the LineChart axis. Cardio + timed plot minutes;
+	// everything else (including weight_distance carries and timed_weighted
+	// holds) plots kg, matching the PR axis chosen in evaluatePr.
+	const seriesUnit = $derived<'kg' | 'min'>(
+		mode === 'distance_time' || mode === 'timed' ? 'min' : 'kg'
+	);
 	const photoSrc = $derived(
 		eq.photoPath ? `/uploads/${eq.photoPath}?v=${eq.updatedAt.getTime()}` : null
 	);
@@ -86,6 +95,18 @@
 		return Number.isInteger(n) ? String(n) : n.toFixed(1);
 	}
 
+	function fmtClock(min: number): string {
+		const total = Math.max(0, Math.round(min * 60));
+		const m = Math.floor(total / 60);
+		const s = String(total % 60).padStart(2, '0');
+		return `${m}:${s}`;
+	}
+
+	function fmtDistance(m: number): string {
+		if (m >= 500 || !Number.isInteger(m)) return `${(m / 1000).toFixed(2)} km`;
+		return `${m} m`;
+	}
+
 	function fmtLast(): string {
 		if (data.daysSinceLast == null) return 'Never logged';
 		const ago =
@@ -94,9 +115,23 @@
 				: data.daysSinceLast === 1
 					? '1 day ago'
 					: `${data.daysSinceLast} days ago`;
-		// Read the last set's own shape rather than the equipment's current
-		// type. After a cardio↔strength type change, the last set might still
-		// have been cardio (or strength) and should display as it was logged.
+		// Read the last set's own shape — covers timed-only holds, weighted
+		// holds, carries, cardio, weighted strength, and bodyweight strength.
+		const lastDistance = data.lastDistance;
+		if (data.lastWeight != null && typeof lastDistance === 'number') {
+			return `${fmtNum(data.lastWeight)} kg × ${fmtDistance(lastDistance)} · ${ago}`;
+		}
+		if (data.lastDurationMin != null && data.lastWeight != null && data.lastReps == null) {
+			// Weighted timed hold.
+			return `${fmtClock(data.lastDurationMin)} × ${fmtNum(data.lastWeight)} kg · ${ago}`;
+		}
+		if (data.lastDurationMin != null && data.lastWeight == null && data.lastReps == null) {
+			// Plain timed hold (no weight, no reps). Distinguish from cardio
+			// (which has reps == null too but typically has extras populated)
+			// by checking the equipment's mode.
+			if (mode === 'timed') return `${fmtClock(data.lastDurationMin)} · ${ago}`;
+			return `${fmtNum(data.lastDurationMin)} min · ${ago}`;
+		}
 		if (data.lastDurationMin != null) {
 			return `${fmtNum(data.lastDurationMin)} min · ${ago}`;
 		}
@@ -116,14 +151,18 @@
 
 	const metaTiles = $derived([
 		{
-			label: isCardio ? 'Last' : 'PR',
-			value: isCardio
-				? data.lastDurationMin != null
-					? `${fmtNum(data.lastDurationMin)} min`
-					: '—'
-				: data.pr != null
-					? `${fmtNum(data.pr)} kg`
-					: '—'
+			label: 'PR',
+			value: (() => {
+				if (data.pr == null) return '—';
+				if (mode === 'timed') return fmtClock(data.pr);
+				if (mode === 'distance_time') {
+					return eq.cardioKind === 'rower'
+						? `${fmtNum(data.pr)} m`
+						: `${fmtNum(data.pr)} km`;
+				}
+				// weighted | bodyweight | timed_weighted | weight_distance
+				return `${fmtNum(data.pr)} kg`;
+			})()
 		},
 		{ label: 'Sessions', value: String(data.sessionsCount) },
 		{
@@ -194,10 +233,9 @@
 				<span class="text-[10px] tabular-nums" style="color: var(--color-text-dim);">
 					{(() => {
 						const delta = data.series[data.series.length - 1] - data.series[0];
-						const unit = isCardio ? 'min' : 'kg';
-						if (delta === 0) return `flat ${unit}`;
+						if (delta === 0) return `flat ${seriesUnit}`;
 						const arrow = delta > 0 ? '▲' : '▼';
-						return `${arrow} ${fmtNum(Math.abs(delta))} ${unit}`;
+						return `${arrow} ${fmtNum(Math.abs(delta))} ${seriesUnit}`;
 					})()}
 				</span>
 			</div>
@@ -268,7 +306,7 @@
 					: 'No data yet'}
 			</div>
 		</div>
-		<LineChart data={data.series} width={420} height={170} unit={isCardio ? 'min' : 'kg'} />
+		<LineChart data={data.series} width={420} height={170} unit={seriesUnit} />
 	</section>
 
 	{#if data.commonWeights.length > 0 && !isCardio}

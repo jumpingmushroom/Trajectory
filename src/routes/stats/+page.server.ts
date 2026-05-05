@@ -33,10 +33,11 @@ export interface MachineCard {
 	glyph: string;
 	tint: string;
 	cardioKind: string | null;
+	inputMode: string;
 	series: number[];
 	delta: number;
 	lastValue: number;
-	unit: 'kg' | 'km' | 'min';
+	unit: 'kg' | 'km' | 'min' | 'm';
 }
 
 export interface CardioEquipmentRow {
@@ -85,6 +86,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			equipmentTint: equipment.tint,
 			equipmentGroup: equipment.group,
 			equipmentCardioKind: equipment.cardioKind,
+			equipmentInputMode: equipment.inputMode,
 			workoutSessionId: setTable.workoutSessionId,
 			weight: setTable.weight,
 			durationMin: setTable.durationMin,
@@ -110,6 +112,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		equipmentTint: string;
 		equipmentGroup: string;
 		equipmentCardioKind: string | null;
+		equipmentInputMode: string;
 		workoutSessionId: string;
 		weight: number | null;
 		durationMin: number | null;
@@ -120,10 +123,18 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// Strength distribution by muscle group over the selected range. Cardio gets
 	// its own dedicated section below; counting cardio "sets" alongside
 	// strength sets is misleading (1 cardio set ≈ 45 min, 1 leg set ≈ 30 s).
-	const groupCounts: Record<string, number> = { push: 0, pull: 0, legs: 0, core: 0 };
+	const groupCounts: Record<string, number> = {
+		push: 0,
+		pull: 0,
+		legs: 0,
+		core: 0,
+		arms: 0,
+		shoulders: 0,
+		glutes: 0
+	};
 	for (const s of sets) {
 		if (s.ts.getTime() < cutoff) continue;
-		if (s.equipmentType === 'cardio') continue;
+		if (s.equipmentInputMode === 'distance_time') continue;
 		const g = s.equipmentGroup;
 		if (g in groupCounts) groupCounts[g] += 1;
 	}
@@ -196,8 +207,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const perEquipment = new Map<
 		string,
 		{
-			meta: Pick<MachineCard, 'name' | 'type' | 'glyph' | 'tint' | 'cardioKind'>;
-			isCardio: boolean;
+			meta: Pick<MachineCard, 'name' | 'type' | 'glyph' | 'tint' | 'cardioKind' | 'inputMode'>;
 			distancePerSession: Map<string, SessionPoint>;
 			durationPerSession: Map<string, SessionPoint>;
 			weightPerSession: Map<string, SessionPoint>;
@@ -207,7 +217,6 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	for (const s of sets) {
 		const tsMs = s.ts.getTime();
 		if (tsMs < cutoff) continue;
-		const isCardio = s.equipmentType === 'cardio';
 		let row = perEquipment.get(s.equipmentId);
 		if (!row) {
 			row = {
@@ -216,9 +225,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					type: s.equipmentType,
 					glyph: s.equipmentGlyph,
 					tint: s.equipmentTint,
-					cardioKind: s.equipmentCardioKind
+					cardioKind: s.equipmentCardioKind,
+					inputMode: s.equipmentInputMode
 				},
-				isCardio,
 				distancePerSession: new Map(),
 				durationPerSession: new Map(),
 				weightPerSession: new Map(),
@@ -228,7 +237,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		}
 		if (tsMs > row.lastTs) row.lastTs = tsMs;
 
-		if (isCardio) {
+		const mode = s.equipmentInputMode;
+		if (mode === 'distance_time') {
 			const km = distanceKm(s.extras);
 			if (km !== null) {
 				const cur = row.distancePerSession.get(s.workoutSessionId);
@@ -243,7 +253,17 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					row.durationPerSession.set(s.workoutSessionId, { value: min, ts: tsMs });
 				}
 			}
+		} else if (mode === 'timed') {
+			const min = s.durationMin ?? 0;
+			if (min > 0) {
+				const cur = row.durationPerSession.get(s.workoutSessionId);
+				if (!cur || min > cur.value) {
+					row.durationPerSession.set(s.workoutSessionId, { value: min, ts: tsMs });
+				}
+			}
 		} else {
+			// weighted | bodyweight | timed_weighted | weight_distance —
+			// chart the same axis evaluatePr uses for is_pr (effective load).
 			const w = effectiveSetLoad(s);
 			if (w > 0) {
 				const cur = row.weightPerSession.get(s.workoutSessionId);
@@ -256,9 +276,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const machineCards: MachineCard[] = [...perEquipment.entries()]
 		.map(([equipmentId, row]) => {
-			let unit: 'kg' | 'km' | 'min';
+			let unit: 'kg' | 'km' | 'min' | 'm';
 			let pointsMap: Map<string, SessionPoint>;
-			if (row.isCardio) {
+			const mode = row.meta.inputMode;
+			if (mode === 'distance_time') {
 				if (row.distancePerSession.size > 0) {
 					unit = 'km';
 					pointsMap = row.distancePerSession;
@@ -266,7 +287,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 					unit = 'min';
 					pointsMap = row.durationPerSession;
 				}
+			} else if (mode === 'timed') {
+				unit = 'min';
+				pointsMap = row.durationPerSession;
 			} else {
+				// weighted | bodyweight | timed_weighted | weight_distance
 				unit = 'kg';
 				pointsMap = row.weightPerSession;
 			}
@@ -281,6 +306,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				glyph: row.meta.glyph,
 				tint: row.meta.tint,
 				cardioKind: row.meta.cardioKind,
+				inputMode: row.meta.inputMode,
 				series,
 				delta,
 				lastValue,

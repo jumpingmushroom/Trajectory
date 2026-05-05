@@ -12,6 +12,12 @@
 	import { holdRepeat } from '$lib/actions/holdRepeat';
 	import type { GlyphKind } from '$lib/components/glyph-kinds';
 	import { fieldsFor, type CardioField } from '$lib/cardio-templates';
+	import {
+		MODE_SHAPE,
+		MODE_LABEL,
+		formatDurationMinAsClock,
+		type InputMode
+	} from '$lib/input-modes';
 	import { syncStatus } from '$lib/sync/status';
 	import { pushToast } from '$lib/stores/toast';
 	import { tsForBackdate, withDateMode } from '$lib/dateMode';
@@ -43,9 +49,14 @@
 	const photoSrc = $derived(
 		eq.photoPath ? `/uploads/${eq.photoPath}?v=${eq.updatedAt.getTime()}` : null
 	);
-	const isCardio = $derived(eq.type === 'cardio');
+	const mode = $derived((eq.inputMode ?? 'weighted') as InputMode);
+	const shape = $derived(MODE_SHAPE[mode]);
+	const isCardio = $derived(mode === 'distance_time');
+	const isTimed = $derived(mode === 'timed' || mode === 'timed_weighted');
+	const isCarry = $derived(mode === 'weight_distance');
+	const isStrengthMode = $derived(mode === 'weighted' || mode === 'bodyweight');
 	const cardioFields = $derived<CardioField[]>(isCardio ? fieldsFor(eq.cardioKind) : []);
-	const isBodyweight = $derived(!isCardio && eq.bodyweightPct != null);
+	const isBodyweight = $derived(mode === 'bodyweight');
 	// Effective bodyweight contribution per rep. Zero when the user hasn't
 	// set a body weight (we still let them log; extras are skipped so the
 	// set looks like a normal 0-kg set in stats — they can fix it later by
@@ -88,9 +99,16 @@
 	let targetSets = $state(3);
 	let lastSetExerciseId = $state('');
 
-	// Cardio state
+	// Cardio state. `duration` doubles as the timed-mode hold duration —
+	// stored in minutes (the same unit set.durationMin uses), but the timed
+	// modes pump it through a mm:ss Stepper formatter for display.
 	let duration = $state(20);
 	let cardioExtras = $state<Record<string, number>>({});
+
+	// Loaded-carry state (weight_distance). Distance is stored in meters; the
+	// Stepper steps in 5 m increments. The SetRow + history collapse to km
+	// once the distance crosses 500 m so an integer-meter axis stays readable.
+	let distance = $state(20);
 
 	$effect(() => {
 		if (ctx && selectedExerciseId && selectedExerciseId !== lastSetExerciseId) {
@@ -101,7 +119,17 @@
 			const seedWeight = ctx.lastWeight ?? weight;
 			weight = isBodyweight ? seedWeight : Math.max(0, seedWeight);
 			reps = ctx.lastReps ?? reps;
-			duration = ctx.lastDurationMin ?? duration;
+			// Seed duration: cardio prefers minutes-scale (default 20),
+			// timed modes prefer 30 s (= 0.5 min) when no prior set exists.
+			if (ctx.lastDurationMin != null) {
+				duration = ctx.lastDurationMin;
+			} else if (isTimed) {
+				duration = 0.5;
+			}
+			// Seed carry distance from the prior set when available.
+			if (typeof ctx.lastDistance === 'number' && ctx.lastDistance > 0) {
+				distance = ctx.lastDistance;
+			}
 			lastSetExerciseId = selectedExerciseId;
 			// Reset the PR-celebration baseline when switching exercises so a
 			// PR locked on the previous exercise doesn't suppress one here.
@@ -257,12 +285,12 @@
 				for (const [k, v] of Object.entries(cardioExtras)) {
 					if (typeof v === 'number' && Number.isFinite(v)) extras[k] = v;
 				}
-				const distance = extras.distance;
-				if (typeof distance === 'number' && distance > 0) {
+				const cardioDistance = extras.distance;
+				if (typeof cardioDistance === 'number' && cardioDistance > 0) {
 					const baseline = Math.max(ctx?.prValue ?? 0, lastCelebratedPr ?? 0);
-					if (distance > baseline) {
+					if (cardioDistance > baseline) {
 						didPr = true;
-						prValue = distance;
+						prValue = cardioDistance;
 						prUnit = eq.cardioKind === 'rower' ? 'm' : 'km';
 					}
 				}
@@ -271,6 +299,63 @@
 					exerciseId: selectedExerciseId,
 					durationMin: duration,
 					extras: Object.keys(extras).length > 0 ? extras : null,
+					ts: setTs()
+				});
+			} else if (mode === 'timed') {
+				if (duration <= 0) {
+					error = 'Duration must be greater than 0.';
+					return;
+				}
+				const baseline = Math.max(ctx?.prValue ?? 0, lastCelebratedPr ?? 0);
+				if (duration > baseline) {
+					didPr = true;
+					prValue = duration;
+					prUnit = '';
+				}
+				await mutate('set.create', {
+					id,
+					exerciseId: selectedExerciseId,
+					durationMin: duration,
+					ts: setTs()
+				});
+			} else if (mode === 'timed_weighted') {
+				if (duration <= 0) {
+					error = 'Duration must be greater than 0.';
+					return;
+				}
+				if (weight > 0) {
+					const baseline = Math.max(ctx?.prValue ?? 0, lastCelebratedPr ?? 0);
+					if (weight > baseline) {
+						didPr = true;
+						prValue = weight;
+						prUnit = 'kg';
+					}
+				}
+				await mutate('set.create', {
+					id,
+					exerciseId: selectedExerciseId,
+					weight,
+					durationMin: duration,
+					ts: setTs()
+				});
+			} else if (mode === 'weight_distance') {
+				if (distance <= 0) {
+					error = 'Distance must be greater than 0.';
+					return;
+				}
+				if (weight > 0) {
+					const baseline = Math.max(ctx?.prValue ?? 0, lastCelebratedPr ?? 0);
+					if (weight > baseline) {
+						didPr = true;
+						prValue = weight;
+						prUnit = 'kg';
+					}
+				}
+				await mutate('set.create', {
+					id,
+					exerciseId: selectedExerciseId,
+					weight,
+					extras: { distance },
 					ts: setTs()
 				});
 			} else {
@@ -301,7 +386,8 @@
 			lastLogAt = Date.now();
 			if (didPr && prValue != null) {
 				lastCelebratedPr = prValue;
-				pushToast(`New PR · ${fmtNum(prValue)} ${prUnit}`, 'info', 4000);
+				const display = mode === 'timed' ? formatDurationMinAsClock(prValue) : fmtNum(prValue);
+				pushToast(`New PR · ${display}${prUnit ? ' ' + prUnit : ''}`, 'info', 4000);
 			}
 			setTimeout(
 				() => {
@@ -322,21 +408,55 @@
 		}
 	}
 
-	async function handleClone(s: { weight: number | null; reps: number | null }) {
-		if (s.weight == null || s.reps == null) return;
+	async function handleClone(s: {
+		weight: number | null;
+		reps: number | null;
+		durationMin: number | null;
+		extras?: Record<string, number> | null;
+	}) {
 		markSwipeHintSeen();
 		try {
-			// Re-snapshot bodyweight: a clone reflects the user's *current*
-			// body weight + pct, not the cloned set's old snapshot. Saves a
-			// tap when the user's weight has drifted between sessions.
-			await mutate('set.create', {
-				id: ulid(),
-				exerciseId: selectedExerciseId,
-				weight: s.weight,
-				reps: s.reps,
-				extras: bwExtras(),
-				ts: setTs()
-			});
+			if (mode === 'timed') {
+				if (s.durationMin == null) return;
+				await mutate('set.create', {
+					id: ulid(),
+					exerciseId: selectedExerciseId,
+					durationMin: s.durationMin,
+					ts: setTs()
+				});
+			} else if (mode === 'timed_weighted') {
+				if (s.weight == null || s.durationMin == null) return;
+				await mutate('set.create', {
+					id: ulid(),
+					exerciseId: selectedExerciseId,
+					weight: s.weight,
+					durationMin: s.durationMin,
+					ts: setTs()
+				});
+			} else if (mode === 'weight_distance') {
+				const d = typeof s.extras?.distance === 'number' ? s.extras.distance : null;
+				if (s.weight == null || d == null) return;
+				await mutate('set.create', {
+					id: ulid(),
+					exerciseId: selectedExerciseId,
+					weight: s.weight,
+					extras: { distance: d },
+					ts: setTs()
+				});
+			} else {
+				if (s.weight == null || s.reps == null) return;
+				// Re-snapshot bodyweight: a clone reflects the user's *current*
+				// body weight + pct, not the cloned set's old snapshot. Saves a
+				// tap when the user's weight has drifted between sessions.
+				await mutate('set.create', {
+					id: ulid(),
+					exerciseId: selectedExerciseId,
+					weight: s.weight,
+					reps: s.reps,
+					extras: bwExtras(),
+					ts: setTs()
+				});
+			}
 			lastLogAt = Date.now();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not clone set.';
@@ -377,6 +497,11 @@
 		return v.toFixed(1);
 	}
 
+	function fmtDistanceM(m: number): string {
+		if (m >= 500 || !Number.isInteger(m)) return `${(m / 1000).toFixed(2)} km`;
+		return `${m} m`;
+	}
+
 	const buttonLabel = $derived.by(() => {
 		if (justSaved) return justPr ? 'New PR · Logged' : 'Logged';
 		if (isCardio) {
@@ -387,6 +512,15 @@
 				}
 			}
 			return `Log · ${parts.join(' · ')}`;
+		}
+		if (mode === 'timed') {
+			return `Log hold · ${formatDurationMinAsClock(duration)}`;
+		}
+		if (mode === 'timed_weighted') {
+			return `Log hold · ${formatDurationMinAsClock(duration)} × ${fmtNum(weight)} kg`;
+		}
+		if (mode === 'weight_distance') {
+			return `Log carry · ${fmtNum(weight)} kg × ${fmtDistanceM(distance)}`;
 		}
 		// Bodyweight equipment: button shows the same number the row will
 		// show after saving (effective = added + bw). Avoids the "I logged
@@ -399,6 +533,22 @@
 	function lastSummary(): string {
 		if (isCardio) {
 			if (ctx?.lastDurationMin != null) return `${fmtNum(ctx.lastDurationMin)} min`;
+			return 'never';
+		}
+		if (mode === 'timed') {
+			if (ctx?.lastDurationMin != null) return formatDurationMinAsClock(ctx.lastDurationMin);
+			return 'never';
+		}
+		if (mode === 'timed_weighted') {
+			if (ctx?.lastDurationMin != null && ctx?.lastWeight != null) {
+				return `${formatDurationMinAsClock(ctx.lastDurationMin)} × ${fmtNum(ctx.lastWeight)} kg`;
+			}
+			return 'never';
+		}
+		if (mode === 'weight_distance') {
+			if (ctx?.lastWeight != null && typeof ctx?.lastDistance === 'number') {
+				return `${fmtNum(ctx.lastWeight)} kg × ${fmtDistanceM(ctx.lastDistance)}`;
+			}
 			return 'never';
 		}
 		if (ctx?.lastWeight != null && ctx?.lastReps != null) {
@@ -442,7 +592,7 @@
 				class="text-[10px] font-bold tracking-[0.16em] uppercase"
 				style="color: var(--color-text-dim-2);"
 			>
-				{isCardio ? 'CARDIO' : 'LOGGING'}
+				{MODE_LABEL[mode].toUpperCase()}
 			</div>
 			<div
 				class="mt-0.5 truncate text-[20px] font-bold tracking-[-0.02em]"
@@ -500,7 +650,11 @@
 					{(() => {
 						const s = ctx.sparklineSeries;
 						const delta = s[s.length - 1] - s[0];
-						const unit = isCardio ? 'min' : 'kg';
+						// Sparkline axis matches what the mode tracks: cardio →
+						// minutes, timed → minutes (rendered raw because the
+						// delta is signed), other modes → kg. The mm:ss render
+						// only fires for absolute values, not deltas.
+						const unit = isCardio || isTimed ? 'min' : 'kg';
 						if (delta === 0) return `flat ${unit}`;
 						const arrow = delta > 0 ? '▲' : '▼';
 						return `${arrow} ${fmtNum(Math.abs(delta))} ${unit}`;
@@ -733,6 +887,66 @@
 				<div class="ml-auto text-[10px]" style="color: var(--color-text-dim-2);">auto</div>
 			</section>
 		{/if}
+	{:else if mode === 'timed' || mode === 'timed_weighted'}
+		<section class="mt-4">
+			<Stepper
+				value={duration}
+				onChange={(v) => (duration = v)}
+				step={5 / 60}
+				min={5 / 60}
+				max={20}
+				label="HOLD"
+				unit=""
+				formatter={formatDurationMinAsClock}
+				hint={ctx?.lastDurationMin != null
+					? `Previous: ${formatDurationMinAsClock(ctx.lastDurationMin)}`
+					: 'Tap +/− for 5 s · hold to scroll'}
+			/>
+		</section>
+
+		{#if mode === 'timed_weighted'}
+			<section class="mt-4">
+				<Stepper
+					value={weight}
+					onChange={(v) => (weight = v)}
+					step={2.5}
+					min={0}
+					label="ADDED WEIGHT"
+					unit="kg"
+					hint={ctx?.lastWeight != null
+						? `Previous: ${fmtNum(ctx.lastWeight)} kg`
+						: 'Plate, vest, or DB held during the hold'}
+				/>
+			</section>
+		{/if}
+	{:else if mode === 'weight_distance'}
+		<section class="mt-4">
+			<Stepper
+				value={weight}
+				onChange={(v) => (weight = v)}
+				step={2.5}
+				min={0}
+				label="WEIGHT"
+				unit="kg"
+				hint={ctx?.lastWeight != null
+					? `Previous: ${fmtNum(ctx.lastWeight)} kg`
+					: 'Per-hand load — total carried = 2× this'}
+			/>
+		</section>
+		<section class="mt-4">
+			<Stepper
+				value={distance}
+				onChange={(v) => (distance = v)}
+				step={5}
+				min={5}
+				max={2000}
+				label="DISTANCE"
+				unit="m"
+				hint={typeof ctx?.lastDistance === 'number'
+					? `Previous: ${fmtDistanceM(ctx.lastDistance)}`
+					: 'Tap +/− for 5 m · hold to scroll'}
+			/>
+		</section>
 	{:else}
 		{#if isBodyweight}
 			<!--
@@ -932,14 +1146,17 @@
 					{:else}
 						<SetRow
 							index={i}
+							{mode}
 							weight={s.weight ?? 0}
 							reps={s.reps ?? 0}
+							durationMin={s.durationMin ?? null}
+							distance={typeof s.extras?.distance === 'number' ? s.extras.distance : null}
 							bwLoadKg={typeof s.extras?.bwLoadKg === 'number' ? s.extras.bwLoadKg : 0}
 							isLatest={i === sessionSetsForExercise.length - 1}
 							pending={s.pending}
 							onClone={() => handleClone(s)}
 							onDelete={() => handleDelete(s.id)}
-							onEdit={(w, r) => handleEdit(s.id, w, r)}
+							onEdit={isStrengthMode ? (w, r) => handleEdit(s.id, w, r) : undefined}
 						/>
 					{/if}
 				{/each}
