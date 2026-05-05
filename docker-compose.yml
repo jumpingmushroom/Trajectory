@@ -19,6 +19,7 @@ services:
       NODE_ENV: development
       TRAJECTORY_DATA_DIR: /app/data
       TRAJECTORY_DB_FILE: /app/data/db.sqlite
+      BODY_SIZE_LIMIT: 16M
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5173}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@trajectory.local}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-on-first-login}

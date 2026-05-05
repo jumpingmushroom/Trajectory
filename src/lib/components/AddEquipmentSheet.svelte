@@ -2,6 +2,7 @@
 	import { mutate, ulid } from '$lib/mutate';
 	import { invalidateAll } from '$app/navigation';
 	import EquipmentGlyph from './EquipmentGlyph.svelte';
+	import PhotoCropper from './PhotoCropper.svelte';
 	import {
 		GLYPHS,
 		CATEGORY_ORDER,
@@ -61,6 +62,8 @@
 	let photoFile = $state<File | null>(null);
 	let photoPreview = $state<string | null>(initialPhotoSrc);
 	let removePhoto = $state(false);
+	// File picked but not yet cropped — drives the PhotoCropper sheet.
+	let pendingFile = $state<File | null>(null);
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
 	let glyphSearch = $state('');
@@ -120,12 +123,25 @@
 	function pickPhoto(e: Event) {
 		const input = e.target as HTMLInputElement;
 		const file = input.files?.[0] ?? null;
+		// Reset so re-picking the same file fires onchange.
+		input.value = '';
+		if (!file) return;
+		pendingFile = file;
+	}
+
+	function handleCropConfirm(blob: Blob, name: string) {
+		pendingFile = null;
+		const cropped = new File([blob], name, { type: blob.type });
 		if (photoPreview && photoPreview.startsWith('blob:')) {
 			URL.revokeObjectURL(photoPreview);
 		}
-		photoFile = file;
-		photoPreview = file ? URL.createObjectURL(file) : null;
-		if (file) removePhoto = false;
+		photoFile = cropped;
+		photoPreview = URL.createObjectURL(cropped);
+		removePhoto = false;
+	}
+
+	function handleCropCancel() {
+		pendingFile = null;
 	}
 
 	function clearPhoto() {
@@ -182,7 +198,11 @@
 					body: form
 				});
 				if (!res.ok) {
-					console.error('photo upload failed:', await res.text());
+					// Equipment row was already created by mutate(); leave the
+					// sheet open so the user can retry the photo without
+					// re-entering all fields. POST overwrites on retry.
+					error = `Photo upload failed (${res.status}).`;
+					return;
 				}
 			}
 			// mutate() handles invalidation when the queue drains; no need
@@ -742,3 +762,14 @@
 		</div>
 	</div>
 </div>
+
+{#if pendingFile}
+	<PhotoCropper
+		file={pendingFile}
+		aspect={4 / 3}
+		outputSize={{ w: 1280, h: 960 }}
+		title="Crop equipment photo"
+		onConfirm={handleCropConfirm}
+		onCancel={handleCropCancel}
+	/>
+{/if}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { authClient } from '$lib/auth-client';
 	import { goto, invalidateAll } from '$app/navigation';
+	import PhotoCropper from '$lib/components/PhotoCropper.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -9,6 +10,8 @@
 	let avatarBusy = $state(false);
 	let avatarError = $state<string | null>(null);
 	let fileInput: HTMLInputElement | null = $state(null);
+	// File picked but not yet cropped — drives the cropper sheet.
+	let pendingFile = $state<File | null>(null);
 	// Cache-bust the avatar URL when it just changed so the browser refetches.
 	let avatarVersion = $state(0);
 
@@ -28,26 +31,32 @@
 		fileInput?.click();
 	}
 
-	async function handleAvatarChange(e: Event) {
+	function handleAvatarChange(e: Event) {
 		const target = e.target as HTMLInputElement;
 		const file = target.files?.[0];
+		if (fileInput) fileInput.value = '';
 		if (!file) return;
 		avatarError = null;
+		pendingFile = file;
+	}
+
+	async function uploadCropped(blob: Blob, name: string) {
+		pendingFile = null;
 		avatarBusy = true;
+		avatarError = null;
 		try {
 			const fd = new FormData();
-			fd.append('photo', file);
+			fd.append('photo', new File([blob], name, { type: blob.type }));
 			const res = await fetch('/api/profile/avatar', { method: 'POST', body: fd });
 			if (!res.ok) {
 				const body = await res.json().catch(() => ({}));
-				avatarError = body.error ?? 'Upload failed.';
+				avatarError = body.message ?? 'Upload failed.';
 				return;
 			}
 			avatarVersion++;
 			await invalidateAll();
 		} finally {
 			avatarBusy = false;
-			if (fileInput) fileInput.value = '';
 		}
 	}
 
@@ -62,6 +71,17 @@
 		}
 	}
 </script>
+
+{#if pendingFile}
+	<PhotoCropper
+		file={pendingFile}
+		aspect={1}
+		outputSize={{ w: 512, h: 512 }}
+		title="Crop avatar"
+		onConfirm={uploadCropped}
+		onCancel={() => (pendingFile = null)}
+	/>
+{/if}
 
 <svelte:head>
 	<title>Profile · Trajectory</title>

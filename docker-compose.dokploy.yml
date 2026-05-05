@@ -41,6 +41,10 @@ services:
       PORT: 5173
       TRAJECTORY_DATA_DIR: /app/data
       TRAJECTORY_DB_FILE: /app/data/db.sqlite
+      # adapter-node defaults to 512K, smaller than typical phone photos.
+      # The in-handler caps (4MB avatar, 12MB equipment) are the real
+      # limits; this just keeps the framework from rejecting first.
+      BODY_SIZE_LIMIT: 16M
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
