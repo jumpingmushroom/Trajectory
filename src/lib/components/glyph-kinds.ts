@@ -28,6 +28,7 @@ export type GlyphKind =
 	| 'rower'
 	| 'preacher'
 	| 'chestpress'
+	| 'pecdeck'
 	| 'legpress'
 	| 'shoulderpress'
 	| 'captainschair'
@@ -35,8 +36,11 @@ export type GlyphKind =
 	| 'elliptical'
 	| 'legcurl'
 	| 'legextension'
+	| 'hipabduction'
 	| 'hyperextension'
 	| 'pullupbar'
+	| 'assistedpullup'
+	| 'seatedrow'
 	| 'dipstation'
 	| 'cablecrossover'
 	| 'dumbbells'
@@ -92,6 +96,13 @@ export const GLYPHS: GlyphMeta[] = [
 		defaults: { type: 'machine', group: 'push' }
 	},
 	{
+		kind: 'pecdeck',
+		label: 'Pec Deck',
+		category: 'push',
+		aliases: ['pec deck', 'pec fly', 'chest fly machine', 'butterfly', 'machine fly'],
+		defaults: { type: 'machine', group: 'push' }
+	},
+	{
 		kind: 'shoulderpress',
 		label: 'Shoulder Press',
 		category: 'push',
@@ -130,6 +141,13 @@ export const GLYPHS: GlyphMeta[] = [
 		defaults: { type: 'cable', group: 'pull' }
 	},
 	{
+		kind: 'seatedrow',
+		label: 'Seated Row',
+		category: 'pull',
+		aliases: ['seated row', 'machine row', 'low row', 'cable row', 'chest-supported row'],
+		defaults: { type: 'machine', group: 'pull' }
+	},
+	{
 		kind: 'tbarrow',
 		label: 'T-Bar Row',
 		category: 'pull',
@@ -143,6 +161,22 @@ export const GLYPHS: GlyphMeta[] = [
 		aliases: ['pull-up', 'pullup', 'pull up', 'chin-up', 'chinup'],
 		// Whole body hangs from the bar ≈ 100% body weight per rep.
 		defaults: { type: 'freeweight', group: 'pull', bodyweightPct: 1.0, inputMode: 'bodyweight' }
+	},
+	{
+		kind: 'assistedpullup',
+		label: 'Assisted Pull-Up',
+		category: 'pull',
+		aliases: [
+			'assisted pull-up',
+			'assisted pullup',
+			'assisted pull up',
+			'assisted dip',
+			'gravitron'
+		],
+		// The selectorized stack offsets a portion of body weight rather than
+		// adding to it. Logging stays weighted (load = stack assistance value)
+		// — no bodyweightPct, no bodyweight inputMode.
+		defaults: { type: 'machine', group: 'pull' }
 	},
 	{
 		kind: 'preacher',
@@ -180,6 +214,20 @@ export const GLYPHS: GlyphMeta[] = [
 		category: 'legs',
 		aliases: ['leg extension', 'quad extension'],
 		defaults: { type: 'machine', group: 'legs' }
+	},
+	{
+		kind: 'hipabduction',
+		label: 'Hip Abduction',
+		category: 'legs',
+		aliases: [
+			'hip abduction',
+			'hip adduction',
+			'abductor',
+			'adductor',
+			'inner thigh',
+			'outer thigh'
+		],
+		defaults: { type: 'machine', group: 'glutes' }
 	},
 	{
 		kind: 'hackquat',
@@ -293,7 +341,7 @@ export const GLYPHS: GlyphMeta[] = [
 		kind: 'bike',
 		label: 'Bike',
 		category: 'cardio',
-		aliases: ['bike', 'stationary bike', 'spin bike', 'cycle'],
+		aliases: ['bike', 'stationary bike', 'spin bike', 'cycle', 'recumbent', 'recumbent bike'],
 		defaults: { type: 'cardio', group: 'cardio', inputMode: 'distance_time' }
 	},
 	{

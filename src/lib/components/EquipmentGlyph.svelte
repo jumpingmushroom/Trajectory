@@ -76,6 +76,16 @@
 		<circle cx="52" cy="28" r="3" stroke={accent} stroke-width={aSw} />
 		<circle cx="52" cy="36" r="3" stroke={accent} stroke-width={aSw} />
 		<rect x="58" y="22" width="8" height="22" rx="1.5" {stroke} stroke-width={sw} />
+	{:else if kind === 'pecdeck'}
+		<!-- Front view: vertical seat post + back, with two pads on swing arms
+		     spread out at chest height. -->
+		<path d="M8 52h64" {stroke} stroke-width={sw} />
+		<rect x="37" y="20" width="6" height="24" rx="1.5" {stroke} stroke-width={sw} />
+		<rect x="30" y="44" width="20" height="6" rx="1.5" {stroke} stroke-width={sw} />
+		<path d="M40 30l-22 -10" stroke={accent} stroke-width={aSw} />
+		<path d="M40 30l22 -10" stroke={accent} stroke-width={aSw} />
+		<rect x="10" y="14" width="10" height="10" rx="1.5" stroke={accent} stroke-width={aSw} />
+		<rect x="60" y="14" width="10" height="10" rx="1.5" stroke={accent} stroke-width={aSw} />
 	{:else if kind === 'treadmill'}
 		<path d="M10 42l50-14" stroke={accent} stroke-width={aSw} />
 		<path d="M10 42h50" {stroke} stroke-width={sw} />
@@ -146,6 +156,28 @@
 		<path d="M44 28l8 -2" {stroke} stroke-width={sw} />
 		<rect x="14" y="42" width="6" height="10" rx="1" {stroke} stroke-width={sw} />
 		<path d="M52 44h8v8" {stroke} stroke-width={sw} />
+	{:else if kind === 'seatedrow'}
+		<!-- Side view: seat on left, foot brace mid, weight stack on right,
+		     handle being pulled toward seat along an accent cable. -->
+		<path d="M8 52h64" {stroke} stroke-width={sw} />
+		<rect x="14" y="38" width="16" height="6" rx="1.5" {stroke} stroke-width={sw} />
+		<path d="M18 44v8" {stroke} stroke-width={sw} />
+		<path d="M26 44v8" {stroke} stroke-width={sw} />
+		<rect x="34" y="28" width="4" height="14" rx="1" {stroke} stroke-width={sw} />
+		<rect x="56" y="20" width="10" height="26" rx="1.5" {stroke} stroke-width={sw} />
+		<path d="M30 36h26" stroke={accent} stroke-width={aSw} />
+		<rect x="26" y="32" width="6" height="8" rx="1" stroke={accent} stroke-width={aSw} />
+	{:else if kind === 'hipabduction'}
+		<!-- Front view: seat block with two thigh pads spread outward (the
+		     abduction motion). User can rename for adduction without losing
+		     the visual cue. -->
+		<path d="M8 52h64" {stroke} stroke-width={sw} />
+		<rect x="32" y="26" width="16" height="20" rx="2" {stroke} stroke-width={sw} />
+		<rect x="34" y="14" width="12" height="14" rx="2" {stroke} stroke-width={sw} />
+		<path d="M32 38l-14 6" stroke={accent} stroke-width={aSw} />
+		<path d="M48 38l14 6" stroke={accent} stroke-width={aSw} />
+		<rect x="10" y="42" width="8" height="10" rx="1.5" stroke={accent} stroke-width={aSw} />
+		<rect x="62" y="42" width="8" height="10" rx="1.5" stroke={accent} stroke-width={aSw} />
 	{:else if kind === 'pullupbar'}
 		<path d="M8 52h64" {stroke} stroke-width={sw} />
 		<path d="M16 52v-44" {stroke} stroke-width={sw} />
@@ -155,6 +187,18 @@
 		<path d="M30 16v6" {stroke} stroke-width={sw} />
 		<path d="M50 16v6" {stroke} stroke-width={sw} />
 		<path d="M58 16v6" {stroke} stroke-width={sw} />
+	{:else if kind === 'assistedpullup'}
+		<!-- Pull-up frame with a kneeling platform on the bar that rises as
+		     stack weight offsets body weight. Stack indicator on the left post. -->
+		<path d="M8 52h64" {stroke} stroke-width={sw} />
+		<path d="M14 52v-44" {stroke} stroke-width={sw} />
+		<path d="M66 52v-44" {stroke} stroke-width={sw} />
+		<path d="M14 8h52" stroke={accent} stroke-width={aSw} />
+		<path d="M22 12v6" {stroke} stroke-width={sw} />
+		<path d="M58 12v6" {stroke} stroke-width={sw} />
+		<rect x="32" y="36" width="16" height="6" rx="1.5" stroke={accent} stroke-width={aSw} />
+		<path d="M40 36v-14" stroke={accent} stroke-width={aSw} />
+		<rect x="18" y="28" width="6" height="18" rx="1" {stroke} stroke-width={sw} />
 	{:else if kind === 'dipstation'}
 		<path d="M8 52h64" {stroke} stroke-width={sw} />
 		<path d="M14 52v-26" {stroke} stroke-width={sw} />
