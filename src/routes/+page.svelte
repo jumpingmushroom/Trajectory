@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import EquipmentTile from '$lib/components/EquipmentTile.svelte';
 	import GymChip from '$lib/components/GymChip.svelte';
 	import GymSheet from '$lib/components/GymSheet.svelte';
@@ -31,6 +32,149 @@
 			starting = false;
 		}
 	}
+
+	// End-session flow. Mirrors /sessions/[id]: optimistic end + 10s undo
+	// toast, undoUntil persisted to sessionStorage so the toast survives
+	// the SvelteKit invalidate that unmounts SessionBar after the session
+	// closes. Uses the same key prefix as /sessions/[id] so a toast armed
+	// here can be cleared from there (and vice versa).
+	const UNDO_WINDOW_MS = 10_000;
+	const UNDO_KEY_PREFIX = 'trajectory.undoUntil.';
+
+	let ending = $state(false);
+	let endError = $state<string | null>(null);
+	let endingId = $state<string | null>(null);
+	let undoUntil = $state<number | null>(null);
+	let undoNow = $state(Date.now());
+	let undoTimer: ReturnType<typeof setInterval> | null = null;
+
+	function readUndoFromStorage(id: string): number | null {
+		if (typeof sessionStorage === 'undefined') return null;
+		const raw = sessionStorage.getItem(UNDO_KEY_PREFIX + id);
+		if (!raw) return null;
+		const ts = Number(raw);
+		if (!Number.isFinite(ts) || ts <= Date.now()) {
+			sessionStorage.removeItem(UNDO_KEY_PREFIX + id);
+			return null;
+		}
+		return ts;
+	}
+
+	// Scan storage for any still-valid undo key. Used on mount when the
+	// session id is no longer in `data.activeSession` (post-reload, after
+	// the optimistic end has been confirmed server-side).
+	function findStoredUndo(): { id: string; until: number } | null {
+		if (typeof sessionStorage === 'undefined') return null;
+		let best: { id: string; until: number } | null = null;
+		for (let i = 0; i < sessionStorage.length; i++) {
+			const key = sessionStorage.key(i);
+			if (!key || !key.startsWith(UNDO_KEY_PREFIX)) continue;
+			const id = key.slice(UNDO_KEY_PREFIX.length);
+			const until = readUndoFromStorage(id);
+			if (until == null) continue;
+			if (!best || until > best.until) best = { id, until };
+		}
+		return best;
+	}
+
+	function clearUndoStorage(id: string) {
+		if (typeof sessionStorage === 'undefined') return;
+		sessionStorage.removeItem(UNDO_KEY_PREFIX + id);
+	}
+
+	function startUndoTicker() {
+		if (undoTimer != null) clearInterval(undoTimer);
+		undoTimer = setInterval(() => {
+			undoNow = Date.now();
+			if (undoUntil != null && undoNow >= undoUntil) {
+				undoUntil = null;
+				if (endingId) clearUndoStorage(endingId);
+				endingId = null;
+				if (undoTimer != null) {
+					clearInterval(undoTimer);
+					undoTimer = null;
+				}
+			}
+		}, 250);
+	}
+
+	$effect(() => {
+		// Hydrate undoUntil on (re)mount. Prefer the id of a still-open
+		// session if one exists; otherwise scan storage for any key (covers
+		// the reload-during-undo path where activeSession is already null
+		// because the optimistic end has been confirmed).
+		if (undoUntil != null) return;
+		const openId = data.activeSession?.id;
+		if (openId) {
+			const stored = readUndoFromStorage(openId);
+			if (stored != null) {
+				endingId = openId;
+				undoUntil = stored;
+				undoNow = Date.now();
+				startUndoTicker();
+				return;
+			}
+		}
+		const found = findStoredUndo();
+		if (found) {
+			endingId = found.id;
+			undoUntil = found.until;
+			undoNow = Date.now();
+			startUndoTicker();
+		}
+	});
+
+	onDestroy(() => {
+		if (undoTimer != null) clearInterval(undoTimer);
+	});
+
+	async function handleEnd() {
+		const open = data.activeSession;
+		if (!open || ending) return;
+		ending = true;
+		endError = null;
+		endingId = open.id;
+		const until = Date.now() + UNDO_WINDOW_MS;
+		undoUntil = until;
+		undoNow = Date.now();
+		if (typeof sessionStorage !== 'undefined') {
+			sessionStorage.setItem(UNDO_KEY_PREFIX + open.id, String(until));
+		}
+		startUndoTicker();
+		try {
+			await mutate('session.end', { id: open.id });
+		} catch (err) {
+			endError = err instanceof Error ? err.message : 'Could not end session.';
+			undoUntil = null;
+			clearUndoStorage(open.id);
+			endingId = null;
+			if (undoTimer != null) {
+				clearInterval(undoTimer);
+				undoTimer = null;
+			}
+		} finally {
+			ending = false;
+		}
+	}
+
+	async function handleUndo() {
+		const id = endingId;
+		if (!undoUntil || !id) return;
+		undoUntil = null;
+		clearUndoStorage(id);
+		endingId = null;
+		if (undoTimer != null) {
+			clearInterval(undoTimer);
+			undoTimer = null;
+		}
+		try {
+			await mutate('session.endUndo', { id });
+		} catch (err) {
+			endError = err instanceof Error ? err.message : 'Could not undo.';
+		}
+	}
+
+	const undoRemainingMs = $derived(undoUntil == null ? 0 : Math.max(0, undoUntil - undoNow));
 
 	type Filter = 'all' | 'push' | 'pull' | 'legs' | 'core' | 'cardio';
 	const filters: { id: Filter; label: string }[] = [
@@ -216,7 +360,7 @@
 
 {#if asOfTs != null}
 	<BackdatedSessionPreview {asOfTs} session={data.backdatedSession} />
-{:else if data.activeSession && data.activeSession.setCount > 0}
+{:else if data.activeSession}
 	<SessionBar
 		id={data.activeSession.id}
 		startedAt={data.activeSession.startedAt}
@@ -224,7 +368,50 @@
 		lastSetTs={data.activeSession.lastSetTs}
 		lastEquipmentName={data.activeSession.lastEquipmentName}
 		lastEquipmentId={data.activeSession.lastEquipmentId}
+		onStop={handleEnd}
+		{ending}
 	/>
+{/if}
+
+{#if undoUntil != null && undoRemainingMs > 0}
+	<div
+		class="fixed inset-x-0 z-30 mx-auto flex w-full max-w-[480px] items-center gap-3 px-4"
+		style="bottom: calc(max(env(safe-area-inset-bottom, 0px), 12px) + 65px);"
+	>
+		<div
+			class="flex flex-1 items-center gap-3 rounded-2xl border px-4 py-3"
+			style="background: var(--color-surface); border-color: var(--color-line-2); backdrop-filter: blur(8px);"
+		>
+			<div class="flex flex-1 flex-col">
+				<div class="text-[13px] font-semibold" style="color: var(--color-text);">Session ended</div>
+				<div class="text-[11px]" style="color: var(--color-text-dim-2);">
+					{Math.ceil(undoRemainingMs / 1000)}s to undo
+				</div>
+			</div>
+			<button
+				type="button"
+				class="rounded-full px-3 py-1.5 text-[12px] font-bold"
+				style="background: var(--color-amber-dim); color: var(--color-amber);"
+				onclick={handleUndo}
+			>
+				Undo
+			</button>
+		</div>
+	</div>
+{/if}
+
+{#if endError}
+	<div
+		class="fixed inset-x-0 z-20 mx-auto flex w-full max-w-[480px] px-4"
+		style="bottom: calc(max(env(safe-area-inset-bottom, 0px), 12px) + 16px);"
+	>
+		<div
+			class="flex-1 rounded-2xl border px-4 py-3 text-center text-[12px]"
+			style="background: var(--color-surface); border-color: var(--color-line-2); color: var(--color-text-dim);"
+		>
+			{endError}
+		</div>
+	</div>
 {/if}
 
 <TabBar active="home" />
