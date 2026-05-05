@@ -23,7 +23,20 @@
 	let dateSheetOpen = $state(false);
 
 	function setTs(): number {
-		return asOfTs == null ? Date.now() : tsForBackdate(asOfTs);
+		if (asOfTs == null) return Date.now();
+		// Editing a closed historical session: append just after the last
+		// existing set instead of projecting *current* wall-clock onto the
+		// picked day. Otherwise a clone at 18:41 today lands at 18:41
+		// yesterday, blowing the session's endedAt (and its computed
+		// duration) out to "from session start until now-o'clock".
+		if (data.sessionSets.length > 0) {
+			let maxTs = 0;
+			for (const s of data.sessionSets) {
+				if (s.ts > maxTs) maxTs = s.ts;
+			}
+			return maxTs + 60_000;
+		}
+		return tsForBackdate(asOfTs);
 	}
 
 	const eq = $derived(data.equipment);
