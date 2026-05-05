@@ -71,7 +71,7 @@
 	// Strength state. Bodyweight-loaded equipment defaults `weight` to 0
 	// (added/assistance load); regular equipment keeps the 60 kg seed.
 	let weight = $state(eq.bodyweightPct != null ? 0 : 60);
-	let reps = $state(8);
+	let reps = $state(10);
 	let targetSets = $state(3);
 	let lastSetExerciseId = $state('');
 
