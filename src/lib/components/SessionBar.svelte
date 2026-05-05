@@ -1,7 +1,8 @@
 <script lang="ts">
 	// Sticky bar shown above the TabBar on Home when there's an open
-	// workout session. Tapping it jumps the user back into the Log screen
-	// for the equipment they last logged against.
+	// workout session. Tapping the body jumps the user back into the Log
+	// screen for the equipment they last logged against; the trailing
+	// stop button ends the session (parent owns the mutation + undo flow).
 
 	import { onDestroy } from 'svelte';
 
@@ -11,7 +12,9 @@
 		setCount,
 		lastSetTs,
 		lastEquipmentName,
-		lastEquipmentId
+		lastEquipmentId,
+		onStop,
+		ending = false
 	}: {
 		id: string;
 		startedAt: number;
@@ -19,6 +22,8 @@
 		lastSetTs: number | null;
 		lastEquipmentName: string | null;
 		lastEquipmentId: string | null;
+		onStop: () => void;
+		ending?: boolean;
 	} = $props();
 
 	let now = $state(Date.now());
@@ -46,80 +51,88 @@
 
 	// With sets: jump back to the last-equipment Log screen. Without sets
 	// (manual start, no sets logged yet): land on SessionDetail so the user
-	// can End or Delete an empty session without round-tripping via History.
+	// can Delete an empty session without round-tripping via History.
 	const href = $derived(lastEquipmentId ? `/log/${lastEquipmentId}` : `/sessions/${id}`);
 </script>
 
-<a
-	{href}
-	class="fixed inset-x-0 z-10 mx-auto block w-full max-w-[480px] px-4"
+<div
+	class="fixed inset-x-0 z-10 mx-auto w-full max-w-[480px] px-4"
 	style="bottom: calc(max(env(safe-area-inset-bottom, 0px), 12px) + 65px);"
 >
 	<div
-		class="flex items-center gap-3 rounded-2xl border px-4 py-2.5"
+		class="flex items-stretch gap-2 rounded-2xl border"
 		style="background: var(--color-amber-dim); border-color: var(--color-amber-line); backdrop-filter: blur(8px);"
 	>
-		<div
-			class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full"
-			style="background: var(--color-amber); color: #1b0a00;"
+		<a {href} class="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5">
+			<div
+				class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full"
+				style="background: var(--color-amber); color: #1b0a00;"
+			>
+				<svg
+					width="18"
+					height="18"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+				>
+					<circle cx="12" cy="12" r="10" />
+					<path d="M12 7v5l3 2" />
+				</svg>
+			</div>
+			<div class="flex min-w-0 flex-1 flex-col">
+				<div
+					class="truncate text-[10px] font-bold tracking-[0.14em] uppercase"
+					style="color: var(--color-amber);"
+				>
+					Active session · {elapsedLabel}
+				</div>
+				<div
+					class="truncate text-[13px] font-semibold tracking-[-0.01em]"
+					style="color: var(--color-text);"
+				>
+					{#if setCount === 0}
+						No sets logged yet · tap to manage
+					{:else}
+						{setCount} set{setCount === 1 ? '' : 's'} logged
+						{#if lastEquipmentName}
+							· last on {lastEquipmentName}
+						{/if}
+					{/if}
+				</div>
+			</div>
+			{#if restRemaining != null && restRemaining > 0}
+				<div
+					class="flex flex-shrink-0 flex-col items-end text-[11px] font-bold tabular-nums"
+					style="color: var(--color-amber);"
+				>
+					<span>rest</span>
+					<span class="text-[14px]">{fmtRest(restRemaining)}</span>
+				</div>
+			{/if}
+		</a>
+		<button
+			type="button"
+			onclick={onStop}
+			disabled={ending}
+			aria-label="End session"
+			class="flex w-12 flex-shrink-0 items-center justify-center rounded-r-2xl border-l disabled:opacity-60"
+			style="border-color: var(--color-amber-line); color: var(--color-amber);"
 		>
 			<svg
 				width="18"
 				height="18"
 				viewBox="0 0 24 24"
-				fill="none"
+				fill="currentColor"
 				stroke="currentColor"
-				stroke-width="2"
-				stroke-linecap="round"
+				stroke-width="1.5"
 				stroke-linejoin="round"
+				aria-hidden="true"
 			>
-				<circle cx="12" cy="12" r="10" />
-				<path d="M12 7v5l3 2" />
+				<rect x="6" y="6" width="12" height="12" rx="1.5" />
 			</svg>
-		</div>
-		<div class="flex min-w-0 flex-1 flex-col">
-			<div
-				class="truncate text-[10px] font-bold tracking-[0.14em] uppercase"
-				style="color: var(--color-amber);"
-			>
-				Active session · {elapsedLabel}
-			</div>
-			<div
-				class="truncate text-[13px] font-semibold tracking-[-0.01em]"
-				style="color: var(--color-text);"
-			>
-				{#if setCount === 0}
-					No sets logged yet · tap to manage
-				{:else}
-					{setCount} set{setCount === 1 ? '' : 's'} logged
-					{#if lastEquipmentName}
-						· last on {lastEquipmentName}
-					{/if}
-				{/if}
-			</div>
-		</div>
-		{#if restRemaining != null && restRemaining > 0}
-			<div
-				class="flex flex-col items-end text-[11px] font-bold tabular-nums"
-				style="color: var(--color-amber);"
-			>
-				<span>rest</span>
-				<span class="text-[14px]">{fmtRest(restRemaining)}</span>
-			</div>
-		{:else}
-			<svg
-				width="16"
-				height="16"
-				viewBox="0 0 24 24"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="1.75"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-				style="color: var(--color-amber);"
-			>
-				<path d="M9 6l6 6-6 6" />
-			</svg>
-		{/if}
+		</button>
 	</div>
-</a>
+</div>
