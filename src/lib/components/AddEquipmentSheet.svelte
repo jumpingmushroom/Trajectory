@@ -71,6 +71,10 @@
 	let submitting = $state(false);
 	let error = $state<string | null>(null);
 	let glyphSearch = $state('');
+	// Tracks whether the user has typed in the Name field. Once true, glyph
+	// picks no longer clobber the name — so a customised "Cable Row by the
+	// mirror" survives a return trip to step 1 to switch glyphs.
+	let nameTouched = $state(mode === 'edit');
 
 	// Captured snapshot for diff at save time. Only meaningful in edit mode.
 	const initial = {
@@ -114,6 +118,10 @@
 			// their choice. New equipment created from a glyph that doesn't
 			// declare a default lands on 'weighted' from the initial state.
 			if (d.inputMode) inputMode = d.inputMode;
+			if (!nameTouched) {
+				const meta = GLYPHS.find((g) => g.kind === kind);
+				if (meta) name = meta.label;
+			}
 			if (step === 0) {
 				error = null;
 				step = 1;
@@ -437,11 +445,11 @@
 						>
 							{section.label}
 						</div>
-						<div class="grid grid-cols-4 gap-2">
+						<div class="grid grid-cols-3 gap-2">
 							{#each section.items as g (g.kind)}
 								<button
 									type="button"
-									class="flex aspect-square items-center justify-center rounded-xl border p-2"
+									class="flex min-h-[96px] flex-col items-center justify-center gap-1.5 rounded-xl border p-2"
 									style="background: {glyph === g.kind
 										? 'var(--color-amber-dim)'
 										: 'var(--color-surface-2)'}; border-color: {glyph === g.kind
@@ -452,10 +460,18 @@
 									aria-label={g.label}
 									title={g.label}
 								>
-									<EquipmentGlyph
-										kind={g.kind}
-										accent={glyph === g.kind ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
-									/>
+									<div class="h-12 w-12">
+										<EquipmentGlyph
+											kind={g.kind}
+											accent={glyph === g.kind ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
+										/>
+									</div>
+									<span
+										class="line-clamp-2 text-center text-[10px] leading-tight"
+										style="color: {glyph === g.kind ? 'var(--color-amber)' : 'var(--color-text-dim)'};"
+									>
+										{g.label}
+									</span>
 								</button>
 							{/each}
 						</div>
@@ -467,10 +483,10 @@
 						No glyph matches "{glyphSearch}". Pick
 						<span style="color: var(--color-text);">Generic</span> and name it whatever you like.
 					</div>
-					<div class="grid grid-cols-4 gap-2">
+					<div class="grid grid-cols-3 gap-2">
 						<button
 							type="button"
-							class="flex aspect-square items-center justify-center rounded-xl border p-2"
+							class="flex min-h-[96px] flex-col items-center justify-center gap-1.5 rounded-xl border p-2"
 							style="background: {glyph === 'generic'
 								? 'var(--color-amber-dim)'
 								: 'var(--color-surface-2)'}; border-color: {glyph === 'generic'
@@ -481,19 +497,27 @@
 							aria-label="Generic"
 							title="Generic"
 						>
-							<EquipmentGlyph
-								kind="generic"
-								accent={glyph === 'generic' ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
-							/>
+							<div class="h-12 w-12">
+								<EquipmentGlyph
+									kind="generic"
+									accent={glyph === 'generic' ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
+								/>
+							</div>
+							<span
+								class="line-clamp-2 text-center text-[10px] leading-tight"
+								style="color: {glyph === 'generic' ? 'var(--color-amber)' : 'var(--color-text-dim)'};"
+							>
+								Generic
+							</span>
 						</button>
 					</div>
 				</div>
 			{:else}
-				<div class="mt-2 grid grid-cols-4 gap-2">
+				<div class="mt-2 grid grid-cols-3 gap-2">
 					{#each filteredGlyphs as g (g.kind)}
 						<button
 							type="button"
-							class="flex aspect-square items-center justify-center rounded-xl border p-2"
+							class="flex min-h-[96px] flex-col items-center justify-center gap-1.5 rounded-xl border p-2"
 							style="background: {glyph === g.kind
 								? 'var(--color-amber-dim)'
 								: 'var(--color-surface-2)'}; border-color: {glyph === g.kind
@@ -504,10 +528,18 @@
 							aria-label={g.label}
 							title={g.label}
 						>
-							<EquipmentGlyph
-								kind={g.kind}
-								accent={glyph === g.kind ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
-							/>
+							<div class="h-12 w-12">
+								<EquipmentGlyph
+									kind={g.kind}
+									accent={glyph === g.kind ? 'var(--color-amber)' : 'rgba(244,237,226,0.55)'}
+								/>
+							</div>
+							<span
+								class="line-clamp-2 text-center text-[10px] leading-tight"
+								style="color: {glyph === g.kind ? 'var(--color-amber)' : 'var(--color-text-dim)'};"
+							>
+								{g.label}
+							</span>
 						</button>
 					{/each}
 				</div>
@@ -527,6 +559,7 @@
 			</span>
 			<input
 				bind:value={name}
+				oninput={() => (nameTouched = true)}
 				name="equipment-name"
 				type="text"
 				placeholder="Cable Row by the mirror"
