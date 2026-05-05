@@ -181,6 +181,10 @@
 		submitting = true;
 		try {
 			const id = ulid();
+			// Seed bodyweightPct from the glyph default. The user can refine
+			// it later from the equipment detail page; we don't expose a
+			// number field here to keep the add flow short.
+			const defaultBwPct = defaultsForGlyph(glyph).bodyweightPct;
 			await mutate('equipment.create', {
 				id,
 				gymId,
@@ -188,7 +192,8 @@
 				type,
 				group,
 				glyph,
-				cardioKind: type === 'cardio' ? cardioKind : null
+				cardioKind: type === 'cardio' ? cardioKind : null,
+				bodyweightPct: defaultBwPct ?? null
 			});
 			if (photoFile) {
 				const form = new FormData();

@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { gym, equipment, exercise, set as setTable, workoutSession } from '$lib/server/db/schema';
 import { isNull, eq, and, desc, asc } from 'drizzle-orm';
+import { effectiveSetLoad } from '$lib/server/db/effective-load';
 
 export interface HistorySessionSummary {
 	id: string;
@@ -46,6 +47,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 					weight: setTable.weight,
 					reps: setTable.reps,
 					durationMin: setTable.durationMin,
+					extras: setTable.extras,
 					ts: setTable.ts,
 					equipmentId: exercise.equipmentId,
 					equipmentName: equipment.name
@@ -59,6 +61,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 				weight: number | null;
 				reps: number | null;
 				durationMin: number | null;
+				extras: Record<string, number> | null;
 				ts: Date;
 				equipmentId: string;
 				equipmentName: string;
@@ -91,8 +94,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			cur.machineOrder.push(s.equipmentId);
 		}
 		cur.setCount += 1;
-		if (s.weight != null && s.reps != null) {
-			cur.totalVolume += s.weight * s.reps;
+		if (s.reps != null && (s.weight != null || s.extras?.bwLoadKg != null)) {
+			cur.totalVolume += effectiveSetLoad(s) * s.reps;
 		}
 		if (s.durationMin != null) {
 			cur.cardioDurationMin += s.durationMin;

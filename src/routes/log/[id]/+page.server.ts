@@ -1,9 +1,17 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { equipment, exercise, gym, set as setTable, workoutSession } from '$lib/server/db/schema';
+import {
+	equipment,
+	exercise,
+	gym,
+	set as setTable,
+	workoutSession,
+	user
+} from '$lib/server/db/schema';
 import { isNull, eq, and, asc, desc, inArray, gte, lt } from 'drizzle-orm';
 import { parseAsOfTs, startOfUtcDay, endOfUtcDay } from '$lib/dateMode';
+import { effectiveSetLoad } from '$lib/server/db/effective-load';
 
 export interface ExerciseContext {
 	id: string;
@@ -12,6 +20,10 @@ export interface ExerciseContext {
 	lastWeight: number | null;
 	lastReps: number | null;
 	lastDurationMin: number | null;
+	// Bodyweight contribution snapshotted on the most-recent set. Lets the
+	// "Last time: X kg × Y" label render effective load to match the set
+	// list. Null when the last set has no bodyweight snapshot.
+	lastBwLoadKg: number | null;
 	commonWeights: number[];
 	sparklineSeries: number[];
 	// Current PR for this exercise & user. Strength: MAX(weight). Cardio:
@@ -43,6 +55,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				cardioKind: equipment.cardioKind,
 				sortOrder: equipment.sortOrder,
 				notes: equipment.notes,
+				bodyweightPct: equipment.bodyweightPct,
 				createdAt: equipment.createdAt,
 				updatedAt: equipment.updatedAt,
 				deletedAt: equipment.deletedAt
@@ -121,10 +134,11 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			.map(([w]) => w)
 			.sort((a, b) => a - b);
 
-		// Top-set per session, oldest first, last 10.
+		// Top-set per session, oldest first, last 10. Bodyweight equipment
+		// charts effective load so adding/removing a weighted vest shows up.
 		const perSession = new Map<string, number>();
 		for (const s of own) {
-			const v = eqRow.type === 'cardio' ? (s.durationMin ?? 0) : (s.weight ?? 0);
+			const v = eqRow.type === 'cardio' ? (s.durationMin ?? 0) : effectiveSetLoad(s);
 			if (v <= 0) continue;
 			const cur = perSession.get(s.workoutSessionId) ?? 0;
 			if (v > cur) perSession.set(s.workoutSessionId, v);
@@ -155,12 +169,14 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			}
 		} else {
 			for (const s of own) {
-				if (typeof s.weight === 'number' && s.weight > 0) {
-					if (prValue == null || s.weight > prValue) prValue = s.weight;
+				const v = effectiveSetLoad(s);
+				if (v > 0) {
+					if (prValue == null || v > prValue) prValue = v;
 				}
 			}
 		}
 
+		const lastBw = last?.extras?.bwLoadKg;
 		return {
 			id: ex.id,
 			name: ex.name,
@@ -168,6 +184,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			lastWeight: last?.weight ?? null,
 			lastReps: last?.reps ?? null,
 			lastDurationMin: last?.durationMin ?? null,
+			lastBwLoadKg: typeof lastBw === 'number' && Number.isFinite(lastBw) ? lastBw : null,
 			commonWeights,
 			sparklineSeries,
 			prValue
@@ -214,6 +231,14 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			? sets.filter((s) => s.workoutSessionId === activeSession.id).reverse()
 			: [];
 
+	const profile = (
+		await db
+			.select({ bodyWeightKg: user.bodyWeightKg })
+			.from(user)
+			.where(eq(user.id, locals.user.id))
+			.limit(1)
+	)[0];
+
 	return {
 		userId: locals.user.id,
 		equipment: eqRow,
@@ -230,6 +255,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 			extras: s.extras,
 			ts: s.ts.getTime()
 		})),
+		bodyWeightKg: profile?.bodyWeightKg ?? null,
 		asOfTs
 	};
 };

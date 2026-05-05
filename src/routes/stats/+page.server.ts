@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { achievement, equipment, exercise, set as setTable } from '$lib/server/db/schema';
 import { isNull, eq, and, asc, desc } from 'drizzle-orm';
+import { effectiveSetLoad } from '$lib/server/db/effective-load';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -243,7 +244,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				}
 			}
 		} else {
-			const w = s.weight ?? 0;
+			const w = effectiveSetLoad(s);
 			if (w > 0) {
 				const cur = row.weightPerSession.get(s.workoutSessionId);
 				if (!cur || w > cur.value) {

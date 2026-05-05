@@ -13,6 +13,7 @@
 		lastWeight,
 		lastReps,
 		lastDurationMin,
+		lastBwLoadKg = null,
 		daysSince,
 		href
 	}: {
@@ -20,6 +21,9 @@
 		lastWeight: number | null;
 		lastReps: number | null;
 		lastDurationMin: number | null;
+		// Bodyweight contribution snapshotted on the most recent set. Adds
+		// to lastWeight when present so the tile shows effective load.
+		lastBwLoadKg?: number | null;
 		daysSince: number | null;
 		href: string;
 	} = $props();
@@ -41,8 +45,9 @@
 			return { primary: 'Logged', secondary: ago };
 		}
 		if (lastWeight != null && lastReps != null) {
+			const display = lastWeight + (lastBwLoadKg ?? 0);
 			return {
-				primary: `${formatNum(lastWeight)} kg × ${lastReps}`,
+				primary: `${formatNum(display)} kg × ${lastReps}`,
 				secondary: ago
 			};
 		}

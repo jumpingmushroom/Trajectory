@@ -1,8 +1,8 @@
 {
 	"version": "6",
 	"dialect": "sqlite",
-	"id": "651650f5-301d-4650-b318-d9b9aaa1d6df",
-	"prevId": "596fd8cf-6c7e-40b6-8d3d-9bb06ad356e5",
+	"id": "d3fa891e-ee6d-46c5-b65e-7f7184f5117f",
+	"prevId": "651650f5-301d-4650-b318-d9b9aaa1d6df",
 	"tables": {
 		"account": {
 			"name": "account",
@@ -315,6 +315,13 @@
 				"notes": {
 					"name": "notes",
 					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"bodyweight_pct": {
+					"name": "bodyweight_pct",
+					"type": "real",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false
@@ -996,6 +1003,13 @@
 				"ban_expires": {
 					"name": "ban_expires",
 					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"body_weight_kg": {
+					"name": "body_weight_kg",
+					"type": "real",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false

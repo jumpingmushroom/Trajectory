@@ -17,11 +17,13 @@ import {
 	exercise,
 	workoutSession,
 	set as setTable,
+	user,
 	type Gym,
 	type Equipment,
 	type Exercise,
 	type Set as SetRow,
-	type WorkoutSession
+	type WorkoutSession,
+	type User
 } from './db/schema';
 import { newUlid, assertUlid, isUlid } from './ulid';
 
@@ -41,7 +43,8 @@ export type MutationOp =
 	| { op: 'session.start'; payload: SessionStart }
 	| { op: 'session.end'; payload: { id: string } }
 	| { op: 'session.endUndo'; payload: { id: string } }
-	| { op: 'session.delete'; payload: { id: string } };
+	| { op: 'session.delete'; payload: { id: string } }
+	| { op: 'user.update'; payload: UserUpdate };
 
 export interface MutationEnvelope {
 	clientId: string;
@@ -75,6 +78,7 @@ interface EquipmentCreate {
 	tint?: string;
 	cardioKind?: string | null;
 	sortOrder?: number;
+	bodyweightPct?: number | null;
 }
 interface EquipmentUpdate {
 	id: string;
@@ -86,6 +90,11 @@ interface EquipmentUpdate {
 	cardioKind?: string | null;
 	sortOrder?: number;
 	notes?: string | null;
+	bodyweightPct?: number | null;
+}
+
+interface UserUpdate {
+	bodyWeightKg?: number | null;
 }
 
 interface ExerciseCreate {
@@ -161,6 +170,19 @@ function assertEnum<T extends string>(value: unknown, label: string, allowed: Se
 	return v as T;
 }
 
+// Bodyweight load percentage as a decimal in [0, 2]. Stored on equipment to
+// flag bodyweight-loaded exercises (captain's chair, pull-up bar, etc.).
+// Range allows up to 200% so weighted-vest setups or multi-limb leverage
+// configurations aren't artificially clamped. Rounded to 4 decimals on the
+// way in (≈ 0.01 % precision) to keep stored values tidy.
+function assertBodyweightPct(value: unknown, label: string): number {
+	if (typeof value !== 'number' || !Number.isFinite(value)) {
+		badRequest(`${label} must be a finite number`);
+	}
+	if (value < 0 || value > 2) badRequest(`${label} must be between 0 and 2`);
+	return Math.round(value * 10000) / 10000;
+}
+
 function logMutation(clientId: string, mutationId: string, userId: string): boolean {
 	// Returns true if this is a fresh mutation, false if it's a replay.
 	try {
@@ -195,6 +217,34 @@ async function assertGymOwned(gymId: string, userId: string): Promise<Gym> {
 			.limit(1)
 	)[0];
 	if (!row) notFound(`gym ${gymId} not found`);
+	return row;
+}
+
+// User-profile updates that aren't covered by Better Auth's built-in
+// /update-user endpoint (display name, image). Currently just body weight,
+// used to compute bodyweight-loaded effective load on the log screen and
+// snapshot bwLoadKg into `set.extras` at log time. Range 30–400 kg matches
+// realistic human bounds; null clears the value.
+async function userUpdate(payload: UserUpdate, userId: string): Promise<User> {
+	const updates: Partial<User> = { updatedAt: new Date() };
+	if (payload.bodyWeightKg !== undefined) {
+		if (payload.bodyWeightKg === null) {
+			updates.bodyWeightKg = null;
+		} else {
+			if (typeof payload.bodyWeightKg !== 'number' || !Number.isFinite(payload.bodyWeightKg)) {
+				badRequest('bodyWeightKg must be a finite number or null');
+			}
+			if (payload.bodyWeightKg < 30 || payload.bodyWeightKg > 400) {
+				badRequest('bodyWeightKg must be between 30 and 400 kg');
+			}
+			updates.bodyWeightKg = Math.round(payload.bodyWeightKg * 10) / 10;
+		}
+	}
+	if (Object.keys(updates).length === 1) badRequest('user.update needs at least one field');
+
+	await db.update(user).set(updates).where(eq(user.id, userId));
+	const row = (await db.select().from(user).where(eq(user.id, userId)).limit(1))[0];
+	if (!row) notFound('user not found');
 	return row;
 }
 
@@ -282,6 +332,10 @@ async function equipmentCreate(
 		typeof payload.sortOrder === 'number' && Number.isInteger(payload.sortOrder)
 			? payload.sortOrder
 			: 0;
+	const bodyweightPct =
+		payload.bodyweightPct == null
+			? null
+			: assertBodyweightPct(payload.bodyweightPct, 'bodyweightPct');
 
 	await db
 		.insert(equipment)
@@ -294,7 +348,8 @@ async function equipmentCreate(
 			glyph,
 			tint,
 			cardioKind,
-			sortOrder
+			sortOrder,
+			bodyweightPct
 		})
 		.onConflictDoNothing();
 	const row = (await db.select().from(equipment).where(eq(equipment.id, payload.id)).limit(1))[0];
@@ -341,6 +396,7 @@ async function assertEquipmentOwned(equipmentId: string, userId: string): Promis
 				cardioKind: equipment.cardioKind,
 				sortOrder: equipment.sortOrder,
 				notes: equipment.notes,
+				bodyweightPct: equipment.bodyweightPct,
 				createdAt: equipment.createdAt,
 				updatedAt: equipment.updatedAt,
 				deletedAt: equipment.deletedAt
@@ -432,6 +488,13 @@ async function equipmentUpdate(payload: EquipmentUpdate, userId: string): Promis
 		} else {
 			badRequest('notes must be a string or null');
 		}
+		hasUserField = true;
+	}
+	if (payload.bodyweightPct !== undefined) {
+		updates.bodyweightPct =
+			payload.bodyweightPct === null
+				? null
+				: assertBodyweightPct(payload.bodyweightPct, 'bodyweightPct');
 		hasUserField = true;
 	}
 
@@ -688,9 +751,11 @@ function resolveSession(
 }
 
 // Returns true when the about-to-insert set strictly beats the user's
-// prior best for the same exercise. Strength compares MAX(weight); cardio
-// compares MAX(extras.distance). First-ever qualifying set is also a PR.
-// Sets with weight=0 (strength) or no distance (cardio) never PR.
+// prior best for the same exercise. Strength compares MAX(effective load);
+// cardio compares MAX(extras.distance). First-ever qualifying set is also
+// a PR. Sets with effective load ≤ 0 (strength) or no distance (cardio)
+// never PR. "Effective load" = weight + extras.bwLoadKg, so a heavier user
+// or larger bodyweight pct can lock in a higher PR than added weight alone.
 async function evaluatePr(
 	userId: string,
 	exerciseId: string,
@@ -718,12 +783,21 @@ async function evaluatePr(
 		const prior = row?.max ?? null;
 		return prior == null || distance > prior;
 	}
-	if (typeof weight !== 'number' || !Number.isFinite(weight) || weight <= 0) {
+	if (typeof weight !== 'number' || !Number.isFinite(weight)) {
 		return false;
 	}
+	const bwLoad =
+		typeof extras?.bwLoadKg === 'number' && Number.isFinite(extras.bwLoadKg) ? extras.bwLoadKg : 0;
+	const effective = weight + bwLoad;
+	if (effective <= 0) return false;
 	const row = (
 		await db
-			.select({ max: sql<number | null>`MAX(${setTable.weight})` })
+			.select({
+				max: sql<number | null>`MAX(
+					COALESCE(${setTable.weight}, 0)
+					+ COALESCE(json_extract(${setTable.extras}, '$.bwLoadKg'), 0)
+				)`
+			})
 			.from(setTable)
 			.where(
 				and(
@@ -734,7 +808,7 @@ async function evaluatePr(
 			)
 	)[0];
 	const prior = row?.max ?? null;
-	return prior == null || weight > prior;
+	return prior == null || effective > prior;
 }
 
 async function setCreate(
@@ -754,7 +828,8 @@ async function setCreate(
 				id: exercise.id,
 				equipmentId: exercise.equipmentId,
 				gymId: equipment.gymId,
-				type: equipment.type
+				type: equipment.type,
+				bodyweightPct: equipment.bodyweightPct
 			})
 			.from(exercise)
 			.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
@@ -771,7 +846,12 @@ async function setCreate(
 			.limit(1)
 	)[0];
 	if (!ex) notFound(`exercise ${payload.exerciseId} not found`);
-	const eqRow = { id: ex.equipmentId, gymId: ex.gymId, type: ex.type };
+	const eqRow = {
+		id: ex.equipmentId,
+		gymId: ex.gymId,
+		type: ex.type,
+		bodyweightPct: ex.bodyweightPct
+	};
 
 	const isCardio = eqRow.type === 'cardio';
 	const ts =
@@ -804,14 +884,44 @@ async function setCreate(
 			extras = Object.keys(cleaned).length > 0 ? cleaned : null;
 		}
 	} else {
-		if (typeof payload.weight !== 'number' || payload.weight < 0) {
-			badRequest('strength set requires non-negative weight');
+		if (typeof payload.weight !== 'number') {
+			badRequest('strength set requires numeric weight');
 		}
 		if (typeof payload.reps !== 'number' || !Number.isInteger(payload.reps) || payload.reps < 0) {
 			badRequest('strength set requires non-negative integer reps');
 		}
+		// Bodyweight equipment lets `weight` go negative for assisted reps
+		// (e.g. band-assisted pull-ups) since the stored value is *added*
+		// load, not absolute load. Non-bodyweight stays non-negative.
+		if (eqRow.bodyweightPct == null && payload.weight < 0) {
+			badRequest('strength set requires non-negative weight');
+		}
 		weight = payload.weight;
 		reps = payload.reps;
+		// Bodyweight snapshot in `extras`: bwLoadKg (effective contribution),
+		// bwKg (user's BW at log time), bwPct (equipment %). Stored once and
+		// never re-derived so historical effective load doesn't drift if the
+		// user updates either input later. Allowed only on bodyweight rigs;
+		// rejected as junk fields anywhere else.
+		if (payload.extras != null) {
+			if (typeof payload.extras !== 'object' || Array.isArray(payload.extras)) {
+				badRequest('extras must be an object of numbers');
+			}
+			if (eqRow.bodyweightPct == null) {
+				badRequest('extras only allowed on bodyweight equipment for strength sets');
+			}
+			const cleaned: Record<string, number> = {};
+			for (const [k, v] of Object.entries(payload.extras)) {
+				if (k !== 'bwLoadKg' && k !== 'bwKg' && k !== 'bwPct') {
+					badRequest(`unknown extras key for strength set: ${k}`);
+				}
+				if (typeof v !== 'number' || !Number.isFinite(v)) {
+					badRequest(`extras.${k} must be a finite number`);
+				}
+				cleaned[k] = v;
+			}
+			extras = Object.keys(cleaned).length > 0 ? cleaned : null;
+		}
 	}
 
 	// PR evaluation: strength compares against MAX(weight); cardio against
@@ -886,8 +996,27 @@ async function setUpdate(payload: SetUpdate, userId: string): Promise<SetRow> {
 
 	const updates: Partial<SetRow> = { updatedAt: new Date() };
 	if (payload.weight !== undefined) {
-		if (payload.weight !== null && (typeof payload.weight !== 'number' || payload.weight < 0)) {
-			badRequest('weight must be a non-negative number or null');
+		if (
+			payload.weight !== null &&
+			(typeof payload.weight !== 'number' || !Number.isFinite(payload.weight))
+		) {
+			badRequest('weight must be a finite number or null');
+		}
+		// Resolve the set's equipment to know if negative weights (assisted
+		// bodyweight) are legal here. Cheap join — already gated by ownership.
+		if (typeof payload.weight === 'number' && payload.weight < 0) {
+			const ctx = (
+				await db
+					.select({ bodyweightPct: equipment.bodyweightPct })
+					.from(setTable)
+					.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
+					.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
+					.where(and(eq(setTable.id, payload.id), eq(setTable.userId, userId)))
+					.limit(1)
+			)[0];
+			if (!ctx || ctx.bodyweightPct == null) {
+				badRequest('weight must be non-negative on non-bodyweight equipment');
+			}
 		}
 		updates.weight = payload.weight;
 	}
@@ -1186,6 +1315,8 @@ export async function applyMutation(
 			return { replayed: false, result: await sessionEndUndo(payload, userId) };
 		case 'session.delete':
 			return { replayed: false, result: await sessionDelete(payload, userId) };
+		case 'user.update':
+			return { replayed: false, result: await userUpdate(payload, userId) };
 		default:
 			badRequest(`unknown op: ${op}`);
 	}

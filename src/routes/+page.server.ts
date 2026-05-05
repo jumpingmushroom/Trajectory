@@ -21,6 +21,7 @@ export interface EquipmentTileMeta {
 	lastWeight: number | null;
 	lastReps: number | null;
 	lastDurationMin: number | null;
+	lastBwLoadKg: number | null;
 	lastTs: number | null;
 	daysSince: number | null;
 }
@@ -83,6 +84,7 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 					weight: setTable.weight,
 					reps: setTable.reps,
 					durationMin: setTable.durationMin,
+					extras: setTable.extras,
 					ts: setTable.ts
 				})
 				.from(setTable)
@@ -93,6 +95,7 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 				weight: number | null;
 				reps: number | null;
 				durationMin: number | null;
+				extras: Record<string, number> | null;
 				ts: Date;
 			}[])
 		: [];
@@ -108,11 +111,15 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 	const tiles: EquipmentTileMeta[] = equipments.map((eq) => {
 		const last = lastByEquipment.get(eq.id);
 		const ts = last ? last.ts.getTime() : null;
+		const lastBwRaw = last?.extras?.bwLoadKg;
+		const lastBwLoadKg =
+			typeof lastBwRaw === 'number' && Number.isFinite(lastBwRaw) ? lastBwRaw : null;
 		return {
 			equipment: eq,
 			lastWeight: last?.weight ?? null,
 			lastReps: last?.reps ?? null,
 			lastDurationMin: last?.durationMin ?? null,
+			lastBwLoadKg,
 			lastTs: ts,
 			daysSince: ts == null ? null : Math.max(0, Math.floor((referenceTs - ts) / dayMs))
 		};

@@ -32,6 +32,24 @@
 	);
 	const isCardio = $derived(eq.type === 'cardio');
 	const cardioFields = $derived<CardioField[]>(isCardio ? fieldsFor(eq.cardioKind) : []);
+	const isBodyweight = $derived(!isCardio && eq.bodyweightPct != null);
+	// Effective bodyweight contribution per rep. Zero when the user hasn't
+	// set a body weight (we still let them log; extras are skipped so the
+	// set looks like a normal 0-kg set in stats — they can fix it later by
+	// editing their profile + re-cloning).
+	const bwLoadKg = $derived(
+		isBodyweight && data.bodyWeightKg != null
+			? Number(((data.bodyWeightKg as number) * (eq.bodyweightPct as number)).toFixed(2))
+			: 0
+	);
+	function bwExtras(): Record<string, number> | null {
+		if (!isBodyweight || data.bodyWeightKg == null || eq.bodyweightPct == null) return null;
+		return {
+			bwLoadKg,
+			bwKg: data.bodyWeightKg,
+			bwPct: eq.bodyweightPct
+		};
+	}
 
 	// Visible (non-hidden) exercises. For machine/cable/cardio there's
 	// exactly one hidden auto-exercise that we still need to log against.
@@ -50,8 +68,9 @@
 
 	const ctx = $derived(data.contexts.find((c) => c.id === selectedExerciseId) ?? data.contexts[0]);
 
-	// Strength state
-	let weight = $state(60);
+	// Strength state. Bodyweight-loaded equipment defaults `weight` to 0
+	// (added/assistance load); regular equipment keeps the 60 kg seed.
+	let weight = $state(eq.bodyweightPct != null ? 0 : 60);
 	let reps = $state(8);
 	let targetSets = $state(3);
 	let lastSetExerciseId = $state('');
@@ -62,7 +81,12 @@
 
 	$effect(() => {
 		if (ctx && selectedExerciseId && selectedExerciseId !== lastSetExerciseId) {
-			weight = ctx.lastWeight ?? weight;
+			// Clamp the seeded value to 0 on non-bodyweight equipment: an
+			// older set with weight < 0 (left behind by a prior bodyweight
+			// flag that since got cleared) shouldn't carry into the stepper
+			// where the min is 0 — the displayed "-10 kg" would be a lie.
+			const seedWeight = ctx.lastWeight ?? weight;
+			weight = isBodyweight ? seedWeight : Math.max(0, seedWeight);
 			reps = ctx.lastReps ?? reps;
 			duration = ctx.lastDurationMin ?? duration;
 			lastSetExerciseId = selectedExerciseId;
@@ -237,11 +261,15 @@
 					ts: setTs()
 				});
 			} else {
-				if (weight > 0) {
+				// PR comparison uses effective load on bodyweight equipment so a
+				// heavier user (or higher-pct config) doesn't lock in a "free" PR
+				// on the first day they enable it.
+				const effective = weight + bwLoadKg;
+				if (effective > 0) {
 					const baseline = Math.max(ctx?.prValue ?? 0, lastCelebratedPr ?? 0);
-					if (weight > baseline) {
+					if (effective > baseline) {
 						didPr = true;
-						prValue = weight;
+						prValue = effective;
 						prUnit = 'kg';
 					}
 				}
@@ -250,6 +278,7 @@
 					exerciseId: selectedExerciseId,
 					weight,
 					reps,
+					extras: bwExtras(),
 					ts: setTs()
 				});
 				if (setsDone + 1 > targetSets) targetSets = setsDone + 1;
@@ -284,11 +313,15 @@
 		if (s.weight == null || s.reps == null) return;
 		markSwipeHintSeen();
 		try {
+			// Re-snapshot bodyweight: a clone reflects the user's *current*
+			// body weight + pct, not the cloned set's old snapshot. Saves a
+			// tap when the user's weight has drifted between sessions.
 			await mutate('set.create', {
 				id: ulid(),
 				exerciseId: selectedExerciseId,
 				weight: s.weight,
 				reps: s.reps,
+				extras: bwExtras(),
 				ts: setTs()
 			});
 			lastLogAt = Date.now();
@@ -342,8 +375,12 @@
 			}
 			return `Log · ${parts.join(' · ')}`;
 		}
-		if (allDone) return `Extra set · ${fmtNum(weight)} kg × ${reps}`;
-		return `Log set ${setsDone + 1} of ${Math.max(targetSets, 1)} · ${fmtNum(weight)} kg × ${reps}`;
+		// Bodyweight equipment: button shows the same number the row will
+		// show after saving (effective = added + bw). Avoids the "I logged
+		// 0 kg × 8 but the row says 32 kg × 8" disconnect.
+		const display = isBodyweight ? weight + bwLoadKg : weight;
+		if (allDone) return `Extra set · ${fmtNum(display)} kg × ${reps}`;
+		return `Log set ${setsDone + 1} of ${Math.max(targetSets, 1)} · ${fmtNum(display)} kg × ${reps}`;
 	});
 
 	function lastSummary(): string {
@@ -352,7 +389,11 @@
 			return 'never';
 		}
 		if (ctx?.lastWeight != null && ctx?.lastReps != null) {
-			return `${fmtNum(ctx.lastWeight)} kg × ${ctx.lastReps}`;
+			// Effective load when the last set was on bodyweight equipment —
+			// matches what the SetRow above will read.
+			const lastBw = ctx.lastBwLoadKg ?? 0;
+			const display = ctx.lastWeight + lastBw;
+			return `${fmtNum(display)} kg × ${ctx.lastReps}`;
 		}
 		return 'never';
 	}
@@ -680,14 +721,69 @@
 			</section>
 		{/if}
 	{:else}
+		{#if isBodyweight}
+			<!--
+				Hero card on bodyweight equipment: the read-only headline
+				answers "what am I about to log?" without making the user
+				decode the stepper's "0 kg" as anything but their hands. The
+				Stepper below stays as the optional adjuster for belt-loaded
+				or band-assisted reps.
+			-->
+			<section
+				class="mt-4 flex flex-col gap-1 rounded-2xl border p-4"
+				style="background: linear-gradient(var(--color-amber-dim), var(--color-amber-dim)), var(--color-surface); border-color: var(--color-amber-line);"
+			>
+				<div
+					class="text-[10px] font-bold tracking-[0.16em] uppercase"
+					style="color: var(--color-amber);"
+				>
+					Effective load
+				</div>
+				{#if data.bodyWeightKg != null && eq.bodyweightPct != null}
+					<div class="flex items-baseline gap-2 tabular-nums" style="color: var(--color-text);">
+						<span class="text-[36px] font-bold tracking-[-0.03em]">
+							{(weight + bwLoadKg).toFixed(1)}
+						</span>
+						<span class="text-[14px]" style="color: var(--color-text-dim);">kg</span>
+						<span class="text-[20px]" style="color: var(--color-text-dim);">×</span>
+						<span class="text-[28px] font-bold tracking-[-0.02em]">{reps}</span>
+					</div>
+					<div class="text-[12px]" style="color: var(--color-text-dim);">
+						{#if weight === 0}
+							bodyweight only
+							<span style="color: var(--color-text-dim-2);">
+								· {bwLoadKg.toFixed(1)} kg per rep
+							</span>
+						{:else if weight > 0}
+							bodyweight {bwLoadKg.toFixed(1)} kg
+							<span style="color: var(--color-text-dim-2);">+ {fmtNum(weight)} kg added</span>
+						{:else}
+							bodyweight {bwLoadKg.toFixed(1)} kg
+							<span style="color: var(--color-text-dim-2);">
+								− {fmtNum(Math.abs(weight))} kg assisted
+							</span>
+						{/if}
+					</div>
+				{:else}
+					<div class="text-[14px]" style="color: var(--color-text);">
+						<a href="/profile" style="color: var(--color-amber); font-weight: 600;">
+							Set your body weight
+						</a>
+						in your profile to track effective load.
+					</div>
+				{/if}
+			</section>
+		{/if}
+
 		<section class="mt-4">
 			<Stepper
 				value={weight}
 				onChange={(v) => (weight = v)}
 				step={2.5}
-				label="WEIGHT"
+				min={isBodyweight ? -80 : 0}
+				label={isBodyweight ? 'ADDED WEIGHT' : 'WEIGHT'}
 				unit="kg"
-				hint="Tap +/− for 2.5 kg · hold to scroll"
+				hint={isBodyweight ? 'Negative for assisted (band)' : 'Tap +/− for 2.5 kg · hold to scroll'}
 			/>
 		</section>
 
@@ -825,6 +921,7 @@
 							index={i}
 							weight={s.weight ?? 0}
 							reps={s.reps ?? 0}
+							bwLoadKg={typeof s.extras?.bwLoadKg === 'number' ? s.extras.bwLoadKg : 0}
 							isLatest={i === sessionSetsForExercise.length - 1}
 							pending={s.pending}
 							onClone={() => handleClone(s)}

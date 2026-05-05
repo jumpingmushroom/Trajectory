@@ -28,6 +28,11 @@ export const user = sqliteTable('user', {
 	banned: integer('banned', { mode: 'boolean' }).default(false).notNull(),
 	banReason: text('ban_reason'),
 	banExpires: integer('ban_expires', { mode: 'timestamp_ms' }),
+	// User's current body weight in kg. Used to compute effective load for
+	// equipment flagged as `bodyweightPct != null` (captain's chair, pull-up
+	// bar, etc.). Nullable: when null, bodyweight sets log without an
+	// effective-load snapshot.
+	bodyWeightKg: real('body_weight_kg'),
 	createdAt: integer('created_at', { mode: 'timestamp_ms' })
 		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 		.notNull(),
@@ -188,6 +193,13 @@ export const equipment = sqliteTable(
 		// notes: free text, shared across users (it's a fact about the
 		// machine, not the lifter). Surfaced on the Detail screen.
 		notes: text('notes'),
+		// bodyweightPct: when non-null, the equipment loads with the user's
+		// own body weight. The stored decimal (0..2) is multiplied by the
+		// user's `bodyWeightKg` to compute the effective per-rep load — added
+		// to (or subtracted from, when assisted) any external `set.weight`.
+		// Defaults seeded from the glyph kind (e.g. captain's chair → 0.33,
+		// pull-up bar → 1.0); user-overridable per equipment.
+		bodyweightPct: real('bodyweight_pct'),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' })
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull(),

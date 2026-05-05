@@ -9,6 +9,7 @@
 		index,
 		weight,
 		reps,
+		bwLoadKg = 0,
 		isLatest,
 		pending = false,
 		onDelete,
@@ -18,6 +19,11 @@
 		index: number;
 		weight: number;
 		reps: number;
+		// Bodyweight contribution snapshotted at log time. When > 0 the row
+		// renders effective load (weight + bwLoadKg) as the headline number
+		// and shows the breakdown as a subtitle. Defaults to 0 so non-
+		// bodyweight equipment renders exactly as before.
+		bwLoadKg?: number;
 		isLatest: boolean;
 		pending?: boolean;
 		onDelete: () => void;
@@ -29,7 +35,21 @@
 		return Number.isInteger(n) ? String(n) : n.toFixed(1);
 	}
 
-	const volume = $derived(Math.round(weight * reps));
+	const isBodyweight = $derived(bwLoadKg > 0);
+	const effective = $derived(weight + bwLoadKg);
+	const volume = $derived(Math.round(effective * reps));
+
+	// Breakdown subtitle for bodyweight rows. Three flavours:
+	//   weight === 0: "bodyweight only" (cleanest reading for a pure
+	//                  unweighted set, no algebra noise).
+	//   weight > 0:   "5 + 32.0 bw" (added load + bodyweight contribution).
+	//   weight < 0:   "−15 + 32.0 bw" (band-assisted; minus sign explicit).
+	const breakdown = $derived.by(() => {
+		if (!isBodyweight) return '';
+		if (weight === 0) return 'bodyweight only';
+		const sign = weight < 0 ? '−' : '';
+		return `${sign}${fmt(Math.abs(weight))} + ${fmt(bwLoadKg)} bw`;
+	});
 
 	let editing = $state(false);
 	let editWeight = $state(weight);
@@ -46,7 +66,10 @@
 			editing = false;
 			return;
 		}
-		const w = Math.max(0, Number(editWeight) || 0);
+		// Bodyweight equipment allows negative (assisted) added weight.
+		// Non-bodyweight stays clamped at zero.
+		const raw = Number(editWeight) || 0;
+		const w = isBodyweight ? raw : Math.max(0, raw);
 		const r = Math.max(0, Math.round(Number(editReps) || 0));
 		if (w !== weight || r !== reps) onEdit(w, r);
 		editing = false;
@@ -122,11 +145,11 @@
 					type="number"
 					inputmode="decimal"
 					step="0.5"
-					min="0"
+					min={isBodyweight ? -200 : 0}
 					bind:value={editWeight}
 					class="w-16 rounded-md border px-2 py-1 text-right font-semibold tabular-nums"
 					style="background: var(--color-surface-3); border-color: var(--color-line-2); color: var(--color-text);"
-					aria-label="Weight in kg"
+					aria-label={isBodyweight ? 'Added weight in kg' : 'Weight in kg'}
 				/>
 				<span class="text-[11px]" style="color: var(--color-text-dim-2);">kg ×</span>
 				<input
@@ -159,16 +182,21 @@
 		{:else}
 			<button
 				type="button"
-				class="flex flex-1 items-baseline gap-2 text-left text-[15px]"
+				class="flex flex-1 flex-col items-start text-left"
 				style="color: var(--color-text);"
 				onclick={startEdit}
 				disabled={pending || !onEdit}
 				aria-label="Edit set"
 			>
-				<span class="font-semibold">{fmt(weight)}</span>
-				<span class="text-[11px]" style="color: var(--color-text-dim-2);">kg</span>
-				<span style="color: var(--color-text-dim-2);">×</span>
-				<span class="font-semibold">{reps}</span>
+				<span class="flex items-baseline gap-2 text-[15px]">
+					<span class="font-semibold">{fmt(isBodyweight ? effective : weight)}</span>
+					<span class="text-[11px]" style="color: var(--color-text-dim-2);">kg</span>
+					<span style="color: var(--color-text-dim-2);">×</span>
+					<span class="font-semibold">{reps}</span>
+				</span>
+				{#if isBodyweight}
+					<span class="text-[10px]" style="color: var(--color-text-dim-2);">{breakdown}</span>
+				{/if}
 			</button>
 			{#if pending}
 				<span

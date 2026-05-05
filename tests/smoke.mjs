@@ -329,6 +329,173 @@ async function main() {
 		`blocked with 4xx (got ${blockedUndo.status})`
 	);
 
+	// 16. Bodyweight equipment: round-trip pct on equipment.update, and
+	// confirm strength sets accept the bwLoadKg/bwKg/bwPct extras snapshot.
+	console.log('step 16 — bodyweight pct round-trip + extras snapshot');
+	const bwEqId = ulid();
+	const bwCreate = await mutate('equipment.create', {
+		id: bwEqId,
+		gymId,
+		name: 'Smoke Captains Chair',
+		type: 'machine',
+		group: 'core',
+		glyph: 'captainschair',
+		bodyweightPct: 0.33
+	});
+	const bwExId = bwCreate?.result?.hiddenExercise?.id;
+	assert(typeof bwExId === 'string', 'auto-hidden exercise returned for bw equipment');
+	assert(
+		bwCreate?.result?.equipment?.bodyweightPct === 0.33,
+		`equipment.create stores bodyweightPct (got ${bwCreate?.result?.equipment?.bodyweightPct})`
+	);
+
+	const bwSetId = ulid();
+	const bwSet = await mutate('set.create', {
+		id: bwSetId,
+		exerciseId: bwExId,
+		weight: 0,
+		reps: 8,
+		extras: { bwLoadKg: 26.4, bwKg: 80, bwPct: 0.33 },
+		ts: Date.now() + 200
+	});
+	const bwSetRow = bwSet?.result?.set;
+	assert(bwSetRow?.weight === 0, 'bodyweight set stored weight=0');
+	assert(
+		bwSetRow?.extras?.bwLoadKg === 26.4 &&
+			bwSetRow?.extras?.bwKg === 80 &&
+			bwSetRow?.extras?.bwPct === 0.33,
+		'set.create snapshots bw extras'
+	);
+
+	const bwAssistedId = ulid();
+	const bwAssisted = await mutate('set.create', {
+		id: bwAssistedId,
+		exerciseId: bwExId,
+		weight: -10,
+		reps: 5,
+		extras: { bwLoadKg: 26.4, bwKg: 80, bwPct: 0.33 },
+		ts: Date.now() + 250
+	});
+	assert(
+		bwAssisted?.result?.set?.weight === -10,
+		'bodyweight equipment accepts negative (assisted) weight'
+	);
+
+	// Reject path: a regular (non-bodyweight) strength set must not accept
+	// bw-flavoured extras — they'd silently corrupt volume on stats.
+	const rejectExtras = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: ulid(),
+			op: 'set.create',
+			payload: {
+				id: ulid(),
+				exerciseId,
+				weight: 60,
+				reps: 8,
+				extras: { bwLoadKg: 30 },
+				ts: Date.now() + 260
+			}
+		})
+	});
+	assert(!rejectExtras.ok, 'extras on non-bw equipment rejected');
+	assert(
+		rejectExtras.status >= 400 && rejectExtras.status < 500,
+		`bw-extras-on-loaded-equipment rejected with 4xx (got ${rejectExtras.status})`
+	);
+
+	const rejectNeg = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: ulid(),
+			op: 'set.create',
+			payload: {
+				id: ulid(),
+				exerciseId,
+				weight: -5,
+				reps: 8,
+				ts: Date.now() + 270
+			}
+		})
+	});
+	assert(!rejectNeg.ok, 'negative weight on non-bw equipment rejected');
+
+	const updatePct = await mutate('equipment.update', {
+		id: bwEqId,
+		bodyweightPct: 0.4
+	});
+	assert(
+		updatePct?.result?.bodyweightPct === 0.4,
+		`equipment.update round-trips bodyweightPct (got ${updatePct?.result?.bodyweightPct})`
+	);
+
+	// Clearing a pct happens on a fresh equipment with no logged sets — a
+	// machine that already has assisted (negative-weight) sets shouldn't
+	// drop the bodyweight flag, since that would leave the sets stranded
+	// in an invalid state for the log screen.
+	const clearEqId = ulid();
+	await mutate('equipment.create', {
+		id: clearEqId,
+		gymId,
+		name: 'Smoke Toggle BW',
+		type: 'machine',
+		group: 'core',
+		glyph: 'captainschair',
+		bodyweightPct: 0.5
+	});
+	const clearPct = await mutate('equipment.update', { id: clearEqId, bodyweightPct: null });
+	assert(
+		clearPct?.result?.bodyweightPct === null,
+		`equipment.update can clear bodyweightPct (got ${clearPct?.result?.bodyweightPct})`
+	);
+
+	// 17. user.update accepts/clears bodyWeightKg, with range validation.
+	console.log('step 17 — user.update bodyWeightKg');
+	const setBw = await mutate('user.update', { bodyWeightKg: 80 });
+	assert(setBw?.result?.bodyWeightKg === 80, 'user.update sets bodyWeightKg');
+
+	// CSV faithfully preserves both halves of a bodyweight set: the raw
+	// added weight in the `weightKg` column and the bw snapshot in the
+	// `otherExtrasJson` column. Display layers can recombine them; the
+	// export must not flatten one into the other.
+	console.log('step 17b — CSV export preserves bw fields');
+	const csvBwRes = await call('/api/export.csv');
+	assert(csvBwRes.status === 200, `csv → 200 (got ${csvBwRes.status})`);
+	const csvBw = await csvBwRes.text();
+	const bwLine = csvBw.split('\n').find((l) => l.startsWith(bwSetId));
+	assert(typeof bwLine === 'string', 'bw set row present in CSV');
+	const bwCells = bwLine.split(',');
+	assert(bwCells[14] === '0', `bw set CSV weight column = 0 (got ${bwCells[14]})`);
+	// otherExtrasJson is column 20 but contains commas inside the JSON;
+	// rejoin from cell 20 to penultimate cell (last is ts).
+	const bwExtrasJsonCsv = bwCells.slice(20, -1).join(',').replace(/^"|"$/g, '').replace(/""/g, '"');
+	assert(
+		bwExtrasJsonCsv.includes('"bwLoadKg":26.4') &&
+			bwExtrasJsonCsv.includes('"bwKg":80') &&
+			bwExtrasJsonCsv.includes('"bwPct":0.33'),
+		`bw set CSV otherExtrasJson carries snapshot (got ${bwExtrasJsonCsv})`
+	);
+
+	const clearBw = await mutate('user.update', { bodyWeightKg: null });
+	assert(clearBw?.result?.bodyWeightKg === null, 'user.update clears bodyWeightKg');
+
+	const oobBw = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: ulid(),
+			op: 'user.update',
+			payload: { bodyWeightKg: 1000 }
+		})
+	});
+	assert(!oobBw.ok, 'out-of-range bodyWeightKg rejected');
+	assert(
+		oobBw.status >= 400 && oobBw.status < 500,
+		`bodyWeightKg=1000 rejected with 4xx (got ${oobBw.status})`
+	);
+
 	console.log('\nall smoke checks passed');
 }
 

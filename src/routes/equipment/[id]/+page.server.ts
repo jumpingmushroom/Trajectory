@@ -1,8 +1,9 @@
 import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { equipment, exercise, gym, set as setTable } from '$lib/server/db/schema';
+import { equipment, exercise, gym, set as setTable, user } from '$lib/server/db/schema';
 import { isNull, eq, and, asc, inArray } from 'drizzle-orm';
+import { effectiveSetLoad } from '$lib/server/db/effective-load';
 
 export const load: PageServerLoad = async ({ locals, params }) => {
 	if (!locals.user) throw redirect(303, '/login');
@@ -23,6 +24,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 				cardioKind: equipment.cardioKind,
 				sortOrder: equipment.sortOrder,
 				notes: equipment.notes,
+				bodyweightPct: equipment.bodyweightPct,
 				createdAt: equipment.createdAt,
 				updatedAt: equipment.updatedAt,
 				deletedAt: equipment.deletedAt
@@ -57,6 +59,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 					weight: setTable.weight,
 					reps: setTable.reps,
 					durationMin: setTable.durationMin,
+					extras: setTable.extras,
 					ts: setTable.ts,
 					sessionId: setTable.workoutSessionId,
 					exerciseId: setTable.exerciseId
@@ -74,6 +77,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 				weight: number | null;
 				reps: number | null;
 				durationMin: number | null;
+				extras: Record<string, number> | null;
 				ts: Date;
 				sessionId: string;
 				exerciseId: string;
@@ -82,10 +86,12 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 
 	// Per-session top weight for the LineChart series. Cardio rows feed
 	// duration_min instead of weight so the chart still has a series.
+	// Strength rows on bodyweight equipment use effective load (added +
+	// bwLoadKg) so the chart reflects what the lifter actually lifted.
 	const isCardio = eqRow.type === 'cardio';
 	const perSession = new Map<string, { value: number; ts: number }>();
 	for (const s of sets) {
-		const v = isCardio ? (s.durationMin ?? 0) : (s.weight ?? 0);
+		const v = isCardio ? (s.durationMin ?? 0) : effectiveSetLoad(s);
 		if (v <= 0) continue;
 		const cur = perSession.get(s.sessionId);
 		if (!cur || v > cur.value) {
@@ -98,6 +104,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		.map((p) => p.value);
 
 	// Common weights: top 4 distinct weights ordered by recency (max ts).
+	// Keeps the user's typed value (added weight) since that's what the
+	// stepper round-trips on tap.
 	const recencyByWeight = new Map<number, number>();
 	for (const s of sets) {
 		if (s.weight == null || s.weight <= 0) continue;
@@ -111,12 +119,13 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		.map(([w]) => w)
 		.sort((a, b) => a - b);
 
-	// Meta tile values.
+	// Meta tile values. PR uses effective load on bodyweight equipment.
 	const sessionsCount = perSession.size;
 	const setsCount = sets.length;
 	const pr = sets.reduce<number | null>((best, s) => {
-		const v = s.weight;
-		if (v == null) return best;
+		if (s.weight == null && s.extras?.bwLoadKg == null) return best;
+		const v = effectiveSetLoad(s);
+		if (v <= 0) return best;
 		if (best == null || v > best) return v;
 		return best;
 	}, null);
@@ -125,6 +134,18 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	const dayMs = 24 * 60 * 60 * 1000;
 	const daysSinceLast =
 		lastSet == null ? null : Math.max(0, Math.floor((now - lastSet.ts.getTime()) / dayMs));
+
+	const profile = (
+		await db
+			.select({ bodyWeightKg: user.bodyWeightKg })
+			.from(user)
+			.where(eq(user.id, locals.user.id))
+			.limit(1)
+	)[0];
+
+	const lastBwLoadRaw = lastSet?.extras?.bwLoadKg;
+	const lastBwLoadKg =
+		typeof lastBwLoadRaw === 'number' && Number.isFinite(lastBwLoadRaw) ? lastBwLoadRaw : null;
 
 	return {
 		userId: locals.user.id,
@@ -138,6 +159,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		lastWeight: lastSet?.weight ?? null,
 		lastReps: lastSet?.reps ?? null,
 		lastDurationMin: lastSet?.durationMin ?? null,
-		daysSinceLast
+		lastBwLoadKg,
+		daysSinceLast,
+		bodyWeightKg: profile?.bodyWeightKg ?? null
 	};
 };

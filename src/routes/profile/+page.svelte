@@ -2,6 +2,8 @@
 	import { authClient } from '$lib/auth-client';
 	import { goto, invalidateAll } from '$app/navigation';
 	import PhotoCropper from '$lib/components/PhotoCropper.svelte';
+	import Stepper from '$lib/components/Stepper.svelte';
+	import { mutate } from '$lib/mutate';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -14,6 +16,28 @@
 	let pendingFile = $state<File | null>(null);
 	// Cache-bust the avatar URL when it just changed so the browser refetches.
 	let avatarVersion = $state(0);
+
+	// Body weight: null until the user opens the editor or sets a value.
+	// The 80 kg default seeds the stepper for first-time setup; saving with
+	// `null` clears it back to "not set".
+	let bwEditing = $state(false);
+	let bwValue = $state<number>(data.bodyWeightKg ?? 80);
+	let bwSaving = $state(false);
+	let bwError = $state<string | null>(null);
+
+	async function saveBodyWeight(next: number | null) {
+		bwError = null;
+		bwSaving = true;
+		try {
+			await mutate('user.update', { bodyWeightKg: next });
+			await invalidateAll();
+			bwEditing = false;
+		} catch (err) {
+			bwError = err instanceof Error ? err.message : 'Could not save body weight.';
+		} finally {
+			bwSaving = false;
+		}
+	}
 
 	async function handleSignOut() {
 		signingOut = true;
@@ -197,6 +221,77 @@
 		class="flex flex-col gap-3 rounded-2xl border p-4"
 		style="background: var(--color-surface); border-color: var(--color-line);"
 	>
+		<div class="flex items-start justify-between gap-3">
+			<span
+				class="text-[10px] font-bold tracking-[0.14em] uppercase"
+				style="color: var(--color-text-dim-2);"
+			>
+				Body weight
+			</span>
+			{#if !bwEditing}
+				<button
+					type="button"
+					onclick={() => {
+						bwValue = data.bodyWeightKg ?? 80;
+						bwEditing = true;
+					}}
+					class="text-[14px] tabular-nums"
+					style="color: var(--color-text);"
+				>
+					{data.bodyWeightKg != null ? `${data.bodyWeightKg.toFixed(1)} kg` : 'Set'}
+				</button>
+			{/if}
+		</div>
+		{#if bwEditing}
+			<Stepper
+				value={bwValue}
+				onChange={(n) => (bwValue = n)}
+				step={0.5}
+				min={30}
+				max={400}
+				label="BODY WEIGHT"
+				unit="kg"
+				hint="Used for bodyweight exercises"
+			/>
+			{#if bwError}
+				<div class="text-[11px]" style="color: #ff8080;">{bwError}</div>
+			{/if}
+			<div class="flex gap-2">
+				<button
+					type="button"
+					onclick={() => {
+						bwError = null;
+						bwEditing = false;
+					}}
+					disabled={bwSaving}
+					class="flex-1 rounded-full border py-2 text-[13px] disabled:opacity-50"
+					style="border-color: var(--color-line-2); color: var(--color-text-dim);"
+				>
+					Cancel
+				</button>
+				{#if data.bodyWeightKg != null}
+					<button
+						type="button"
+						onclick={() => saveBodyWeight(null)}
+						disabled={bwSaving}
+						class="flex-1 rounded-full border py-2 text-[13px] disabled:opacity-50"
+						style="border-color: var(--color-line-2); color: var(--color-text-dim);"
+					>
+						Clear
+					</button>
+				{/if}
+				<button
+					type="button"
+					onclick={() => saveBodyWeight(bwValue)}
+					disabled={bwSaving}
+					class="flex-[2] rounded-full py-2 text-[13px] font-bold disabled:opacity-50"
+					style="background: var(--color-amber); color: #1b0a00;"
+				>
+					{bwSaving ? 'Saving…' : 'Save'}
+				</button>
+			</div>
+		{/if}
+
 		<div class="flex items-center justify-between">
 			<span
 				class="text-[10px] font-bold tracking-[0.14em] uppercase"

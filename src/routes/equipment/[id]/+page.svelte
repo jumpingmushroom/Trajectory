@@ -24,6 +24,38 @@
 	let notesError = $state<string | null>(null);
 	let notesPristine = $derived(notesDraft === (eq.notes ?? ''));
 
+	// Bodyweight section: editing pct in % units (0..200) but persisted as
+	// decimal (0..2). Local state lives only while editing — re-hydrates
+	// from server state on close.
+	let bwEditing = $state(false);
+	let bwOn = $state(eq.bodyweightPct != null);
+	let bwPctPercent = $state<number>(Math.round((eq.bodyweightPct ?? 0) * 100) || 100);
+	let bwSaving = $state(false);
+	let bwError = $state<string | null>(null);
+
+	$effect(() => {
+		// Keep local toggle/value in sync if the server row changes
+		// (e.g. after invalidateAll on an unrelated mutation).
+		if (!bwEditing) {
+			bwOn = eq.bodyweightPct != null;
+			bwPctPercent = Math.round((eq.bodyweightPct ?? 0) * 100) || 100;
+		}
+	});
+
+	async function saveBodyweightPct() {
+		bwError = null;
+		bwSaving = true;
+		try {
+			const next = bwOn ? Math.max(0, Math.min(200, bwPctPercent)) / 100 : null;
+			await mutate('equipment.update', { id: eq.id, bodyweightPct: next });
+			bwEditing = false;
+		} catch (err) {
+			bwError = err instanceof Error ? err.message : 'Could not save body weight load.';
+		} finally {
+			bwSaving = false;
+		}
+	}
+
 	$effect(() => {
 		// Re-hydrate the textarea when navigating to a different equipment
 		// page (or when invalidateAll refreshes notes from the server after
@@ -69,7 +101,11 @@
 			return `${fmtNum(data.lastDurationMin)} min · ${ago}`;
 		}
 		if (data.lastWeight != null && data.lastReps != null) {
-			return `${fmtNum(data.lastWeight)} kg × ${data.lastReps} · ${ago}`;
+			// Effective load if the last set carried a bodyweight snapshot —
+			// keeps this label aligned with the per-set rows on the session
+			// page and the live preview on the log screen.
+			const display = data.lastWeight + (data.lastBwLoadKg ?? 0);
+			return `${fmtNum(display)} kg × ${data.lastReps} · ${ago}`;
 		}
 		return ago;
 	}
@@ -256,6 +292,107 @@
 					</span>
 				{/each}
 			</div>
+		</section>
+	{/if}
+
+	{#if !isCardio}
+		<section
+			class="mt-3 flex flex-col gap-2 rounded-2xl border p-4"
+			style="background: var(--color-surface); border-color: var(--color-line);"
+		>
+			<div class="flex items-baseline justify-between">
+				<div
+					class="text-[10px] font-bold tracking-[0.14em] uppercase"
+					style="color: var(--color-text-dim-2);"
+				>
+					Body weight load
+				</div>
+				{#if !bwEditing}
+					<button
+						type="button"
+						class="text-[12px]"
+						style="color: var(--color-text-dim);"
+						onclick={() => (bwEditing = true)}
+					>
+						Edit
+					</button>
+				{/if}
+			</div>
+
+			{#if !bwEditing}
+				<div class="text-[14px]" style="color: var(--color-text);">
+					{#if eq.bodyweightPct != null}
+						Adds {Math.round(eq.bodyweightPct * 100)}% of your body weight per rep
+						{#if data.bodyWeightKg != null}
+							<span style="color: var(--color-text-dim);"
+								>(~{(eq.bodyweightPct * data.bodyWeightKg).toFixed(1)} kg)</span
+							>
+						{/if}
+					{:else}
+						<span style="color: var(--color-text-dim);">Loaded externally only</span>
+					{/if}
+				</div>
+			{:else}
+				<label class="flex items-center gap-2 text-[14px]" style="color: var(--color-text);">
+					<input type="checkbox" bind:checked={bwOn} />
+					This equipment loads with body weight
+				</label>
+				{#if bwOn}
+					<label class="flex items-center justify-between gap-3">
+						<span class="text-[12px]" style="color: var(--color-text-dim);"
+							>Percentage of body weight</span
+						>
+						<input
+							type="number"
+							min="0"
+							max="200"
+							step="1"
+							bind:value={bwPctPercent}
+							class="w-24 rounded-lg border px-3 py-2 text-right text-[14px] tabular-nums outline-none"
+							style="background: var(--color-surface-2); border-color: var(--color-line-2); color: var(--color-text);"
+						/>
+					</label>
+					{#if data.bodyWeightKg != null}
+						<div class="text-[11px]" style="color: var(--color-text-dim-2);">
+							≈ {((Math.max(0, Math.min(200, bwPctPercent)) / 100) * data.bodyWeightKg).toFixed(1)}
+							kg per rep at {data.bodyWeightKg.toFixed(1)} kg
+						</div>
+					{:else}
+						<div class="text-[11px]" style="color: var(--color-text-dim-2);">
+							<a href="/profile" style="color: var(--color-amber);">Set your body weight</a> to see effective
+							load.
+						</div>
+					{/if}
+				{/if}
+				{#if bwError}
+					<div class="text-[11px]" style="color: #ff8080;">{bwError}</div>
+				{/if}
+				<div class="flex gap-2">
+					<button
+						type="button"
+						class="flex-1 rounded-full border py-2 text-[13px]"
+						style="border-color: var(--color-line-2); color: var(--color-text-dim);"
+						onclick={() => {
+							bwError = null;
+							bwEditing = false;
+							bwOn = eq.bodyweightPct != null;
+							bwPctPercent = Math.round((eq.bodyweightPct ?? 0) * 100) || 100;
+						}}
+						disabled={bwSaving}
+					>
+						Cancel
+					</button>
+					<button
+						type="button"
+						class="flex-[2] rounded-full py-2 text-[13px] font-bold disabled:opacity-50"
+						style="background: var(--color-amber); color: #1b0a00;"
+						onclick={saveBodyweightPct}
+						disabled={bwSaving}
+					>
+						{bwSaving ? 'Saving…' : 'Save'}
+					</button>
+				</div>
+			{/if}
 		</section>
 	{/if}
 

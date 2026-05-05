@@ -51,7 +51,10 @@ export interface GlyphMeta {
 	// Applied when the glyph is picked in add mode. `group` omitted when
 	// the glyph is multi-use (free-weight bars, ropes, foam roller, generic)
 	// — the previous group selection is preserved instead of clobbered.
-	defaults: { type: EquipmentType; group?: MuscleGroup };
+	// `bodyweightPct` (0..1) seeds equipment.bodyweightPct so the log screen
+	// adds the user's body weight × pct to set.weight. Omitted (or 0) means
+	// the equipment is loaded externally only.
+	defaults: { type: EquipmentType; group?: MuscleGroup; bodyweightPct?: number };
 }
 
 // Order here is the order glyphs appear within their category in the
@@ -77,7 +80,8 @@ export const GLYPHS: GlyphMeta[] = [
 		label: 'Dip Station',
 		category: 'push',
 		aliases: ['dip', 'dips', 'parallel bars'],
-		defaults: { type: 'freeweight', group: 'push' }
+		// Whole body suspended on the arms ≈ 100% body weight per rep.
+		defaults: { type: 'freeweight', group: 'push', bodyweightPct: 1.0 }
 	},
 	{
 		kind: 'cablecrossover',
@@ -114,7 +118,8 @@ export const GLYPHS: GlyphMeta[] = [
 		label: 'Pull-Up Bar',
 		category: 'pull',
 		aliases: ['pull-up', 'pullup', 'pull up', 'chin-up', 'chinup'],
-		defaults: { type: 'freeweight', group: 'pull' }
+		// Whole body hangs from the bar ≈ 100% body weight per rep.
+		defaults: { type: 'freeweight', group: 'pull', bodyweightPct: 1.0 }
 	},
 	{
 		kind: 'preacher',
@@ -181,7 +186,10 @@ export const GLYPHS: GlyphMeta[] = [
 		label: "Captain's Chair",
 		category: 'core',
 		aliases: ["captain's chair", 'captains chair', 'leg raise', 'abs'],
-		defaults: { type: 'machine', group: 'core' }
+		// Both legs ≈ 33% of body weight (Dempster body-segment data). The
+		// trunk + arms (~67%) are supported by the pads, so they don't load
+		// the rep — only the legs do.
+		defaults: { type: 'machine', group: 'core', bodyweightPct: 0.33 }
 	},
 	{
 		kind: 'abwheel',
@@ -195,7 +203,8 @@ export const GLYPHS: GlyphMeta[] = [
 		label: 'Hyperextension',
 		category: 'core',
 		aliases: ['hyperextension', 'back extension', 'roman chair', 'glute ham'],
-		defaults: { type: 'machine', group: 'core' }
+		// Trunk + head + arms above the pivot ≈ 60% of body weight.
+		defaults: { type: 'machine', group: 'core', bodyweightPct: 0.6 }
 	},
 
 	// freeweight
@@ -327,12 +336,12 @@ export const CATEGORY_LABEL: Record<GlyphCategory, string> = {
 // Derived for back-compat with any consumer that just wants the kinds.
 export const GLYPH_KINDS: GlyphKind[] = GLYPHS.map((g) => g.kind);
 
-const DEFAULTS_BY_KIND: Record<GlyphKind, { type: EquipmentType; group?: MuscleGroup }> =
-	Object.fromEntries(GLYPHS.map((g) => [g.kind, g.defaults])) as Record<
-		GlyphKind,
-		{ type: EquipmentType; group?: MuscleGroup }
-	>;
+type GlyphDefaults = { type: EquipmentType; group?: MuscleGroup; bodyweightPct?: number };
 
-export function defaultsForGlyph(kind: GlyphKind): { type: EquipmentType; group?: MuscleGroup } {
+const DEFAULTS_BY_KIND: Record<GlyphKind, GlyphDefaults> = Object.fromEntries(
+	GLYPHS.map((g) => [g.kind, g.defaults])
+) as Record<GlyphKind, GlyphDefaults>;
+
+export function defaultsForGlyph(kind: GlyphKind): GlyphDefaults {
 	return DEFAULTS_BY_KIND[kind];
 }

@@ -10,6 +10,7 @@ import {
 	type Equipment
 } from '$lib/server/db/schema';
 import { isNull, eq, and, asc } from 'drizzle-orm';
+import { effectiveSetLoad } from '$lib/server/db/effective-load';
 
 export interface SessionDetailEquipmentBlock {
 	equipment: Pick<Equipment, 'id' | 'name' | 'type' | 'glyph' | 'tint' | 'cardioKind'>;
@@ -114,7 +115,11 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	}
 
 	const totalVolume = sets.reduce(
-		(a, s) => a + (s.weight != null && s.reps != null ? s.weight * s.reps : 0),
+		(a, s) =>
+			a +
+			(s.reps != null && (s.weight != null || s.extras?.bwLoadKg != null)
+				? effectiveSetLoad(s) * s.reps
+				: 0),
 		0
 	);
 	const lastTs = sets.length > 0 ? sets[sets.length - 1].ts.getTime() : null;

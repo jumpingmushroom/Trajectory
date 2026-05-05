@@ -341,19 +341,32 @@
 									{/each}
 								</div>
 							{:else}
-								<div
-									class="flex flex-1 items-baseline gap-2 text-[13px]"
-									style="color: var(--color-text);"
-								>
-									{#if !set.exerciseIsHidden && set.exerciseName !== block.equipment.name}
-										<span class="text-[10px]" style="color: var(--color-text-dim);">
-											{set.exerciseName}
+								{@const bwLoad =
+									typeof set.extras?.bwLoadKg === 'number' && Number.isFinite(set.extras.bwLoadKg)
+										? set.extras.bwLoadKg
+										: 0}
+								{@const isBw = bwLoad > 0}
+								{@const w = set.weight ?? 0}
+								{@const display = isBw ? w + bwLoad : w}
+								<div class="flex flex-1 flex-col text-[13px]" style="color: var(--color-text);">
+									<span class="flex items-baseline gap-2">
+										{#if !set.exerciseIsHidden && set.exerciseName !== block.equipment.name}
+											<span class="text-[10px]" style="color: var(--color-text-dim);">
+												{set.exerciseName}
+											</span>
+										{/if}
+										<span class="font-semibold">{fmtNum(display)}</span>
+										<span class="text-[10px]" style="color: var(--color-text-dim-2);">kg</span>
+										<span style="color: var(--color-text-dim-2);">×</span>
+										<span class="font-semibold">{set.reps ?? '—'}</span>
+									</span>
+									{#if isBw}
+										<span class="text-[10px]" style="color: var(--color-text-dim-2);">
+											{w === 0
+												? 'bodyweight only'
+												: `${w < 0 ? '−' : ''}${fmtNum(Math.abs(w))} + ${fmtNum(bwLoad)} bw`}
 										</span>
 									{/if}
-									<span class="font-semibold">{fmtNum(set.weight)}</span>
-									<span class="text-[10px]" style="color: var(--color-text-dim-2);">kg</span>
-									<span style="color: var(--color-text-dim-2);">×</span>
-									<span class="font-semibold">{set.reps ?? '—'}</span>
 								</div>
 							{/if}
 							<div class="text-[10px]" style="color: var(--color-text-dim-2);">
