@@ -468,7 +468,9 @@
 									</div>
 									<span
 										class="line-clamp-2 text-center text-[10px] leading-tight"
-										style="color: {glyph === g.kind ? 'var(--color-amber)' : 'var(--color-text-dim)'};"
+										style="color: {glyph === g.kind
+											? 'var(--color-amber)'
+											: 'var(--color-text-dim)'};"
 									>
 										{g.label}
 									</span>
@@ -505,7 +507,9 @@
 							</div>
 							<span
 								class="line-clamp-2 text-center text-[10px] leading-tight"
-								style="color: {glyph === 'generic' ? 'var(--color-amber)' : 'var(--color-text-dim)'};"
+								style="color: {glyph === 'generic'
+									? 'var(--color-amber)'
+									: 'var(--color-text-dim)'};"
 							>
 								Generic
 							</span>
@@ -671,8 +675,8 @@
 							: 'var(--color-surface-2)'}; border-color: {inputMode === m
 							? 'var(--color-amber-line)'
 							: 'var(--color-line-2)'}; color: {inputMode === m
-								? 'var(--color-amber)'
-								: 'var(--color-text)'};"
+							? 'var(--color-amber)'
+							: 'var(--color-text)'};"
 						onclick={() => (inputMode = m)}
 						aria-pressed={inputMode === m}
 					>

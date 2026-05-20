@@ -189,10 +189,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 					if (prValue == null || d > prValue) prValue = d;
 				}
 			}
-		} else if (
-			eqRow.inputMode === 'timed_weighted' ||
-			eqRow.inputMode === 'weight_distance'
-		) {
+		} else if (eqRow.inputMode === 'timed_weighted' || eqRow.inputMode === 'weight_distance') {
 			for (const s of own) {
 				const w = s.weight;
 				if (typeof w === 'number' && Number.isFinite(w) && w > 0) {

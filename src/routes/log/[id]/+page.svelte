@@ -12,12 +12,7 @@
 	import { holdRepeat } from '$lib/actions/holdRepeat';
 	import type { GlyphKind } from '$lib/components/glyph-kinds';
 	import { fieldsFor, type CardioField } from '$lib/cardio-templates';
-	import {
-		MODE_SHAPE,
-		MODE_LABEL,
-		formatDurationMinAsClock,
-		type InputMode
-	} from '$lib/input-modes';
+	import { MODE_LABEL, formatDurationMinAsClock, type InputMode } from '$lib/input-modes';
 	import { syncStatus } from '$lib/sync/status';
 	import { pushToast } from '$lib/stores/toast';
 	import { tsForBackdate, withDateMode } from '$lib/dateMode';
@@ -50,10 +45,8 @@
 		eq.photoPath ? `/uploads/${eq.photoPath}?v=${eq.updatedAt.getTime()}` : null
 	);
 	const mode = $derived((eq.inputMode ?? 'weighted') as InputMode);
-	const shape = $derived(MODE_SHAPE[mode]);
 	const isCardio = $derived(mode === 'distance_time');
 	const isTimed = $derived(mode === 'timed' || mode === 'timed_weighted');
-	const isCarry = $derived(mode === 'weight_distance');
 	const isStrengthMode = $derived(mode === 'weighted' || mode === 'bodyweight');
 	const cardioFields = $derived<CardioField[]>(isCardio ? fieldsFor(eq.cardioKind) : []);
 	const isBodyweight = $derived(mode === 'bodyweight');

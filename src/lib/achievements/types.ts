@@ -3,14 +3,7 @@
 // predicate live in src/lib/server/achievements/evaluator.ts.
 
 export type CardioKind = 'treadmill' | 'bike' | 'rower' | 'generic';
-export type MuscleGroup =
-	| 'push'
-	| 'pull'
-	| 'legs'
-	| 'core'
-	| 'arms'
-	| 'shoulders'
-	| 'glutes';
+export type MuscleGroup = 'push' | 'pull' | 'legs' | 'core' | 'arms' | 'shoulders' | 'glutes';
 
 export type AchievementTrigger = 'set.created' | 'session.ended';
 
