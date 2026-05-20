@@ -88,7 +88,6 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 	// Per-session top value for the LineChart series. The axis follows the
 	// equipment's inputMode: cardio + timed plot duration; weight_distance
 	// plots distance; everything else plots effective load (weight + bw).
-	const isCardio = eqRow.type === 'cardio';
 	const perSession = new Map<string, { value: number; ts: number }>();
 	for (const s of sets) {
 		// Chart axis follows the equipment's PR axis (see evaluatePr in

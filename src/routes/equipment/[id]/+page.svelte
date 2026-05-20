@@ -15,8 +15,6 @@
 	const eq = $derived(data.equipment);
 	const isCardio = $derived(eq.type === 'cardio');
 	const mode = $derived(eq.inputMode ?? 'weighted');
-	const isTimedMode = $derived(mode === 'timed' || mode === 'timed_weighted');
-	const isCarryMode = $derived(mode === 'weight_distance');
 	// Display unit for the LineChart axis. Cardio + timed plot minutes;
 	// everything else (including weight_distance carries and timed_weighted
 	// holds) plots kg, matching the PR axis chosen in evaluatePr.
@@ -156,9 +154,7 @@
 				if (data.pr == null) return '—';
 				if (mode === 'timed') return fmtClock(data.pr);
 				if (mode === 'distance_time') {
-					return eq.cardioKind === 'rower'
-						? `${fmtNum(data.pr)} m`
-						: `${fmtNum(data.pr)} km`;
+					return eq.cardioKind === 'rower' ? `${fmtNum(data.pr)} m` : `${fmtNum(data.pr)} km`;
 				}
 				// weighted | bodyweight | timed_weighted | weight_distance
 				return `${fmtNum(data.pr)} kg`;
