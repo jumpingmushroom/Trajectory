@@ -8,7 +8,11 @@ import { db } from '$lib/server/db';
 import { achievement } from '$lib/server/db/schema';
 import { and, eq, isNull, asc } from 'drizzle-orm';
 
-export const load: LayoutServerLoad = async ({ locals }) => {
+export const load: LayoutServerLoad = async ({ locals, depends }) => {
+	// Tag the load so <AchievementHost /> can re-run *just* this query via
+	// invalidate('app:achievements') after a successful seen-ack, instead
+	// of an invalidateAll().
+	depends('app:achievements');
 	if (!locals.user) {
 		return { achievementQueue: [], isAdmin: false };
 	}
