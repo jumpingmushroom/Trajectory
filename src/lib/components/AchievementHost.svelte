@@ -8,6 +8,7 @@
 	// next queue drain + invalidateAll().
 
 	import { page } from '$app/stores';
+	import { invalidate } from '$app/navigation';
 	import { achievementQueue, type QueuedAchievement } from '$lib/stores/achievementQueue';
 	import { BADGE_BY_KEY } from '$lib/achievements/definitions';
 
@@ -30,11 +31,21 @@
 	async function dismiss() {
 		if (!head || dismissing) return;
 		dismissing = true;
+		let acked = false;
 		try {
-			await fetch(`/api/achievement/${head.id}/seen`, { method: 'POST' });
+			const res = await fetch(`/api/achievement/${head.id}/seen`, { method: 'POST' });
+			acked = res.ok;
 		} catch {
-			// Network down — best effort. The next layout reload will pick
-			// up the still-unread row and re-pop. Acceptable.
+			// Network down — fall through. The dismissed-set guard in the
+			// store keeps this badge from re-popping in the current tab; the
+			// next online session will re-query the server and either find
+			// seenAt already set or get a chance to ack it again.
+		}
+		// Re-run the layout query so other tabs / future renders pick up
+		// the now-acked row. Skip if the POST failed — there's nothing new
+		// to fetch and the guard is doing the work.
+		if (acked) {
+			await invalidate('app:achievements');
 		}
 		achievementQueue.consume(head.id);
 		dismissing = false;
