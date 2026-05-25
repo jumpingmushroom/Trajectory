@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
+	import { invalidateAll } from '$app/navigation';
 	import EquipmentTile from '$lib/components/EquipmentTile.svelte';
 	import GymChip from '$lib/components/GymChip.svelte';
 	import GymSheet from '$lib/components/GymSheet.svelte';
@@ -176,6 +177,72 @@
 
 	const undoRemainingMs = $derived(undoUntil == null ? 0 : Math.max(0, undoUntil - undoNow));
 
+	// Combine-with-previous prompt. Shown when the home loader reports a
+	// session this user closed within the last SESSION_EXTEND_MS at the
+	// active gym and they have no open session yet. Reopens the prior
+	// session via session.endUndo — the same op that powers the 10s undo
+	// toast above. Dismissal is per-session-id and persisted to
+	// localStorage so reloads + new tabs don't re-nag.
+	const COMBINE_DISMISS_KEY_PREFIX = 'trajectory.combineDismissed.';
+	let combineDismissed = $state(false);
+	let combining = $state(false);
+	let combineError = $state<string | null>(null);
+
+	function isCombineDismissed(id: string): boolean {
+		if (typeof localStorage === 'undefined') return false;
+		try {
+			return localStorage.getItem(COMBINE_DISMISS_KEY_PREFIX + id) === '1';
+		} catch {
+			return false;
+		}
+	}
+
+	$effect(() => {
+		const id = data.recentlyEnded?.id;
+		combineDismissed = id ? isCombineDismissed(id) : false;
+	});
+
+	const showCombinePrompt = $derived(
+		data.asOfTs == null &&
+			data.activeSession == null &&
+			data.recentlyEnded != null &&
+			!combineDismissed
+	);
+
+	const recentlyEndedMinutesAgo = $derived(
+		data.recentlyEnded
+			? Math.max(0, Math.round((Date.now() - data.recentlyEnded.endedAt) / 60_000))
+			: 0
+	);
+
+	async function handleContinuePrevious() {
+		const target = data.recentlyEnded;
+		if (!target || combining) return;
+		combining = true;
+		combineError = null;
+		try {
+			await mutate('session.endUndo', { id: target.id });
+			await invalidateAll();
+		} catch (err) {
+			combineError = err instanceof Error ? err.message : 'Could not continue previous session.';
+		} finally {
+			combining = false;
+		}
+	}
+
+	function handleStartNew() {
+		const target = data.recentlyEnded;
+		if (!target) return;
+		if (typeof localStorage !== 'undefined') {
+			try {
+				localStorage.setItem(COMBINE_DISMISS_KEY_PREFIX + target.id, '1');
+			} catch {
+				/* localStorage unavailable; banner hides for this tab via state below */
+			}
+		}
+		combineDismissed = true;
+	}
+
 	type Filter = 'all' | 'push' | 'pull' | 'legs' | 'core' | 'cardio';
 	const filters: { id: Filter; label: string }[] = [
 		{ id: 'all', label: 'All' },
@@ -260,7 +327,44 @@
 		<InstallPrompt />
 	</div>
 
-	{#if asOfTs == null && data.activeSession == null && data.tiles.length > 0}
+	{#if showCombinePrompt && data.recentlyEnded}
+		<section
+			class="mt-3 flex flex-col gap-2 rounded-2xl border px-4 py-3"
+			style="background: var(--color-amber-dim); border-color: var(--color-amber-line);"
+			aria-live="polite"
+		>
+			<div class="text-[13px] font-semibold" style="color: var(--color-amber);">
+				Finished {recentlyEndedMinutesAgo} min ago — {data.recentlyEnded.setCount}
+				{data.recentlyEnded.setCount === 1 ? 'set' : 'sets'}
+			</div>
+			<div class="text-[12px]" style="color: var(--color-text-dim);">
+				Continue this session instead of starting a new one?
+			</div>
+			<div class="mt-1 flex gap-2">
+				<button
+					type="button"
+					class="flex-1 rounded-full px-3 py-2 text-[12px] font-bold disabled:opacity-60"
+					style="background: var(--color-amber); color: #1b0a00;"
+					disabled={combining}
+					onclick={handleContinuePrevious}
+				>
+					{combining ? 'Continuing…' : 'Continue previous'}
+				</button>
+				<button
+					type="button"
+					class="flex-1 rounded-full border px-3 py-2 text-[12px] font-semibold"
+					style="border-color: var(--color-line-2); color: var(--color-text-dim);"
+					disabled={combining}
+					onclick={handleStartNew}
+				>
+					Start new
+				</button>
+			</div>
+			{#if combineError}
+				<div class="text-[12px]" style="color: var(--color-text-dim);">{combineError}</div>
+			{/if}
+		</section>
+	{:else if asOfTs == null && data.activeSession == null && data.tiles.length > 0}
 		<button
 			type="button"
 			class="mt-3 flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[13px] font-bold disabled:opacity-60"

@@ -10,9 +10,10 @@ import {
 	type Equipment,
 	type Gym
 } from '$lib/server/db/schema';
-import { isNull, eq, and, desc, asc, gte, lt } from 'drizzle-orm';
+import { isNull, isNotNull, eq, and, desc, asc, gte, lt } from 'drizzle-orm';
 import { resolveActiveGym } from '$lib/server/active-gym';
 import { parseAsOfTs, startOfUtcDay, endOfUtcDay } from '$lib/dateMode';
+import { SESSION_EXTEND_MS } from '$lib/server/mutations';
 
 const SAFETY_MS = 6 * 60 * 60 * 1000;
 
@@ -148,6 +149,13 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 		lastEquipmentId: string | null;
 	} | null = null;
 
+	let recentlyEnded: {
+		id: string;
+		endedAt: number;
+		setCount: number;
+		durationMin: number;
+	} | null = null;
+
 	if (asOfTs == null) {
 		// Live mode: most-recent open session for this user.
 		const open = (
@@ -204,6 +212,47 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 				};
 			}
 		}
+
+		// When the user has no open session right now, check whether they
+		// closed one within the last SESSION_EXTEND_MS at the active gym. If
+		// so, surface it to the page so the UI can offer "Continue previous"
+		// before a brand-new session gets minted on the next set. The same
+		// 90-min window resolveSession() uses to extend an open session.
+		if (activeSession == null) {
+			const cutoff = new Date(Date.now() - SESSION_EXTEND_MS);
+			const justEnded = (
+				await db
+					.select()
+					.from(workoutSession)
+					.where(
+						and(
+							eq(workoutSession.userId, locals.user.id),
+							eq(workoutSession.gymId, activeGym.id),
+							isNotNull(workoutSession.endedAt),
+							gte(workoutSession.endedAt, cutoff)
+						)
+					)
+					.orderBy(desc(workoutSession.endedAt))
+					.limit(1)
+			)[0];
+
+			if (justEnded && justEnded.endedAt) {
+				const sets = (await db
+					.select({ ts: setTable.ts })
+					.from(setTable)
+					.where(and(eq(setTable.workoutSessionId, justEnded.id), isNull(setTable.deletedAt)))) as {
+					ts: Date;
+				}[];
+				const startedAtMs = justEnded.startedAt.getTime();
+				const endedAtMs = justEnded.endedAt.getTime();
+				recentlyEnded = {
+					id: justEnded.id,
+					endedAt: endedAtMs,
+					setCount: sets.length,
+					durationMin: Math.max(0, Math.round((endedAtMs - startedAtMs) / 60_000))
+				};
+			}
+		}
 	} else {
 		// Date-mode: look up *any* session (open or closed) for this user +
 		// active gym whose startedAt falls on the chosen calendar day.
@@ -254,6 +303,7 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 		tiles,
 		activeSession,
 		backdatedSession,
+		recentlyEnded,
 		asOfTs
 	};
 };

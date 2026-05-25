@@ -660,7 +660,7 @@ async function exerciseDelete(
 
 // ─── set handlers (with implicit session boundary) ─────────────────────
 
-const SESSION_EXTEND_MS = 90 * 60 * 1000;
+export const SESSION_EXTEND_MS = 90 * 60 * 1000;
 // Outer bound for an empty (zero-set) manually started session to attach
 // the next live set. Beyond this, the empty session is closed as a
 // 0-duration row and a fresh implicit session is created. Mirrors the
