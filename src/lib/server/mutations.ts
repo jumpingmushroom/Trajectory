@@ -423,6 +423,23 @@ async function equipmentCreate(
 		type === 'machine' || type === 'cable' || type === 'cardio' || AUTO_HIDDEN_MODES.has(inputMode);
 	if (autoHide) {
 		const hiddenId = derivedExerciseId(payload.id);
+		// derivedExerciseId is lossy (it rewrites the last ULID char), so two
+		// equipment ULIDs sharing their first 25 chars would map to the same
+		// hidden-exercise id. Without this guard the onConflictDoNothing below
+		// would silently no-op and the SELECT would hand back the *other*
+		// equipment's hidden exercise, attributing this equipment's sets to it.
+		// Refuse the collision loudly instead. (A replay of this same equipment
+		// resolves to the same id and is allowed through — that's idempotent.)
+		const existingHidden = (
+			await db
+				.select({ equipmentId: exercise.equipmentId })
+				.from(exercise)
+				.where(eq(exercise.id, hiddenId))
+				.limit(1)
+		)[0];
+		if (existingHidden && existingHidden.equipmentId !== payload.id) {
+			badRequest('equipment id collides with an existing hidden exercise; retry with a fresh id');
+		}
 		await db
 			.insert(exercise)
 			.values({
