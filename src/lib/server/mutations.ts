@@ -830,31 +830,36 @@ function resolveSession(
 // (e.g. zero or null on the relevant column) never PR. The strength axis
 // uses *effective load* (weight + bwLoadKg snapshot) so a heavier user or
 // larger bodyweight pct can lock in a higher PR than added weight alone.
-async function evaluatePr(
+// Runs inside the caller's transaction (sync — better-sqlite3 12.x rejects
+// async transaction bodies) so the prior-max read and the set insert are
+// atomic: two concurrent set.create calls for the same exercise can no longer
+// both read the same prior max and both flag PR. Uses tx + .get() to execute
+// synchronously.
+function evaluatePr(
+	tx: Tx,
 	userId: string,
 	exerciseId: string,
 	inputMode: string,
 	weight: number | null,
 	durationMin: number | null,
 	extras: Record<string, number> | null
-): Promise<boolean> {
+): boolean {
 	if (inputMode === 'distance_time') {
 		const distance = extras?.distance;
 		if (typeof distance !== 'number' || !Number.isFinite(distance) || distance <= 0) {
 			return false;
 		}
-		const row = (
-			await db
-				.select({ max: sql<number | null>`MAX(json_extract(${setTable.extras}, '$.distance'))` })
-				.from(setTable)
-				.where(
-					and(
-						eq(setTable.userId, userId),
-						eq(setTable.exerciseId, exerciseId),
-						isNull(setTable.deletedAt)
-					)
+		const row = tx
+			.select({ max: sql<number | null>`MAX(json_extract(${setTable.extras}, '$.distance'))` })
+			.from(setTable)
+			.where(
+				and(
+					eq(setTable.userId, userId),
+					eq(setTable.exerciseId, exerciseId),
+					isNull(setTable.deletedAt)
 				)
-		)[0];
+			)
+			.get() as { max: number | null } | undefined;
 		const prior = row?.max ?? null;
 		return prior == null || distance > prior;
 	}
@@ -862,18 +867,17 @@ async function evaluatePr(
 		if (typeof durationMin !== 'number' || !Number.isFinite(durationMin) || durationMin <= 0) {
 			return false;
 		}
-		const row = (
-			await db
-				.select({ max: sql<number | null>`MAX(${setTable.durationMin})` })
-				.from(setTable)
-				.where(
-					and(
-						eq(setTable.userId, userId),
-						eq(setTable.exerciseId, exerciseId),
-						isNull(setTable.deletedAt)
-					)
+		const row = tx
+			.select({ max: sql<number | null>`MAX(${setTable.durationMin})` })
+			.from(setTable)
+			.where(
+				and(
+					eq(setTable.userId, userId),
+					eq(setTable.exerciseId, exerciseId),
+					isNull(setTable.deletedAt)
 				)
-		)[0];
+			)
+			.get() as { max: number | null } | undefined;
 		const prior = row?.max ?? null;
 		return prior == null || durationMin > prior;
 	}
@@ -886,23 +890,22 @@ async function evaluatePr(
 		typeof extras?.bwLoadKg === 'number' && Number.isFinite(extras.bwLoadKg) ? extras.bwLoadKg : 0;
 	const effective = weight + bwLoad;
 	if (effective <= 0) return false;
-	const row = (
-		await db
-			.select({
-				max: sql<number | null>`MAX(
-					COALESCE(${setTable.weight}, 0)
-					+ COALESCE(json_extract(${setTable.extras}, '$.bwLoadKg'), 0)
-				)`
-			})
-			.from(setTable)
-			.where(
-				and(
-					eq(setTable.userId, userId),
-					eq(setTable.exerciseId, exerciseId),
-					isNull(setTable.deletedAt)
-				)
+	const row = tx
+		.select({
+			max: sql<number | null>`MAX(
+				COALESCE(${setTable.weight}, 0)
+				+ COALESCE(json_extract(${setTable.extras}, '$.bwLoadKg'), 0)
+			)`
+		})
+		.from(setTable)
+		.where(
+			and(
+				eq(setTable.userId, userId),
+				eq(setTable.exerciseId, exerciseId),
+				isNull(setTable.deletedAt)
 			)
-	)[0];
+		)
+		.get() as { max: number | null } | undefined;
 	const prior = row?.max ?? null;
 	return prior == null || effective > prior;
 }
@@ -1081,11 +1084,6 @@ async function setCreate(
 		}
 	}
 
-	// PR evaluation per inputMode. Strict greater-than only — ties don't
-	// count. Computed inside the transaction below so a concurrent set.create
-	// from the same user can't both see the same prior max and both flag PR.
-	const isPr = await evaluatePr(userId, payload.exerciseId, mode, weight, durationMin, extras);
-
 	// Resolve session + insert the set in one transaction. Two concurrent
 	// set.create calls from the same user (e.g. queue drain firing twice)
 	// would otherwise each see "no open session" and create duplicates.
@@ -1094,6 +1092,13 @@ async function setCreate(
 	// Sync body required by better-sqlite3 12.x.
 	const { session, row } = db.transaction((tx) => {
 		const session = resolveSession(tx, userId, eqRow.gymId, ts);
+
+		// PR evaluation per inputMode. Strict greater-than only — ties don't
+		// count. Inside the transaction so the prior-max read and the insert
+		// are atomic: a concurrent set.create for the same exercise can't read
+		// the same prior max and also flag PR.
+		const isPr = evaluatePr(tx, userId, payload.exerciseId, mode, weight, durationMin, extras);
+
 		tx.insert(setTable)
 			.values({
 				id: payload.id,
