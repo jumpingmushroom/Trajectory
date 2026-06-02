@@ -67,6 +67,8 @@ but it weakens the concurrent-duplicate guard, so the compensating-delete is pre
 
 ### C2 — PR evaluation runs outside the transaction, contradicting its own comment · LOW–MED
 
+**Status:** ✅ Implemented in this PR — `evaluatePr` is now synchronous (`tx` + `.get()`) and called inside the set-create transaction.
+
 **Where:** `src/lib/server/mutations.ts:1073` (call), comment at `:1070-1072`, `evaluatePr` at `:819`.
 
 **What's wrong:** The comment says _"Computed inside the transaction below so a
