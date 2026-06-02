@@ -9,6 +9,7 @@
 
 import { eq, and, isNull, desc, asc, gte, gt, lt, sql } from 'drizzle-orm';
 import { evaluateAchievements } from './achievements/evaluator';
+import { recomputeUser, prAxisValue } from './recompute';
 import { db } from './db';
 import { startOfUtcDay } from '../dateMode';
 import {
@@ -861,59 +862,23 @@ function evaluatePr(
 	durationMin: number | null,
 	extras: Record<string, number> | null
 ): boolean {
-	if (inputMode === 'distance_time') {
-		const distance = extras?.distance;
-		if (typeof distance !== 'number' || !Number.isFinite(distance) || distance <= 0) {
-			return false;
-		}
-		const row = tx
-			.select({ max: sql<number | null>`MAX(json_extract(${setTable.extras}, '$.distance'))` })
-			.from(setTable)
-			.where(
-				and(
-					eq(setTable.userId, userId),
-					eq(setTable.exerciseId, exerciseId),
-					isNull(setTable.deletedAt)
-				)
-			)
-			.get() as { max: number | null } | undefined;
-		const prior = row?.max ?? null;
-		return prior == null || distance > prior;
-	}
-	if (inputMode === 'timed') {
-		if (typeof durationMin !== 'number' || !Number.isFinite(durationMin) || durationMin <= 0) {
-			return false;
-		}
-		const row = tx
-			.select({ max: sql<number | null>`MAX(${setTable.durationMin})` })
-			.from(setTable)
-			.where(
-				and(
-					eq(setTable.userId, userId),
-					eq(setTable.exerciseId, exerciseId),
-					isNull(setTable.deletedAt)
-				)
-			)
-			.get() as { max: number | null } | undefined;
-		const prior = row?.max ?? null;
-		return prior == null || durationMin > prior;
-	}
-	// All remaining modes (weighted, bodyweight, timed_weighted,
-	// weight_distance) PR on weight (effective load for bodyweight).
-	if (typeof weight !== 'number' || !Number.isFinite(weight)) {
-		return false;
-	}
-	const bwLoad =
-		typeof extras?.bwLoadKg === 'number' && Number.isFinite(extras.bwLoadKg) ? extras.bwLoadKg : 0;
-	const effective = weight + bwLoad;
-	if (effective <= 0) return false;
+	const v = prAxisValue(inputMode, weight, durationMin, extras);
+	if (v == null) return false;
+	// MAX over the same axis prAxisValue measures, per mode. This is the live
+	// fast path: a live set is the newest, so current-best MAX == the
+	// chronological running max it would face. (Backdated inserts go through
+	// recomputeUser instead, which replays is_pr in ts order.)
+	const maxExpr =
+		inputMode === 'distance_time'
+			? sql<number | null>`MAX(json_extract(${setTable.extras}, '$.distance'))`
+			: inputMode === 'timed'
+				? sql<number | null>`MAX(${setTable.durationMin})`
+				: sql<number | null>`MAX(
+						COALESCE(${setTable.weight}, 0)
+						+ COALESCE(json_extract(${setTable.extras}, '$.bwLoadKg'), 0)
+					)`;
 	const row = tx
-		.select({
-			max: sql<number | null>`MAX(
-				COALESCE(${setTable.weight}, 0)
-				+ COALESCE(json_extract(${setTable.extras}, '$.bwLoadKg'), 0)
-			)`
-		})
+		.select({ max: maxExpr })
 		.from(setTable)
 		.where(
 			and(
@@ -924,7 +889,146 @@ function evaluatePr(
 		)
 		.get() as { max: number | null } | undefined;
 	const prior = row?.max ?? null;
-	return prior == null || effective > prior;
+	return prior == null || v > prior;
+}
+
+// Per-mode metric validation, shared by set.create and set.update. Each branch
+// lists which set columns are required vs forbidden, and which extras keys (if
+// any) are accepted; the shape mirrors $lib/input-modes.MODE_SHAPE on the
+// client. Returns the cleaned/normalized (weight, reps, durationMin, extras)
+// tuple, throwing badRequest on any shape violation. set.update passes the
+// post-merge payload so an edit that introduces a field the mode forbids (e.g.
+// reps on a carry) is rejected the same way a bad create would be.
+function validateSetMetrics(
+	mode: string,
+	payload: {
+		weight?: number | null;
+		reps?: number | null;
+		durationMin?: number | null;
+		extras?: Record<string, number> | null;
+	},
+	eqRow: { bodyweightPct: number | null }
+): {
+	weight: number | null;
+	reps: number | null;
+	durationMin: number | null;
+	extras: Record<string, number> | null;
+} {
+	let weight: number | null = null;
+	let reps: number | null = null;
+	let durationMin: number | null = null;
+	let extras: Record<string, number> | null = null;
+
+	if (mode === 'distance_time') {
+		if (typeof payload.durationMin !== 'number' || payload.durationMin <= 0) {
+			badRequest('cardio set requires positive durationMin');
+		}
+		durationMin = payload.durationMin;
+		if (payload.extras != null) {
+			if (typeof payload.extras !== 'object' || Array.isArray(payload.extras)) {
+				badRequest('extras must be an object of numbers');
+			}
+			const cleaned: Record<string, number> = {};
+			for (const [k, v] of Object.entries(payload.extras)) {
+				if (typeof v === 'number' && Number.isFinite(v)) cleaned[k] = v;
+			}
+			extras = Object.keys(cleaned).length > 0 ? cleaned : null;
+		}
+	} else if (mode === 'timed') {
+		if (typeof payload.durationMin !== 'number' || payload.durationMin <= 0) {
+			badRequest('timed set requires positive durationMin');
+		}
+		if (payload.weight != null && payload.weight !== 0) {
+			badRequest('timed set must not include weight (use timed_weighted for loaded holds)');
+		}
+		if (payload.reps != null) badRequest('timed set must not include reps');
+		durationMin = payload.durationMin;
+		if (payload.extras != null && Object.keys(payload.extras).length > 0) {
+			badRequest('timed set does not accept extras');
+		}
+	} else if (mode === 'timed_weighted') {
+		if (typeof payload.durationMin !== 'number' || payload.durationMin <= 0) {
+			badRequest('timed_weighted set requires positive durationMin');
+		}
+		if (typeof payload.weight !== 'number' || !Number.isFinite(payload.weight)) {
+			badRequest('timed_weighted set requires numeric weight');
+		}
+		if (payload.weight < 0) badRequest('timed_weighted set requires non-negative weight');
+		if (payload.reps != null) badRequest('timed_weighted set must not include reps');
+		weight = payload.weight;
+		durationMin = payload.durationMin;
+		if (payload.extras != null && Object.keys(payload.extras).length > 0) {
+			badRequest('timed_weighted set does not accept extras');
+		}
+	} else if (mode === 'weight_distance') {
+		if (typeof payload.weight !== 'number' || !Number.isFinite(payload.weight)) {
+			badRequest('weight_distance set requires numeric weight');
+		}
+		if (payload.weight < 0) badRequest('weight_distance set requires non-negative weight');
+		if (payload.reps != null) badRequest('weight_distance set must not include reps');
+		if (payload.durationMin != null) {
+			badRequest('weight_distance set must not include durationMin');
+		}
+		if (
+			payload.extras == null ||
+			typeof payload.extras !== 'object' ||
+			Array.isArray(payload.extras)
+		) {
+			badRequest('weight_distance set requires extras.distance');
+		}
+		const dist = (payload.extras as Record<string, unknown>).distance;
+		if (typeof dist !== 'number' || !Number.isFinite(dist) || dist <= 0) {
+			badRequest('weight_distance set requires positive extras.distance');
+		}
+		const cleaned: Record<string, number> = { distance: dist };
+		for (const k of Object.keys(payload.extras)) {
+			if (k !== 'distance') badRequest(`unknown extras key for weight_distance set: ${k}`);
+		}
+		weight = payload.weight;
+		extras = cleaned;
+	} else {
+		// weighted | bodyweight (the legacy strength path).
+		if (typeof payload.weight !== 'number') {
+			badRequest('strength set requires numeric weight');
+		}
+		if (typeof payload.reps !== 'number' || !Number.isInteger(payload.reps) || payload.reps < 0) {
+			badRequest('strength set requires non-negative integer reps');
+		}
+		// Bodyweight equipment lets `weight` go negative for assisted reps
+		// (e.g. band-assisted pull-ups) since the stored value is *added* load,
+		// not absolute load. Non-bodyweight stays non-negative.
+		if (eqRow.bodyweightPct == null && (payload.weight as number) < 0) {
+			badRequest('strength set requires non-negative weight');
+		}
+		weight = payload.weight as number;
+		reps = payload.reps as number;
+		// Bodyweight snapshot in `extras`: bwLoadKg (effective contribution),
+		// bwKg (user's BW at log time), bwPct (equipment %). Stored once and
+		// never re-derived so historical effective load doesn't drift if the
+		// user updates either input later. Allowed only on bodyweight rigs;
+		// rejected as junk fields anywhere else.
+		if (payload.extras != null) {
+			if (typeof payload.extras !== 'object' || Array.isArray(payload.extras)) {
+				badRequest('extras must be an object of numbers');
+			}
+			if (eqRow.bodyweightPct == null) {
+				badRequest('extras only allowed on bodyweight equipment for strength sets');
+			}
+			const cleaned: Record<string, number> = {};
+			for (const [k, v] of Object.entries(payload.extras)) {
+				if (k !== 'bwLoadKg' && k !== 'bwKg' && k !== 'bwPct') {
+					badRequest(`unknown extras key for strength set: ${k}`);
+				}
+				if (typeof v !== 'number' || !Number.isFinite(v)) {
+					badRequest(`extras.${k} must be a finite number`);
+				}
+				cleaned[k] = v;
+			}
+			extras = Object.keys(cleaned).length > 0 ? cleaned : null;
+		}
+	}
+
+	return { weight, reps, durationMin, extras };
 }
 
 async function setCreate(
@@ -980,126 +1084,8 @@ async function setCreate(
 	// workout that hasn't happened yet, and they'd corrupt the heatmap.
 	if (ts > Date.now() + 60_000) badRequest('ts must not be in the future');
 
-	let weight: number | null = null;
-	let reps: number | null = null;
-	let durationMin: number | null = null;
-	let extras: Record<string, number> | null = null;
-
 	const mode = eqRow.inputMode;
-
-	// Per-mode validation. Each branch lists which set columns are required
-	// vs forbidden, and which extras keys (if any) are accepted. The general
-	// shape is mirrored in $lib/input-modes.MODE_SHAPE on the client.
-	if (mode === 'distance_time') {
-		if (typeof payload.durationMin !== 'number' || payload.durationMin <= 0) {
-			badRequest('cardio set requires positive durationMin');
-		}
-		durationMin = payload.durationMin;
-		if (payload.extras != null) {
-			if (typeof payload.extras !== 'object' || Array.isArray(payload.extras)) {
-				badRequest('extras must be an object of numbers');
-			}
-			const cleaned: Record<string, number> = {};
-			for (const [k, v] of Object.entries(payload.extras)) {
-				if (typeof v === 'number' && Number.isFinite(v)) cleaned[k] = v;
-			}
-			extras = Object.keys(cleaned).length > 0 ? cleaned : null;
-		}
-	} else if (mode === 'timed') {
-		if (typeof payload.durationMin !== 'number' || payload.durationMin <= 0) {
-			badRequest('timed set requires positive durationMin');
-		}
-		if (payload.weight != null && payload.weight !== 0) {
-			badRequest('timed set must not include weight (use timed_weighted for loaded holds)');
-		}
-		if (payload.reps != null) badRequest('timed set must not include reps');
-		durationMin = payload.durationMin;
-		// extras intentionally not allowed for plain timed holds.
-		if (payload.extras != null && Object.keys(payload.extras).length > 0) {
-			badRequest('timed set does not accept extras');
-		}
-	} else if (mode === 'timed_weighted') {
-		if (typeof payload.durationMin !== 'number' || payload.durationMin <= 0) {
-			badRequest('timed_weighted set requires positive durationMin');
-		}
-		if (typeof payload.weight !== 'number' || !Number.isFinite(payload.weight)) {
-			badRequest('timed_weighted set requires numeric weight');
-		}
-		if (payload.weight < 0) badRequest('timed_weighted set requires non-negative weight');
-		if (payload.reps != null) badRequest('timed_weighted set must not include reps');
-		weight = payload.weight;
-		durationMin = payload.durationMin;
-		if (payload.extras != null && Object.keys(payload.extras).length > 0) {
-			badRequest('timed_weighted set does not accept extras');
-		}
-	} else if (mode === 'weight_distance') {
-		if (typeof payload.weight !== 'number' || !Number.isFinite(payload.weight)) {
-			badRequest('weight_distance set requires numeric weight');
-		}
-		if (payload.weight < 0) badRequest('weight_distance set requires non-negative weight');
-		if (payload.reps != null) badRequest('weight_distance set must not include reps');
-		if (payload.durationMin != null) {
-			badRequest('weight_distance set must not include durationMin');
-		}
-		if (
-			payload.extras == null ||
-			typeof payload.extras !== 'object' ||
-			Array.isArray(payload.extras)
-		) {
-			badRequest('weight_distance set requires extras.distance');
-		}
-		const dist = (payload.extras as Record<string, unknown>).distance;
-		if (typeof dist !== 'number' || !Number.isFinite(dist) || dist <= 0) {
-			badRequest('weight_distance set requires positive extras.distance');
-		}
-		const cleaned: Record<string, number> = { distance: dist };
-		// Reject any other key so users don't smuggle cardio extras through.
-		for (const k of Object.keys(payload.extras)) {
-			if (k !== 'distance') badRequest(`unknown extras key for weight_distance set: ${k}`);
-		}
-		weight = payload.weight;
-		extras = cleaned;
-	} else {
-		// weighted | bodyweight (the legacy strength path).
-		if (typeof payload.weight !== 'number') {
-			badRequest('strength set requires numeric weight');
-		}
-		if (typeof payload.reps !== 'number' || !Number.isInteger(payload.reps) || payload.reps < 0) {
-			badRequest('strength set requires non-negative integer reps');
-		}
-		// Bodyweight equipment lets `weight` go negative for assisted reps
-		// (e.g. band-assisted pull-ups) since the stored value is *added*
-		// load, not absolute load. Non-bodyweight stays non-negative.
-		if (eqRow.bodyweightPct == null && payload.weight < 0) {
-			badRequest('strength set requires non-negative weight');
-		}
-		weight = payload.weight;
-		reps = payload.reps;
-		// Bodyweight snapshot in `extras`: bwLoadKg (effective contribution),
-		// bwKg (user's BW at log time), bwPct (equipment %). Stored once and
-		// never re-derived so historical effective load doesn't drift if the
-		// user updates either input later. Allowed only on bodyweight rigs;
-		// rejected as junk fields anywhere else.
-		if (payload.extras != null) {
-			if (typeof payload.extras !== 'object' || Array.isArray(payload.extras)) {
-				badRequest('extras must be an object of numbers');
-			}
-			if (eqRow.bodyweightPct == null) {
-				badRequest('extras only allowed on bodyweight equipment for strength sets');
-			}
-			const cleaned: Record<string, number> = {};
-			for (const [k, v] of Object.entries(payload.extras)) {
-				if (k !== 'bwLoadKg' && k !== 'bwKg' && k !== 'bwPct') {
-					badRequest(`unknown extras key for strength set: ${k}`);
-				}
-				if (typeof v !== 'number' || !Number.isFinite(v)) {
-					badRequest(`extras.${k} must be a finite number`);
-				}
-				cleaned[k] = v;
-			}
-			extras = Object.keys(cleaned).length > 0 ? cleaned : null;
-		}
-	}
+	const { weight, reps, durationMin, extras } = validateSetMetrics(mode, payload, eqRow);
 
 	// Resolve session + insert the set in one transaction. Two concurrent
 	// set.create calls from the same user (e.g. queue drain firing twice)
@@ -1155,13 +1141,23 @@ async function setCreate(
 			}
 		}
 
-		// Evaluate achievement predicates against the just-inserted set.
-		// Runs in the same transaction so awards roll back together with
-		// the set if the parent insert later throws.
-		evaluateAchievements(tx, userId, 'set.created', {
-			setId: payload.id,
-			sessionId: session.sessionId
-		});
+		if (session.isBackdated) {
+			// A backdated set can sit *before* later sets of the same exercise
+			// (demoting their is_pr) and can shrink a comeback gap or change a
+			// density window — i.e. it's non-monotonic. Re-derive everything for
+			// the user (this also corrects the is_pr we just inserted) and
+			// reconcile achievements (award + revoke) in the same transaction.
+			recomputeUser(tx, userId);
+		} else {
+			// Live set: monotonic (newest, can only raise maxes / add data), so
+			// the incremental is_pr above is correct and an additive achievement
+			// pass is sufficient and fast. Runs in the same transaction so awards
+			// roll back together with the set if the insert later throws.
+			evaluateAchievements(tx, userId, 'set.created', {
+				setId: payload.id,
+				sessionId: session.sessionId
+			});
+		}
 
 		return { session, row };
 	});
@@ -1172,91 +1168,95 @@ async function setCreate(
 async function setUpdate(payload: SetUpdate, userId: string): Promise<SetRow> {
 	assertUlid(payload.id, 'id');
 
-	const updates: Partial<SetRow> = { updatedAt: new Date() };
-	if (payload.weight !== undefined) {
-		if (
-			payload.weight !== null &&
-			(typeof payload.weight !== 'number' || !Number.isFinite(payload.weight))
-		) {
-			badRequest('weight must be a finite number or null');
-		}
-		// Resolve the set's equipment to know if negative weights (assisted
-		// bodyweight) are legal here. Cheap join — already gated by ownership.
-		if (typeof payload.weight === 'number' && payload.weight < 0) {
-			const ctx = (
-				await db
-					.select({ bodyweightPct: equipment.bodyweightPct })
-					.from(setTable)
-					.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
-					.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
-					.where(and(eq(setTable.id, payload.id), eq(setTable.userId, userId)))
-					.limit(1)
-			)[0];
-			if (!ctx || ctx.bodyweightPct == null) {
-				badRequest('weight must be non-negative on non-bodyweight equipment');
-			}
-		}
-		updates.weight = payload.weight;
-	}
-	if (payload.reps !== undefined) {
-		if (
-			payload.reps !== null &&
-			(typeof payload.reps !== 'number' || !Number.isInteger(payload.reps) || payload.reps < 0)
-		) {
-			badRequest('reps must be a non-negative integer or null');
-		}
-		updates.reps = payload.reps;
-	}
-	if (payload.durationMin !== undefined) {
-		if (
-			payload.durationMin !== null &&
-			(typeof payload.durationMin !== 'number' || payload.durationMin < 0)
-		) {
-			badRequest('durationMin must be a non-negative number or null');
-		}
-		updates.durationMin = payload.durationMin;
-	}
-	if (payload.extras !== undefined) {
-		if (payload.extras === null) {
-			updates.extras = null;
-		} else if (typeof payload.extras === 'object' && !Array.isArray(payload.extras)) {
-			const cleaned: Record<string, number> = {};
-			for (const [k, v] of Object.entries(payload.extras)) {
-				if (typeof v === 'number' && Number.isFinite(v)) cleaned[k] = v;
-			}
-			updates.extras = Object.keys(cleaned).length > 0 ? cleaned : null;
-		} else {
-			badRequest('extras must be an object or null');
-		}
-	}
-
-	if (Object.keys(updates).length === 1) badRequest('set.update needs at least one field');
-
-	// All three predicates matter: id (target row), userId (tenancy), and
-	// deletedAt IS NULL (don't resurrect a tombstoned set). Without the
-	// deletedAt filter, a "delete then edit" race could write fields onto a
-	// soft-deleted row that History/Stats already hide but which still
-	// counts toward MAX(weight) PR comparisons.
-	await db
-		.update(setTable)
-		.set(updates)
-		.where(
-			and(eq(setTable.id, payload.id), eq(setTable.userId, userId), isNull(setTable.deletedAt))
-		);
-
-	// SELECT mirrors the same predicates — a set that's missing, owned by
-	// someone else, or already deleted should all 404 the same way so the
-	// caller can't infer existence from the error code.
-	const row = (
+	// Resolve the set + its equipment (inputMode, bodyweightPct) and assert
+	// ownership transitively (set → exercise → equipment → gym → userId). All
+	// deletedAt IS NULL, so a tombstoned set or another user's set both 404 the
+	// same way (no existence leak). ts and exercise stay immutable — re-dating
+	// or moving a set is a delete + re-log.
+	const existing = (
 		await db
-			.select()
+			.select({
+				weight: setTable.weight,
+				reps: setTable.reps,
+				durationMin: setTable.durationMin,
+				extras: setTable.extras,
+				inputMode: equipment.inputMode,
+				bodyweightPct: equipment.bodyweightPct
+			})
 			.from(setTable)
+			.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
+			.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
+			.innerJoin(gym, eq(gym.id, equipment.gymId))
 			.where(
-				and(eq(setTable.id, payload.id), eq(setTable.userId, userId), isNull(setTable.deletedAt))
+				and(
+					eq(setTable.id, payload.id),
+					eq(gym.userId, userId),
+					isNull(setTable.deletedAt),
+					isNull(exercise.deletedAt),
+					isNull(equipment.deletedAt),
+					isNull(gym.deletedAt)
+				)
 			)
 			.limit(1)
 	)[0];
-	if (!row) notFound(`set ${payload.id} not found`);
+	if (!existing) notFound(`set ${payload.id} not found`);
+
+	if (
+		payload.weight === undefined &&
+		payload.reps === undefined &&
+		payload.durationMin === undefined &&
+		payload.extras === undefined
+	) {
+		badRequest('set.update needs at least one field');
+	}
+
+	// Merge supplied fields over current values, then validate the MERGED set
+	// against the equipment's input mode — so an edit can't leave the row in a
+	// shape the mode forbids (e.g. reps on a carry) and required fields stay
+	// satisfied by the untouched values. extras keys are shallow-merged so
+	// editing one key (cardio distance) preserves the rest (calories, the
+	// bodyweight snapshot). extras: null clears.
+	const existingExtras = existing.extras as Record<string, number> | null;
+	const mergedExtras =
+		payload.extras === undefined
+			? existingExtras
+			: payload.extras === null
+				? null
+				: { ...(existingExtras ?? {}), ...payload.extras };
+	const clean = validateSetMetrics(
+		existing.inputMode,
+		{
+			weight: payload.weight === undefined ? existing.weight : payload.weight,
+			reps: payload.reps === undefined ? existing.reps : payload.reps,
+			durationMin: payload.durationMin === undefined ? existing.durationMin : payload.durationMin,
+			extras: mergedExtras
+		},
+		{ bodyweightPct: existing.bodyweightPct }
+	);
+
+	// Sync transaction (better-sqlite3): apply the edit, then re-derive is_pr +
+	// achievements for the whole user (edits can lower a value, so a badge or PR
+	// may need revoking — recomputeUser reconciles add + remove).
+	const row = db.transaction((tx) => {
+		tx.update(setTable)
+			.set({
+				weight: clean.weight,
+				reps: clean.reps,
+				durationMin: clean.durationMin,
+				extras: clean.extras,
+				updatedAt: new Date()
+			})
+			.where(
+				and(eq(setTable.id, payload.id), eq(setTable.userId, userId), isNull(setTable.deletedAt))
+			)
+			.run();
+		recomputeUser(tx, userId);
+		const fresh = tx.select().from(setTable).where(eq(setTable.id, payload.id)).limit(1).get() as
+			| SetRow
+			| undefined;
+		if (!fresh) notFound(`set ${payload.id} not found`);
+		return fresh;
+	});
 	return row;
 }
 
@@ -1272,7 +1272,7 @@ async function setDelete(
 	// assert ownership first.
 	const existing = (
 		await db
-			.select({ id: setTable.id })
+			.select({ id: setTable.id, sessionId: setTable.workoutSessionId })
 			.from(setTable)
 			.where(
 				and(eq(setTable.id, payload.id), eq(setTable.userId, userId), isNull(setTable.deletedAt))
@@ -1282,10 +1282,54 @@ async function setDelete(
 	if (!existing) notFound(`set ${payload.id} not found`);
 
 	const now = Date.now();
-	await db
-		.update(setTable)
-		.set({ deletedAt: new Date(now), updatedAt: new Date(now) })
-		.where(and(eq(setTable.id, payload.id), eq(setTable.userId, userId)));
+	db.transaction((tx) => {
+		tx.update(setTable)
+			.set({ deletedAt: new Date(now), updatedAt: new Date(now) })
+			.where(and(eq(setTable.id, payload.id), eq(setTable.userId, userId)))
+			.run();
+
+		// Re-tighten a CLOSED session's bounds to its remaining sets so History/
+		// Stats don't show a duration that outlives the actual work (e.g. you
+		// deleted the last set). Open sessions keep their live startedAt/null
+		// endedAt. An emptied session is left in place (explicit session.delete
+		// removes it; GC is a follow-up).
+		const agg = tx
+			.select({
+				minTs: sql<number | null>`MIN(${setTable.ts})`,
+				maxTs: sql<number | null>`MAX(${setTable.ts})`,
+				cnt: sql<number>`COUNT(*)`
+			})
+			.from(setTable)
+			.where(and(eq(setTable.workoutSessionId, existing.sessionId), isNull(setTable.deletedAt)))
+			.get() as { minTs: number | null; maxTs: number | null; cnt: number } | undefined;
+		const sess = tx
+			.select()
+			.from(workoutSession)
+			.where(eq(workoutSession.id, existing.sessionId))
+			.limit(1)
+			.get() as WorkoutSession | undefined;
+		if (
+			sess &&
+			sess.endedAt != null &&
+			agg &&
+			agg.cnt > 0 &&
+			agg.minTs != null &&
+			agg.maxTs != null
+		) {
+			tx.update(workoutSession)
+				.set({
+					startedAt: new Date(agg.minTs),
+					endedAt: new Date(agg.maxTs),
+					updatedAt: new Date(now)
+				})
+				.where(eq(workoutSession.id, existing.sessionId))
+				.run();
+		}
+
+		// Deleting a set can lower an exercise's best or remove the only data
+		// behind a badge → re-derive is_pr + reconcile achievements (revoke).
+		recomputeUser(tx, userId);
+	});
 	return { id: payload.id, deletedAt: now };
 }
 

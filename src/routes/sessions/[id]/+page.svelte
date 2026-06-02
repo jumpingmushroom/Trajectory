@@ -1,11 +1,38 @@
 <script lang="ts">
 	import EquipmentGlyph from '$lib/components/EquipmentGlyph.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import SetRow from '$lib/components/SetRow.svelte';
+	import CardioRow from '$lib/components/CardioRow.svelte';
 	import type { GlyphKind } from '$lib/components/glyph-kinds';
 	import type { PageData } from './$types';
 	import { mutate } from '$lib/mutate';
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { onDestroy } from 'svelte';
+	import type { InputMode, SetEditFields } from '$lib/input-modes';
+
+	let setActionError = $state<string | null>(null);
+
+	async function handleSetEdit(id: string, fields: SetEditFields) {
+		setActionError = null;
+		try {
+			await mutate('set.update', { id, ...fields });
+			// No optimistic overlay here — refetch so recomputed is_pr / session
+			// duration / any revoked badge are reflected.
+			await invalidateAll();
+		} catch (err) {
+			setActionError = err instanceof Error ? err.message : 'Could not update set.';
+		}
+	}
+
+	async function handleSetDelete(id: string) {
+		setActionError = null;
+		try {
+			await mutate('set.delete', { id });
+			await invalidateAll();
+		} catch (err) {
+			setActionError = err instanceof Error ? err.message : 'Could not delete set.';
+		}
+	}
 
 	let { data }: { data: PageData } = $props();
 	const s = $derived(data.session);
@@ -135,19 +162,9 @@
 		}
 	}
 
-	function fmtNum(n: number | null): string {
-		if (n == null) return '—';
-		return Number.isInteger(n) ? String(n) : n.toFixed(1);
-	}
-
 	function formatVol(kg: number): string {
 		const rounded = Math.round(kg);
 		return `${rounded.toLocaleString('en-US').replace(/,/g, ' ')} kg`;
-	}
-
-	function timeOnly(ms: number): string {
-		const d = new Date(ms);
-		return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 	}
 
 	function dayLabel(dayOffset: number, startedAt: number): string {
@@ -156,24 +173,6 @@
 		if (dayOffset < 14) return `${dayOffset} days ago`;
 		const d = new Date(startedAt);
 		return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-	}
-
-	function cardioSummary(extras: Record<string, number> | null): string[] {
-		if (!extras) return [];
-		const out: string[] = [];
-		if (typeof extras.distance === 'number') {
-			if (extras.distance >= 200 && Number.isInteger(extras.distance))
-				out.push(`${extras.distance} m`);
-			else out.push(`${fmtNum(extras.distance)} km`);
-		}
-		if (typeof extras.incline === 'number') out.push(`${fmtNum(extras.incline)}%`);
-		if (typeof extras.level === 'number') out.push(`L${extras.level}`);
-		if (typeof extras.rpm === 'number') out.push(`${extras.rpm} rpm`);
-		if (typeof extras.spm === 'number') out.push(`${extras.spm} spm`);
-		if (typeof extras.split === 'number') out.push(`${extras.split}s/500`);
-		if (typeof extras.hr === 'number') out.push(`${extras.hr} bpm`);
-		if (typeof extras.calories === 'number') out.push(`${extras.calories} kcal`);
-		return out;
 	}
 </script>
 
@@ -280,6 +279,15 @@
 		</div>
 	</section>
 
+	{#if setActionError}
+		<div
+			class="mt-4 rounded-xl border px-3 py-2 text-[12px]"
+			style="border-color: #5a2230; background: rgba(255,128,128,0.08); color: #ff9a9a;"
+		>
+			{setActionError}
+		</div>
+	{/if}
+
 	<section class="mt-5 flex flex-col gap-4">
 		{#each data.blocks as block (block.equipment.id)}
 			<div class="flex flex-col gap-2">
@@ -316,65 +324,38 @@
 					</svg>
 				</a>
 
-				<ul class="flex flex-col gap-1.5">
+				<div class="flex flex-col gap-1.5">
 					{#each block.sets as set, i (set.id)}
-						<li
-							class="flex items-center gap-3 rounded-xl border px-3 py-2 tabular-nums"
-							style="background: var(--color-surface-2); border-color: var(--color-line);"
-						>
-							<div
-								class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
-								style="background: var(--color-surface-3); color: var(--color-text-dim);"
-							>
-								{i + 1}
+						{#if !set.exerciseIsHidden && set.exerciseName !== block.equipment.name}
+							<div class="px-1 text-[10px]" style="color: var(--color-text-dim);">
+								{set.exerciseName}
 							</div>
-							{#if set.durationMin != null}
-								<div
-									class="flex flex-1 items-baseline gap-2 text-[13px]"
-									style="color: var(--color-text);"
-								>
-									<span class="font-semibold">{fmtNum(set.durationMin)}</span>
-									<span class="text-[10px]" style="color: var(--color-text-dim-2);">min</span>
-									{#each cardioSummary(set.extras) as bit, k (k)}
-										<span style="color: var(--color-text-dim-2);">·</span>
-										<span style="color: var(--color-text-dim);">{bit}</span>
-									{/each}
-								</div>
-							{:else}
-								{@const bwLoad =
-									typeof set.extras?.bwLoadKg === 'number' && Number.isFinite(set.extras.bwLoadKg)
-										? set.extras.bwLoadKg
-										: 0}
-								{@const isBw = bwLoad > 0}
-								{@const w = set.weight ?? 0}
-								{@const display = isBw ? w + bwLoad : w}
-								<div class="flex flex-1 flex-col text-[13px]" style="color: var(--color-text);">
-									<span class="flex items-baseline gap-2">
-										{#if !set.exerciseIsHidden && set.exerciseName !== block.equipment.name}
-											<span class="text-[10px]" style="color: var(--color-text-dim);">
-												{set.exerciseName}
-											</span>
-										{/if}
-										<span class="font-semibold">{fmtNum(display)}</span>
-										<span class="text-[10px]" style="color: var(--color-text-dim-2);">kg</span>
-										<span style="color: var(--color-text-dim-2);">×</span>
-										<span class="font-semibold">{set.reps ?? '—'}</span>
-									</span>
-									{#if isBw}
-										<span class="text-[10px]" style="color: var(--color-text-dim-2);">
-											{w === 0
-												? 'bodyweight only'
-												: `${w < 0 ? '−' : ''}${fmtNum(Math.abs(w))} + ${fmtNum(bwLoad)} bw`}
-										</span>
-									{/if}
-								</div>
-							{/if}
-							<div class="text-[10px]" style="color: var(--color-text-dim-2);">
-								{timeOnly(set.ts)}
-							</div>
-						</li>
+						{/if}
+						{#if block.equipment.inputMode === 'distance_time'}
+							<CardioRow
+								index={i}
+								durationMin={set.durationMin ?? 0}
+								extras={set.extras}
+								isLatest={false}
+								onDelete={() => handleSetDelete(set.id)}
+								onEdit={(fields) => handleSetEdit(set.id, fields)}
+							/>
+						{:else}
+							<SetRow
+								index={i}
+								mode={block.equipment.inputMode as InputMode}
+								weight={set.weight ?? 0}
+								reps={set.reps ?? 0}
+								durationMin={set.durationMin ?? null}
+								distance={typeof set.extras?.distance === 'number' ? set.extras.distance : null}
+								bwLoadKg={typeof set.extras?.bwLoadKg === 'number' ? set.extras.bwLoadKg : 0}
+								isLatest={false}
+								onDelete={() => handleSetDelete(set.id)}
+								onEdit={(fields) => handleSetEdit(set.id, fields)}
+							/>
+						{/if}
 					{/each}
-				</ul>
+				</div>
 			</div>
 		{/each}
 	</section>

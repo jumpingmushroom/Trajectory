@@ -12,7 +12,12 @@
 	import { holdRepeat } from '$lib/actions/holdRepeat';
 	import type { GlyphKind } from '$lib/components/glyph-kinds';
 	import { fieldsFor, type CardioField } from '$lib/cardio-templates';
-	import { MODE_LABEL, formatDurationMinAsClock, type InputMode } from '$lib/input-modes';
+	import {
+		MODE_LABEL,
+		formatDurationMinAsClock,
+		type InputMode,
+		type SetEditFields
+	} from '$lib/input-modes';
 	import { syncStatus } from '$lib/sync/status';
 	import { pushToast } from '$lib/stores/toast';
 	import { tsForBackdate, withDateMode } from '$lib/dateMode';
@@ -47,7 +52,6 @@
 	const mode = $derived((eq.inputMode ?? 'weighted') as InputMode);
 	const isCardio = $derived(mode === 'distance_time');
 	const isTimed = $derived(mode === 'timed' || mode === 'timed_weighted');
-	const isStrengthMode = $derived(mode === 'weighted' || mode === 'bodyweight');
 	const cardioFields = $derived<CardioField[]>(isCardio ? fieldsFor(eq.cardioKind) : []);
 	const isBodyweight = $derived(mode === 'bodyweight');
 	// Effective bodyweight contribution per rep. Zero when the user hasn't
@@ -465,9 +469,9 @@
 		}
 	}
 
-	async function handleEdit(setId: string, weightVal: number, repsVal: number) {
+	async function handleEdit(setId: string, fields: SetEditFields) {
 		try {
-			await mutate('set.update', { id: setId, weight: weightVal, reps: repsVal });
+			await mutate('set.update', { id: setId, ...fields });
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not update set.';
 		}
@@ -1135,6 +1139,7 @@
 							isLatest={i === sessionSetsForExercise.length - 1}
 							pending={s.pending}
 							onDelete={() => handleDelete(s.id)}
+							onEdit={(fields) => handleEdit(s.id, fields)}
 						/>
 					{:else}
 						<SetRow
@@ -1149,7 +1154,7 @@
 							pending={s.pending}
 							onClone={() => handleClone(s)}
 							onDelete={() => handleDelete(s.id)}
-							onEdit={isStrengthMode ? (w, r) => handleEdit(s.id, w, r) : undefined}
+							onEdit={(fields) => handleEdit(s.id, fields)}
 						/>
 					{/if}
 				{/each}

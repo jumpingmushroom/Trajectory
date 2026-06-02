@@ -7,7 +7,12 @@
 	// without an edit affordance (re-clone via swipe-right works for all).
 
 	import { swipeable } from '$lib/actions/swipe';
-	import { formatDurationMinAsClock, type InputMode } from '$lib/input-modes';
+	import {
+		formatDurationMinAsClock,
+		MODE_SHAPE,
+		type InputMode,
+		type SetEditFields
+	} from '$lib/input-modes';
 
 	let {
 		index,
@@ -37,10 +42,14 @@
 		isLatest: boolean;
 		pending?: boolean;
 		onDelete: () => void;
-		onClone: () => void;
-		// onEdit only fires for weighted/bodyweight modes. The Log screen
-		// passes undefined for the new modes so the row stays read-only there.
-		onEdit?: (weight: number, reps: number) => void;
+		// Optional — swipe-right clone only makes sense in the active log flow;
+		// omit on read-only/historical screens (the hint hides too).
+		onClone?: () => void;
+		// Fires with only the fields this mode edits (weight/reps for strength,
+		// durationMin for holds, weight+durationMin for loaded holds, weight +
+		// extras.distance for carries). The server merges over the stored row, so
+		// untouched fields — including the bodyweight snapshot — are preserved.
+		onEdit?: (fields: SetEditFields) => void;
 	} = $props();
 
 	function fmt(n: number): string {
@@ -73,14 +82,23 @@
 		return `${sign}${fmt(Math.abs(weight))} + ${fmt(bwLoadKg)} bw`;
 	});
 
+	const shape = $derived(MODE_SHAPE[mode]);
+
 	let editing = $state(false);
 	let editWeight = $state(weight);
 	let editReps = $state(reps);
+	let editMin = $state(0);
+	let editSec = $state(0);
+	let editDistance = $state(distance ?? 0);
 
 	function startEdit() {
 		if (pending || !onEdit) return;
 		editWeight = weight;
 		editReps = reps;
+		const totalSec = Math.max(0, Math.round((durationMin ?? 0) * 60));
+		editMin = Math.floor(totalSec / 60);
+		editSec = totalSec % 60;
+		editDistance = distance ?? 0;
 		editing = true;
 	}
 	function commit() {
@@ -88,12 +106,27 @@
 			editing = false;
 			return;
 		}
-		// Bodyweight equipment allows negative (assisted) added weight.
-		// Non-bodyweight stays clamped at zero.
-		const raw = Number(editWeight) || 0;
-		const w = isBodyweight ? raw : Math.max(0, raw);
-		const r = Math.max(0, Math.round(Number(editReps) || 0));
-		if (w !== weight || r !== reps) onEdit(w, r);
+		const fields: SetEditFields = {};
+		if (shape.hasWeight) {
+			// Bodyweight equipment allows negative (assisted) added weight;
+			// everything else clamps at zero.
+			const raw = Number(editWeight) || 0;
+			fields.weight = isBodyweight ? raw : Math.max(0, raw);
+		}
+		if (shape.hasReps) {
+			fields.reps = Math.max(0, Math.round(Number(editReps) || 0));
+		}
+		if (shape.hasDuration) {
+			const mm = Math.max(0, Math.round(Number(editMin) || 0));
+			const ss = Math.min(59, Math.max(0, Math.round(Number(editSec) || 0)));
+			fields.durationMin = mm + ss / 60;
+		}
+		if (shape.hasDistance) {
+			// Carry distance is metres; send via extras (the server shallow-merges
+			// so any other extras keys survive).
+			fields.extras = { distance: Math.max(0, Number(editDistance) || 0) };
+		}
+		onEdit(fields);
 		editing = false;
 	}
 	function cancel() {
@@ -102,25 +135,27 @@
 </script>
 
 <div class="relative">
-	<div
-		class="absolute inset-y-0 left-0 flex items-center px-4 text-[11px] font-bold tracking-[0.14em] uppercase"
-		style="color: var(--color-teal);"
-	>
-		<svg
-			width="16"
-			height="16"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			stroke-width="1.75"
-			stroke-linecap="round"
-			stroke-linejoin="round"
+	{#if onClone}
+		<div
+			class="absolute inset-y-0 left-0 flex items-center px-4 text-[11px] font-bold tracking-[0.14em] uppercase"
+			style="color: var(--color-teal);"
 		>
-			<rect x="8" y="8" width="12" height="12" rx="2" />
-			<path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3" />
-		</svg>
-		<span class="ml-2">Clone</span>
-	</div>
+			<svg
+				width="16"
+				height="16"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="1.75"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<rect x="8" y="8" width="12" height="12" rx="2" />
+				<path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3" />
+			</svg>
+			<span class="ml-2">Clone</span>
+		</div>
+	{/if}
 	<div
 		class="absolute inset-y-0 right-0 flex items-center px-4 text-[11px] font-bold tracking-[0.14em] uppercase"
 		style="color: #ff8080;"
@@ -162,28 +197,74 @@
 			{index + 1}
 		</div>
 		{#if editing}
-			<div class="flex flex-1 items-center gap-2 text-[14px]">
-				<input
-					type="number"
-					inputmode="decimal"
-					step="0.5"
-					min={isBodyweight ? -200 : 0}
-					bind:value={editWeight}
-					class="w-16 rounded-md border px-2 py-1 text-right font-semibold tabular-nums"
-					style="background: var(--color-surface-3); border-color: var(--color-line-2); color: var(--color-text);"
-					aria-label={isBodyweight ? 'Added weight in kg' : 'Weight in kg'}
-				/>
-				<span class="text-[11px]" style="color: var(--color-text-dim-2);">kg ×</span>
-				<input
-					type="number"
-					inputmode="numeric"
-					step="1"
-					min="0"
-					bind:value={editReps}
-					class="w-12 rounded-md border px-2 py-1 text-right font-semibold tabular-nums"
-					style="background: var(--color-surface-3); border-color: var(--color-line-2); color: var(--color-text);"
-					aria-label="Reps"
-				/>
+			<div class="flex flex-1 flex-wrap items-center gap-1.5 text-[14px]">
+				{#if shape.hasWeight}
+					<input
+						type="number"
+						inputmode="decimal"
+						step="0.5"
+						min={isBodyweight ? -200 : 0}
+						bind:value={editWeight}
+						class="w-16 rounded-md border px-2 py-1 text-right font-semibold tabular-nums"
+						style="background: var(--color-surface-3); border-color: var(--color-line-2); color: var(--color-text);"
+						aria-label={isBodyweight ? 'Added weight in kg' : 'Weight in kg'}
+					/>
+					<span class="text-[11px]" style="color: var(--color-text-dim-2);">kg</span>
+				{/if}
+				{#if shape.hasReps}
+					<span class="text-[11px]" style="color: var(--color-text-dim-2);">×</span>
+					<input
+						type="number"
+						inputmode="numeric"
+						step="1"
+						min="0"
+						bind:value={editReps}
+						class="w-12 rounded-md border px-2 py-1 text-right font-semibold tabular-nums"
+						style="background: var(--color-surface-3); border-color: var(--color-line-2); color: var(--color-text);"
+						aria-label="Reps"
+					/>
+				{/if}
+				{#if shape.hasDuration}
+					{#if shape.hasWeight}
+						<span class="text-[11px]" style="color: var(--color-text-dim-2);">·</span>
+					{/if}
+					<input
+						type="number"
+						inputmode="numeric"
+						step="1"
+						min="0"
+						bind:value={editMin}
+						class="w-12 rounded-md border px-2 py-1 text-right font-semibold tabular-nums"
+						style="background: var(--color-surface-3); border-color: var(--color-line-2); color: var(--color-text);"
+						aria-label="Minutes"
+					/>
+					<span class="text-[11px]" style="color: var(--color-text-dim-2);">:</span>
+					<input
+						type="number"
+						inputmode="numeric"
+						step="1"
+						min="0"
+						max="59"
+						bind:value={editSec}
+						class="w-12 rounded-md border px-2 py-1 text-right font-semibold tabular-nums"
+						style="background: var(--color-surface-3); border-color: var(--color-line-2); color: var(--color-text);"
+						aria-label="Seconds"
+					/>
+				{/if}
+				{#if shape.hasDistance}
+					<span class="text-[11px]" style="color: var(--color-text-dim-2);">×</span>
+					<input
+						type="number"
+						inputmode="decimal"
+						step="1"
+						min="0"
+						bind:value={editDistance}
+						class="w-16 rounded-md border px-2 py-1 text-right font-semibold tabular-nums"
+						style="background: var(--color-surface-3); border-color: var(--color-line-2); color: var(--color-text);"
+						aria-label="Distance in metres"
+					/>
+					<span class="text-[11px]" style="color: var(--color-text-dim-2);">m</span>
+				{/if}
 			</div>
 			<button
 				type="button"
@@ -207,7 +288,7 @@
 				class="flex flex-1 flex-col items-start text-left"
 				style="color: var(--color-text);"
 				onclick={startEdit}
-				disabled={pending || !onEdit || !isStrengthMode}
+				disabled={pending || !onEdit}
 				aria-label="Edit set"
 			>
 				<span class="flex items-baseline gap-2 text-[15px]">

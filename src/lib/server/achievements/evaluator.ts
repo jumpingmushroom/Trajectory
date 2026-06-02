@@ -55,14 +55,29 @@ export function evaluateAchievements(
 	trigger: AchievementTrigger,
 	ctx: EvalContext
 ): void {
-	const state = loadState(tx, ctx);
+	for (const key of matchedBadgeKeys(tx, userId, trigger, ctx)) {
+		award(tx, userId, key, ctx);
+	}
+}
 
+// Which badge keys the user currently qualifies for under this trigger + ctx,
+// recording nothing. Shared by evaluateAchievements (awards each) and the
+// reconciler in recompute.ts (unions these across a full-history replay to
+// derive the complete earned set). Keeping one matcher means predicates live
+// in exactly one place.
+export function matchedBadgeKeys(
+	tx: Tx,
+	userId: string,
+	trigger: AchievementTrigger,
+	ctx: EvalContext
+): string[] {
+	const state = loadState(tx, ctx);
+	const out: string[] = [];
 	for (const def of BADGE_DEFINITIONS) {
 		if (!def.triggers.includes(trigger)) continue;
-		if (matches(tx, userId, def.predicate, state)) {
-			award(tx, userId, def.key, ctx);
-		}
+		if (matches(tx, userId, def.predicate, state)) out.push(def.key);
 	}
+	return out;
 }
 
 function loadState(tx: Tx, ctx: EvalContext): EvalState {
