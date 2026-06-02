@@ -347,7 +347,7 @@ export const BADGE_DEFINITIONS: BadgeDefinition[] = [
 		category: 'easter',
 		hidden: true,
 		title: 'Marathon',
-		description: 'A single session over two hours long',
+		description: 'Two hours of training in a single session',
 		icon: 'hourglass',
 		triggers: ['session.ended'],
 		predicate: { kind: 'easter-session-duration-min', minutes: 120 }
