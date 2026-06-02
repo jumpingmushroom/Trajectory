@@ -94,6 +94,8 @@ queries to `.get()`). **Behavior change:** yes (fixes over-counted PRs).
 
 ### C3 — Achievement "variety" queries count sets from soft-deleted equipment · LOW
 
+**Status:** ✅ Implemented in this PR — added `isNull(exercise.deletedAt)` + `isNull(equipment.deletedAt)` to all four variety predicates.
+
 **Where:** `src/lib/server/achievements/evaluator.ts:246-321` (`variety-cardio-kinds-all`,
 `variety-input-modes-all`, `variety-equipment-in-week`, `variety-groups-in-week`).
 
@@ -113,6 +115,8 @@ achievement gating).
 
 ### C4 — `derivedExerciseId` can collide for two equipment sharing a 25-char ULID prefix · LOW
 
+**Status:** ✅ Implemented in this PR — `equipmentCreate` now detects the collision (derived id already owned by different equipment) and refuses it with a 400 instead of silently mis-attributing sets. Chosen over re-deriving the id scheme, which would require a data migration of existing hidden-exercise rows + their set FKs; the guard removes the data-corruption risk with zero migration.
+
 **Where:** `src/lib/server/mutations.ts:1400-1403`.
 
 **What's wrong:** The hidden-exercise PK is `equipmentId.slice(0, 25) + 'X'` — i.e. two
@@ -129,6 +133,8 @@ need a migration if changed for existing rows). **Behavior change:** no for new 
 Flagging for a decision rather than recommending an immediate change.
 
 ### C5 — `mutate()` reports success when a queued mutation was discarded as a permanent 4xx · LOW
+
+**Status:** ✅ Implemented in this PR — `drainNow` returns `discardedIds`; `mutate()` checks its own enqueued id and returns `discarded: true` (a new field on `MutationResult`) when the server permanently rejected it.
 
 **Where:** `src/lib/mutate.ts:34`; discard path `src/lib/sync/sync.ts:164-170`.
 
@@ -163,6 +169,8 @@ the `WHERE`. The existing `set_user_ts_idx (userId, ts)` already supports it.
 
 ### P2 — Home loader fetches all of the user's sets to compute last-set-per-equipment · MED
 
+**Status:** ✅ Implemented in this PR — query is now scoped to the active gym's equipment and uses a `row_number()` window to return one latest-set row per equipment instead of the full history. Behavior-preserving (tiles only ever rendered active-gym equipment).
+
 **Where:** `src/routes/+page.server.ts:82-110`.
 
 **What's wrong:** `lastSetsRaw` selects every non-deleted set for the user (no `LIMIT`),
@@ -178,6 +186,8 @@ rows (one per tile) instead of the full history. **Risk:** med (query rewrite �
 prefill values are unchanged). **Behavior change:** none if done correctly.
 
 ### P3 — History loader scans all sessions + all sets with no window · LOW–MED
+
+**Status:** ✅ Implemented in this PR — the full session list is still shown (bounding it would hide history, a product decision), but per-session summaries are now aggregated in SQL (one numeric row per session + one row per distinct machine) instead of streaming every set row into JS. Behavior-preserving — same filters and volume formula.
 
 **Where:** `src/routes/history/+page.server.ts:34-71`.
 
