@@ -2,7 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { achievement, equipment, exercise, set as setTable } from '$lib/server/db/schema';
-import { isNull, eq, and, asc, desc } from 'drizzle-orm';
+import { isNull, eq, and, asc, desc, gte } from 'drizzle-orm';
 import { effectiveSetLoad } from '$lib/server/db/effective-load';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -101,7 +101,11 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 				eq(setTable.userId, locals.user.id),
 				isNull(setTable.deletedAt),
 				isNull(exercise.deletedAt),
-				isNull(equipment.deletedAt)
+				isNull(equipment.deletedAt),
+				// Scope to the selected range in SQL (uses set_user_ts_idx) rather
+				// than fetching the full lifetime history and filtering in JS.
+				// `all` (cutoff === 0) keeps the unbounded scan intentionally.
+				...(cutoff > 0 ? [gte(setTable.ts, new Date(cutoff))] : [])
 			)
 		)
 		.orderBy(asc(setTable.ts))) as Array<{
