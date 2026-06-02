@@ -1251,12 +1251,9 @@ async function setUpdate(payload: SetUpdate, userId: string): Promise<SetRow> {
 			)
 			.run();
 		recomputeUser(tx, userId);
-		const fresh = tx
-			.select()
-			.from(setTable)
-			.where(eq(setTable.id, payload.id))
-			.limit(1)
-			.get() as SetRow | undefined;
+		const fresh = tx.select().from(setTable).where(eq(setTable.id, payload.id)).limit(1).get() as
+			| SetRow
+			| undefined;
 		if (!fresh) notFound(`set ${payload.id} not found`);
 		return fresh;
 	});
@@ -1311,9 +1308,20 @@ async function setDelete(
 			.where(eq(workoutSession.id, existing.sessionId))
 			.limit(1)
 			.get() as WorkoutSession | undefined;
-		if (sess && sess.endedAt != null && agg && agg.cnt > 0 && agg.minTs != null && agg.maxTs != null) {
+		if (
+			sess &&
+			sess.endedAt != null &&
+			agg &&
+			agg.cnt > 0 &&
+			agg.minTs != null &&
+			agg.maxTs != null
+		) {
 			tx.update(workoutSession)
-				.set({ startedAt: new Date(agg.minTs), endedAt: new Date(agg.maxTs), updatedAt: new Date(now) })
+				.set({
+					startedAt: new Date(agg.minTs),
+					endedAt: new Date(agg.maxTs),
+					updatedAt: new Date(now)
+				})
 				.where(eq(workoutSession.id, existing.sessionId))
 				.run();
 		}

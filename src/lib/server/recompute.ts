@@ -8,13 +8,7 @@
 // async transaction bodies). Uses .get()/.all()/.run().
 
 import { and, eq, isNull, isNotNull, asc, inArray } from 'drizzle-orm';
-import {
-	achievement,
-	equipment,
-	exercise,
-	set as setTable,
-	workoutSession
-} from './db/schema';
+import { achievement, equipment, exercise, set as setTable, workoutSession } from './db/schema';
 import { newUlid } from './ulid';
 import { matchedBadgeKeys, type Tx } from './achievements/evaluator';
 

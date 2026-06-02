@@ -720,8 +720,20 @@ async function main() {
 	assert(typeof prExId === 'string', 'PR machine hidden exercise returned');
 	const prSetA = ulid();
 	const prSetB = ulid();
-	await mutate('set.create', { id: prSetA, exerciseId: prExId, weight: 50, reps: 5, ts: Date.now() + 400 });
-	await mutate('set.create', { id: prSetB, exerciseId: prExId, weight: 60, reps: 5, ts: Date.now() + 410 });
+	await mutate('set.create', {
+		id: prSetA,
+		exerciseId: prExId,
+		weight: 50,
+		reps: 5,
+		ts: Date.now() + 400
+	});
+	await mutate('set.create', {
+		id: prSetB,
+		exerciseId: prExId,
+		weight: 60,
+		reps: 5,
+		ts: Date.now() + 410
+	});
 	let prA = await callJson(`/api/set/${prSetA}`);
 	let prB = await callJson(`/api/set/${prSetB}`);
 	assert(prA.body?.isPr === true, 'first-ever set A is a PR');

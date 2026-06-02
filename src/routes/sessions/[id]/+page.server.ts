@@ -13,7 +13,10 @@ import { isNull, eq, and, asc } from 'drizzle-orm';
 import { effectiveSetLoad } from '$lib/server/db/effective-load';
 
 export interface SessionDetailEquipmentBlock {
-	equipment: Pick<Equipment, 'id' | 'name' | 'type' | 'glyph' | 'tint' | 'cardioKind' | 'inputMode'>;
+	equipment: Pick<
+		Equipment,
+		'id' | 'name' | 'type' | 'glyph' | 'tint' | 'cardioKind' | 'inputMode'
+	>;
 	sets: Array<{
 		id: string;
 		exerciseName: string;
