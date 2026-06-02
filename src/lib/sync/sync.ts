@@ -120,11 +120,18 @@ function stopHeartbeat(): void {
 	}
 }
 
-export async function drainNow(): Promise<{ drained: number; remaining: number }> {
-	if (draining) return { drained: 0, remaining: await pendingCount() };
+export async function drainNow(): Promise<{
+	drained: number;
+	remaining: number;
+	discardedIds: string[];
+}> {
+	if (draining) return { drained: 0, remaining: await pendingCount(), discardedIds: [] };
 	draining = true;
 	syncStatus.update((s) => ({ ...s, draining: true }));
 	let drained = 0;
+	// mutationIds dropped this drain as permanent 4xx — surfaced so callers
+	// (mutate()) can tell a discard apart from a successful save.
+	const discardedIds: string[] = [];
 	try {
 		const queue = await listPending();
 		const now = Date.now();
@@ -168,6 +175,7 @@ export async function drainNow(): Promise<{ drained: number; remaining: number }
 				console.error(`[sync] ${m.op} ${m.mutationId} rejected (${result.status}): ${result.body}`);
 				pushToast(`Couldn't save ${m.op.replace(/\./g, ' ')} — change discarded.`);
 				await complete(m.mutationId);
+				discardedIds.push(m.mutationId);
 			} else {
 				const delay = backoffFor(m.attempts);
 				await recordFailure(m.mutationId, result.body || String(result.status), Date.now() + delay);
@@ -197,7 +205,7 @@ export async function drainNow(): Promise<{ drained: number; remaining: number }
 		syncStatus.update((s) => ({ ...s, draining: false }));
 		if (!syncStatus.snapshot().online) startHeartbeat();
 	}
-	return { drained, remaining: await pendingCount() };
+	return { drained, remaining: await pendingCount(), discardedIds };
 }
 
 let initialized = false;
