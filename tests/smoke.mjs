@@ -703,6 +703,71 @@ async function main() {
 	const plankRow = csvLinesNew[0].split(',');
 	assert(plankRow[11] === 'timed', `plank row inputMode column = "timed" (got "${plankRow[11]}")`);
 
+	// 23. is_pr recomputation on edit + delete (chronological replay). Uses a
+	// fresh exercise so the assertions are deterministic regardless of the
+	// shared smoke user's accumulated history.
+	console.log('step 23 — is_pr recomputes on edit + delete');
+	const prEqId = ulid();
+	const prEq = await mutate('equipment.create', {
+		id: prEqId,
+		gymId,
+		name: 'Smoke PR Machine',
+		type: 'machine',
+		group: 'pull',
+		glyph: 'cable'
+	});
+	const prExId = prEq?.result?.hiddenExercise?.id;
+	assert(typeof prExId === 'string', 'PR machine hidden exercise returned');
+	const prSetA = ulid();
+	const prSetB = ulid();
+	await mutate('set.create', { id: prSetA, exerciseId: prExId, weight: 50, reps: 5, ts: Date.now() + 400 });
+	await mutate('set.create', { id: prSetB, exerciseId: prExId, weight: 60, reps: 5, ts: Date.now() + 410 });
+	let prA = await callJson(`/api/set/${prSetA}`);
+	let prB = await callJson(`/api/set/${prSetB}`);
+	assert(prA.body?.isPr === true, 'first-ever set A is a PR');
+	assert(prB.body?.isPr === true, 'heavier later set B is a PR');
+
+	// Edit B below A → chronologically A is the high-water mark, B is demoted.
+	await mutate('set.update', { id: prSetB, weight: 40 });
+	prA = await callJson(`/api/set/${prSetA}`);
+	prB = await callJson(`/api/set/${prSetB}`);
+	assert(prA.body?.isPr === true, 'A keeps its PR after B is lowered');
+	assert(prB.body?.isPr === false, 'lowered B is no longer a PR');
+	assert(prB.body?.weight === 40, 'B weight updated to 40');
+
+	// Delete A → B is the only remaining set, so it becomes the PR.
+	await mutate('set.delete', { id: prSetA });
+	prA = await callJson(`/api/set/${prSetA}`);
+	prB = await callJson(`/api/set/${prSetB}`);
+	assert(prA.body === null || prA.status === 404 || prA.body?.deletedAt != null, 'A is gone');
+	assert(prB.body?.isPr === true, 'remaining B is promoted to PR after A is deleted');
+
+	// 24. set.update enforces per-mode validation on the merged set.
+	console.log('step 24 — set.update rejects mode-invalid edits');
+	const badEdit = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: ulid(),
+			op: 'set.update',
+			payload: { id: prSetB, weight: null }
+		})
+	});
+	assert(
+		!badEdit.ok && badEdit.status >= 400 && badEdit.status < 500,
+		`clearing weight on a strength set rejected with 4xx (got ${badEdit.status})`
+	);
+
+	// 25. Admin recompute endpoint reconciles every user (idempotent backfill).
+	// Last so its global reconcile can't perturb earlier assertions.
+	console.log('step 25 — admin recompute endpoint');
+	const recompute = await callJson('/api/admin/recompute', { method: 'POST' });
+	assert(recompute.ok, `admin recompute → 2xx (got ${recompute.status})`);
+	assert(
+		typeof recompute.body?.recomputed === 'number' && recompute.body.recomputed >= 1,
+		`recompute returns a user count (got ${JSON.stringify(recompute.body)})`
+	);
+
 	console.log('\nall smoke checks passed');
 }
 
