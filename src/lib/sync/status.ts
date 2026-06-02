@@ -45,14 +45,3 @@ export async function refreshPendingCount(): Promise<void> {
 	const list = await listPending();
 	store.update((s) => ({ ...s, pending: list.length, pendingMutations: list }));
 }
-
-// Subset of pending mutations matching a particular op + filter, used
-// by the Log screen to render optimistic rows for queued set.create
-// calls.
-export async function pendingMatching(
-	predicate: (m: PendingMutation) => boolean
-): Promise<PendingMutation[]> {
-	if (typeof indexedDB === 'undefined') return [];
-	const all = await listPending();
-	return all.filter(predicate);
-}

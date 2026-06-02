@@ -74,11 +74,6 @@ export async function listPending(): Promise<PendingMutation[]> {
 	return (await db.getAllFromIndex(STORE, 'byEnqueuedAt')) as PendingMutation[];
 }
 
-export async function listPendingByOp(op: string): Promise<PendingMutation[]> {
-	const all = await listPending();
-	return all.filter((m) => m.op === op);
-}
-
 export async function complete(mutationId: string): Promise<void> {
 	const db = await getDb();
 	await db.delete(STORE, mutationId);
