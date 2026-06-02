@@ -204,6 +204,50 @@ async function main() {
 	const replayedHits = csv2.split('\n').filter((l) => l.startsWith(replayPayload.id)).length;
 	assert(replayedHits === 1, `replay produced exactly 1 row (got ${replayedHits})`);
 
+	// 7b. Failed-mutation rollback — a handler that throws must NOT leave its
+	// (clientId, mutationId) marked applied, otherwise the client's retry
+	// replays as a no-op and the write is silently lost. We send an invalid
+	// payload (negative weight on loaded equipment, rejected 4xx) under a fixed
+	// mutationId, then retry the SAME mutationId with a valid payload and assert
+	// it actually applies (replayed false) and lands exactly once.
+	console.log('step 7b — failed mutation rolls back its idempotency marker');
+	const retryMutationId = ulid();
+	const retrySetId = ulid();
+	const firstAttempt = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: retryMutationId,
+			op: 'set.create',
+			payload: { id: retrySetId, exerciseId, weight: -5, reps: 8, ts: Date.now() + 110 }
+		})
+	});
+	assert(!firstAttempt.ok, 'invalid set.create rejected');
+	assert(
+		firstAttempt.status >= 400 && firstAttempt.status < 500,
+		`invalid set.create rejected with 4xx (got ${firstAttempt.status})`
+	);
+	const retryAttempt = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: retryMutationId,
+			op: 'set.create',
+			payload: { id: retrySetId, exerciseId, weight: 50, reps: 8, ts: Date.now() + 120 }
+		})
+	});
+	assert(retryAttempt.ok, `retry of failed mutationId applies (got ${retryAttempt.status})`);
+	assert(
+		retryAttempt.body?.replayed === false,
+		'retry is treated as fresh, not a replay of the failed attempt'
+	);
+	const csvRetry = await (await call('/api/export.csv')).text();
+	const retryHits = csvRetry.split('\n').filter((l) => l.startsWith(retrySetId)).length;
+	assert(
+		retryHits === 1,
+		`rolled-back-then-retried mutation landed exactly 1 row (got ${retryHits})`
+	);
+
 	// 8. cardioKind ↔ type invariant on equipment.update.
 	console.log('step 8 — cardioKind invariant on equipment.update');
 	const cardioEqId = ulid();

@@ -231,6 +231,20 @@ function logMutation(clientId: string, mutationId: string, userId: string): bool
 	}
 }
 
+// Roll back the idempotency marker for a mutation whose handler threw, so a
+// later retry of the same (clientId, mutationId) re-applies instead of being
+// short-circuited as a replay. Best-effort: a failed delete here is logged,
+// not rethrown, so it never masks the original handler error.
+function unlogMutation(clientId: string, mutationId: string): void {
+	try {
+		db.$client
+			.prepare(`DELETE FROM mutation_log WHERE client_id = ? AND mutation_id = ?`)
+			.run(clientId, mutationId);
+	} catch (err) {
+		console.error('[trajectory] failed to roll back mutation_log entry:', err);
+	}
+}
+
 // ─── op handlers ────────────────────────────────────────────────────────
 
 // Per-user tenancy guard. A gym is the root of ownership in this schema —
@@ -1422,45 +1436,57 @@ export async function applyMutation(
 		return { replayed: true, result: null };
 	}
 
+	// The log row is committed before the handler runs (so two concurrent
+	// duplicates serialise — the second sees the conflict and replays). But
+	// that means a handler error would otherwise leave the mutation marked
+	// "applied" forever: the client's retry replays as a no-op and the write
+	// is silently lost. Roll the marker back on any throw so the retry
+	// genuinely re-applies. Handlers are idempotent (ULID PKs +
+	// onConflictDoNothing), so re-applying after a partial failure is safe.
 	const op = envelope.op as MutationOp['op'];
 	const payload = envelope.payload as never;
-	switch (op) {
-		case 'gym.create':
-			return { replayed: false, result: await gymCreate(payload, userId) };
-		case 'gym.update':
-			return { replayed: false, result: await gymUpdate(payload, userId) };
-		case 'gym.delete':
-			return { replayed: false, result: await gymDelete(payload, userId) };
-		case 'equipment.create':
-			return { replayed: false, result: await equipmentCreate(payload, userId) };
-		case 'equipment.update':
-			return { replayed: false, result: await equipmentUpdate(payload, userId) };
-		case 'equipment.delete':
-			return { replayed: false, result: await equipmentDelete(payload, userId) };
-		case 'exercise.create':
-			return { replayed: false, result: await exerciseCreate(payload, userId) };
-		case 'exercise.update':
-			return { replayed: false, result: await exerciseUpdate(payload, userId) };
-		case 'exercise.delete':
-			return { replayed: false, result: await exerciseDelete(payload, userId) };
-		case 'set.create':
-			return { replayed: false, result: await setCreate(payload, userId) };
-		case 'set.update':
-			return { replayed: false, result: await setUpdate(payload, userId) };
-		case 'set.delete':
-			return { replayed: false, result: await setDelete(payload, userId) };
-		case 'session.start':
-			return { replayed: false, result: await sessionStart(payload, userId) };
-		case 'session.end':
-			return { replayed: false, result: await sessionEnd(payload, userId) };
-		case 'session.endUndo':
-			return { replayed: false, result: await sessionEndUndo(payload, userId) };
-		case 'session.delete':
-			return { replayed: false, result: await sessionDelete(payload, userId) };
-		case 'user.update':
-			return { replayed: false, result: await userUpdate(payload, userId) };
-		default:
-			badRequest(`unknown op: ${op}`);
+	try {
+		switch (op) {
+			case 'gym.create':
+				return { replayed: false, result: await gymCreate(payload, userId) };
+			case 'gym.update':
+				return { replayed: false, result: await gymUpdate(payload, userId) };
+			case 'gym.delete':
+				return { replayed: false, result: await gymDelete(payload, userId) };
+			case 'equipment.create':
+				return { replayed: false, result: await equipmentCreate(payload, userId) };
+			case 'equipment.update':
+				return { replayed: false, result: await equipmentUpdate(payload, userId) };
+			case 'equipment.delete':
+				return { replayed: false, result: await equipmentDelete(payload, userId) };
+			case 'exercise.create':
+				return { replayed: false, result: await exerciseCreate(payload, userId) };
+			case 'exercise.update':
+				return { replayed: false, result: await exerciseUpdate(payload, userId) };
+			case 'exercise.delete':
+				return { replayed: false, result: await exerciseDelete(payload, userId) };
+			case 'set.create':
+				return { replayed: false, result: await setCreate(payload, userId) };
+			case 'set.update':
+				return { replayed: false, result: await setUpdate(payload, userId) };
+			case 'set.delete':
+				return { replayed: false, result: await setDelete(payload, userId) };
+			case 'session.start':
+				return { replayed: false, result: await sessionStart(payload, userId) };
+			case 'session.end':
+				return { replayed: false, result: await sessionEnd(payload, userId) };
+			case 'session.endUndo':
+				return { replayed: false, result: await sessionEndUndo(payload, userId) };
+			case 'session.delete':
+				return { replayed: false, result: await sessionDelete(payload, userId) };
+			case 'user.update':
+				return { replayed: false, result: await userUpdate(payload, userId) };
+			default:
+				badRequest(`unknown op: ${op}`);
+		}
+	} catch (err) {
+		unlogMutation(envelope.clientId, envelope.mutationId);
+		throw err;
 	}
 }
 
