@@ -2,8 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
 import { gym, equipment, exercise, set as setTable, workoutSession } from '$lib/server/db/schema';
-import { isNull, eq, and, desc, asc } from 'drizzle-orm';
-import { effectiveSetLoad } from '$lib/server/db/effective-load';
+import { isNull, eq, and, desc, asc, sql } from 'drizzle-orm';
 
 export interface HistorySessionSummary {
 	id: string;
@@ -37,40 +36,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 		.where(eq(workoutSession.userId, locals.user.id))
 		.orderBy(desc(workoutSession.startedAt));
 
-	const sessionIds = sessions.map((s) => s.id);
-
-	// All sets for this user's sessions, joined to equipment for the names.
-	const sessionSets = sessionIds.length
-		? ((await db
-				.select({
-					sessionId: setTable.workoutSessionId,
-					weight: setTable.weight,
-					reps: setTable.reps,
-					durationMin: setTable.durationMin,
-					extras: setTable.extras,
-					ts: setTable.ts,
-					equipmentId: exercise.equipmentId,
-					equipmentName: equipment.name,
-					equipmentInputMode: equipment.inputMode
-				})
-				.from(setTable)
-				.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
-				.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
-				.where(and(eq(setTable.userId, locals.user.id), isNull(setTable.deletedAt)))
-				.orderBy(asc(setTable.ts))) as {
-				sessionId: string;
-				weight: number | null;
-				reps: number | null;
-				durationMin: number | null;
-				extras: Record<string, number> | null;
-				ts: Date;
-				equipmentId: string;
-				equipmentName: string;
-				equipmentInputMode: string;
-			}[])
-		: [];
-
-	// Group sets by session for summary metrics.
+	// Per-session summary metrics, aggregated in SQL so we transfer one row per
+	// session (numeric) plus one row per distinct machine, rather than every
+	// set row for the user's entire history. Tombstone filter mirrors the prior
+	// JS pass (set.deletedAt only — deleted equipment's sets still count here,
+	// matching pre-existing history behaviour).
 	const summaries = new Map<
 		string,
 		{
@@ -82,33 +52,67 @@ export const load: PageServerLoad = async ({ locals }) => {
 			lastSetTs: number | null;
 		}
 	>();
-	for (const s of sessionSets) {
-		const cur = summaries.get(s.sessionId) ?? {
-			machineOrder: [] as string[],
+
+	// effective load = COALESCE(weight,0) + COALESCE(extras.bwLoadKg,0); volume
+	// only counts sets with reps and at least one of weight / bwLoadKg present —
+	// identical to the previous effectiveSetLoad(s) * reps accumulation.
+	const numericRows = (await db
+		.select({
+			sessionId: setTable.workoutSessionId,
+			setCount: sql<number>`COUNT(*)`,
+			lastSetTs: sql<number>`MAX(${setTable.ts})`,
+			cardioDurationMin: sql<number>`COALESCE(SUM(CASE WHEN ${equipment.inputMode} = 'distance_time' THEN ${setTable.durationMin} ELSE 0 END), 0)`,
+			totalVolume: sql<number>`COALESCE(SUM(CASE WHEN ${setTable.reps} IS NOT NULL AND (${setTable.weight} IS NOT NULL OR json_extract(${setTable.extras}, '$.bwLoadKg') IS NOT NULL) THEN (COALESCE(${setTable.weight}, 0) + COALESCE(json_extract(${setTable.extras}, '$.bwLoadKg'), 0)) * ${setTable.reps} ELSE 0 END), 0)`
+		})
+		.from(setTable)
+		.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
+		.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
+		.where(and(eq(setTable.userId, locals.user.id), isNull(setTable.deletedAt)))
+		.groupBy(setTable.workoutSessionId)) as {
+		sessionId: string;
+		setCount: number;
+		lastSetTs: number | null;
+		cardioDurationMin: number;
+		totalVolume: number;
+	}[];
+
+	for (const r of numericRows) {
+		summaries.set(r.sessionId, {
+			machineOrder: [],
 			machineNames: new Map<string, string>(),
-			setCount: 0,
-			totalVolume: 0,
-			cardioDurationMin: 0,
-			lastSetTs: null as number | null
-		};
-		if (!cur.machineNames.has(s.equipmentId)) {
-			cur.machineNames.set(s.equipmentId, s.equipmentName);
-			cur.machineOrder.push(s.equipmentId);
-		}
-		cur.setCount += 1;
-		if (s.reps != null && (s.weight != null || s.extras?.bwLoadKg != null)) {
-			cur.totalVolume += effectiveSetLoad(s) * s.reps;
-		}
-		// Only cardio sessions feed into the "cardio min" headline. Plank / wall
-		// sit (mode = 'timed' or 'timed_weighted') also have a duration but
-		// they're isometric strength work — counting them here would inflate
-		// the cardio readout and make the heatmap misleading.
-		if (s.durationMin != null && s.equipmentInputMode === 'distance_time') {
-			cur.cardioDurationMin += s.durationMin;
-		}
-		const tsMs = s.ts.getTime();
-		if (cur.lastSetTs == null || tsMs > cur.lastSetTs) cur.lastSetTs = tsMs;
-		summaries.set(s.sessionId, cur);
+			setCount: r.setCount,
+			totalVolume: r.totalVolume,
+			cardioDurationMin: r.cardioDurationMin,
+			lastSetTs: r.lastSetTs ?? null
+		});
+	}
+
+	// Distinct machines per session, ordered by first appearance (MIN ts) so
+	// machineOrder reproduces the old first-seen order from the ts-asc scan.
+	const machineRows = (await db
+		.select({
+			sessionId: setTable.workoutSessionId,
+			equipmentId: exercise.equipmentId,
+			name: equipment.name,
+			firstTs: sql<number>`MIN(${setTable.ts})`
+		})
+		.from(setTable)
+		.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
+		.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
+		.where(and(eq(setTable.userId, locals.user.id), isNull(setTable.deletedAt)))
+		.groupBy(setTable.workoutSessionId, exercise.equipmentId, equipment.name)
+		.orderBy(asc(setTable.workoutSessionId), sql`MIN(${setTable.ts}) ASC`)) as {
+		sessionId: string;
+		equipmentId: string;
+		name: string;
+		firstTs: number;
+	}[];
+
+	for (const m of machineRows) {
+		const cur = summaries.get(m.sessionId);
+		if (!cur || cur.machineNames.has(m.equipmentId)) continue;
+		cur.machineNames.set(m.equipmentId, m.name);
+		cur.machineOrder.push(m.equipmentId);
 	}
 
 	const gymById = new Map(gyms.map((g) => [g.id, g] as const));
