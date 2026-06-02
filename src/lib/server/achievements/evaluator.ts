@@ -48,6 +48,10 @@ interface EvalState {
 }
 
 const ONE_DAY_MS = 86_400_000;
+// Longest gap between two sets that still counts as "active" for session
+// duration badges (easter-session-duration-min). Anything longer is a break /
+// sporadic logging, not training time, so it's capped to this.
+const ACTIVE_REST_CAP_MS = 10 * 60_000;
 
 export function evaluateAchievements(
 	tx: Tx,
@@ -369,8 +373,33 @@ function matches(tx: Tx, userId: string, predicate: Predicate, state: EvalState)
 		case 'easter-session-duration-min': {
 			const s = state.session;
 			if (!s || !s.endedAt) return false;
-			const minutes = (s.endedAt.getTime() - s.startedAt.getTime()) / 60_000;
-			return minutes >= predicate.minutes;
+			// Active training time, NOT wall-clock span. A session auto-extends
+			// across long gaps (and backdated sets group by calendar day), so
+			// endedAt - startedAt can reach hours from a handful of sets logged
+			// sporadically. Sum the inter-set gaps with each capped at
+			// ACTIVE_REST_CAP_MS, so only sustained work counts — a multi-hour
+			// idle gap contributes at most one rest, not its full length.
+			const tsList = (
+				tx
+					.select({ ts: setTable.ts })
+					.from(setTable)
+					.where(
+						and(
+							eq(setTable.workoutSessionId, s.id),
+							eq(setTable.userId, userId),
+							isNull(setTable.deletedAt)
+						)
+					)
+					.all() as { ts: Date }[]
+			)
+				.map((r) => r.ts.getTime())
+				.sort((a, b) => a - b);
+			if (tsList.length < 2) return false;
+			let activeMs = 0;
+			for (let i = 1; i < tsList.length; i++) {
+				activeMs += Math.min(tsList[i] - tsList[i - 1], ACTIVE_REST_CAP_MS);
+			}
+			return activeMs / 60_000 >= predicate.minutes;
 		}
 
 		case 'easter-session-set-density': {
