@@ -13,7 +13,7 @@ import { isNull, eq, and, asc } from 'drizzle-orm';
 import { effectiveSetLoad } from '$lib/server/db/effective-load';
 
 export interface SessionDetailEquipmentBlock {
-	equipment: Pick<Equipment, 'id' | 'name' | 'type' | 'glyph' | 'tint' | 'cardioKind'>;
+	equipment: Pick<Equipment, 'id' | 'name' | 'type' | 'glyph' | 'tint' | 'cardioKind' | 'inputMode'>;
 	sets: Array<{
 		id: string;
 		exerciseName: string;
@@ -60,7 +60,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 			equipmentType: equipment.type,
 			equipmentGlyph: equipment.glyph,
 			equipmentTint: equipment.tint,
-			equipmentCardioKind: equipment.cardioKind
+			equipmentCardioKind: equipment.cardioKind,
+			equipmentInputMode: equipment.inputMode
 		})
 		.from(setTable)
 		.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
@@ -82,6 +83,7 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		equipmentGlyph: string;
 		equipmentTint: string;
 		equipmentCardioKind: string | null;
+		equipmentInputMode: string;
 	}>;
 
 	// Group by equipment, preserving first-seen order.
@@ -97,7 +99,8 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 					type: s.equipmentType,
 					glyph: s.equipmentGlyph,
 					tint: s.equipmentTint,
-					cardioKind: s.equipmentCardioKind
+					cardioKind: s.equipmentCardioKind,
+					inputMode: s.equipmentInputMode
 				},
 				sets: []
 			});

@@ -32,6 +32,16 @@ export const INPUT_MODES: InputMode[] = [
 	'weight_distance'
 ];
 
+// Partial set-metric payload emitted by an inline edit (SetRow / CardioRow).
+// Only the fields a given mode edits are present; the server merges them over
+// the stored row (preserving untouched fields like the bodyweight snapshot).
+export type SetEditFields = {
+	weight?: number | null;
+	reps?: number | null;
+	durationMin?: number | null;
+	extras?: Record<string, number> | null;
+};
+
 export interface ModeShape {
 	hasWeight: boolean;
 	hasReps: boolean;
