@@ -253,6 +253,8 @@ function matches(tx: Tx, userId: string, predicate: Predicate, state: EvalState)
 					and(
 						eq(setTable.userId, userId),
 						isNull(setTable.deletedAt),
+						isNull(exercise.deletedAt),
+						isNull(equipment.deletedAt),
 						eq(equipment.inputMode, 'distance_time')
 					)
 				)
@@ -266,7 +268,14 @@ function matches(tx: Tx, userId: string, predicate: Predicate, state: EvalState)
 				.from(setTable)
 				.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
 				.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
-				.where(and(eq(setTable.userId, userId), isNull(setTable.deletedAt)))
+				.where(
+					and(
+						eq(setTable.userId, userId),
+						isNull(setTable.deletedAt),
+						isNull(exercise.deletedAt),
+						isNull(equipment.deletedAt)
+					)
+				)
 				.get() as { modes: number } | undefined;
 			// 6 = MODE_SHAPE size in $lib/input-modes. If you add a mode there,
 			// bump this. Skipped over a constant import to keep the evaluator
@@ -281,10 +290,13 @@ function matches(tx: Tx, userId: string, predicate: Predicate, state: EvalState)
 				.select({ count: countDistinct(exercise.equipmentId) })
 				.from(setTable)
 				.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
+				.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
 				.where(
 					and(
 						eq(setTable.userId, userId),
 						isNull(setTable.deletedAt),
+						isNull(exercise.deletedAt),
+						isNull(equipment.deletedAt),
 						gte(setTable.ts, new Date(start)),
 						lt(setTable.ts, new Date(end))
 					)
@@ -305,6 +317,8 @@ function matches(tx: Tx, userId: string, predicate: Predicate, state: EvalState)
 					and(
 						eq(setTable.userId, userId),
 						isNull(setTable.deletedAt),
+						isNull(exercise.deletedAt),
+						isNull(equipment.deletedAt),
 						gte(setTable.ts, new Date(start)),
 						lt(setTable.ts, new Date(end))
 					)
