@@ -231,6 +231,20 @@ function logMutation(clientId: string, mutationId: string, userId: string): bool
 	}
 }
 
+// Roll back the idempotency marker for a mutation whose handler threw, so a
+// later retry of the same (clientId, mutationId) re-applies instead of being
+// short-circuited as a replay. Best-effort: a failed delete here is logged,
+// not rethrown, so it never masks the original handler error.
+function unlogMutation(clientId: string, mutationId: string): void {
+	try {
+		db.$client
+			.prepare(`DELETE FROM mutation_log WHERE client_id = ? AND mutation_id = ?`)
+			.run(clientId, mutationId);
+	} catch (err) {
+		console.error('[trajectory] failed to roll back mutation_log entry:', err);
+	}
+}
+
 // ─── op handlers ────────────────────────────────────────────────────────
 
 // Per-user tenancy guard. A gym is the root of ownership in this schema —
@@ -409,6 +423,23 @@ async function equipmentCreate(
 		type === 'machine' || type === 'cable' || type === 'cardio' || AUTO_HIDDEN_MODES.has(inputMode);
 	if (autoHide) {
 		const hiddenId = derivedExerciseId(payload.id);
+		// derivedExerciseId is lossy (it rewrites the last ULID char), so two
+		// equipment ULIDs sharing their first 25 chars would map to the same
+		// hidden-exercise id. Without this guard the onConflictDoNothing below
+		// would silently no-op and the SELECT would hand back the *other*
+		// equipment's hidden exercise, attributing this equipment's sets to it.
+		// Refuse the collision loudly instead. (A replay of this same equipment
+		// resolves to the same id and is allowed through — that's idempotent.)
+		const existingHidden = (
+			await db
+				.select({ equipmentId: exercise.equipmentId })
+				.from(exercise)
+				.where(eq(exercise.id, hiddenId))
+				.limit(1)
+		)[0];
+		if (existingHidden && existingHidden.equipmentId !== payload.id) {
+			badRequest('equipment id collides with an existing hidden exercise; retry with a fresh id');
+		}
 		await db
 			.insert(exercise)
 			.values({
@@ -816,31 +847,36 @@ function resolveSession(
 // (e.g. zero or null on the relevant column) never PR. The strength axis
 // uses *effective load* (weight + bwLoadKg snapshot) so a heavier user or
 // larger bodyweight pct can lock in a higher PR than added weight alone.
-async function evaluatePr(
+// Runs inside the caller's transaction (sync — better-sqlite3 12.x rejects
+// async transaction bodies) so the prior-max read and the set insert are
+// atomic: two concurrent set.create calls for the same exercise can no longer
+// both read the same prior max and both flag PR. Uses tx + .get() to execute
+// synchronously.
+function evaluatePr(
+	tx: Tx,
 	userId: string,
 	exerciseId: string,
 	inputMode: string,
 	weight: number | null,
 	durationMin: number | null,
 	extras: Record<string, number> | null
-): Promise<boolean> {
+): boolean {
 	if (inputMode === 'distance_time') {
 		const distance = extras?.distance;
 		if (typeof distance !== 'number' || !Number.isFinite(distance) || distance <= 0) {
 			return false;
 		}
-		const row = (
-			await db
-				.select({ max: sql<number | null>`MAX(json_extract(${setTable.extras}, '$.distance'))` })
-				.from(setTable)
-				.where(
-					and(
-						eq(setTable.userId, userId),
-						eq(setTable.exerciseId, exerciseId),
-						isNull(setTable.deletedAt)
-					)
+		const row = tx
+			.select({ max: sql<number | null>`MAX(json_extract(${setTable.extras}, '$.distance'))` })
+			.from(setTable)
+			.where(
+				and(
+					eq(setTable.userId, userId),
+					eq(setTable.exerciseId, exerciseId),
+					isNull(setTable.deletedAt)
 				)
-		)[0];
+			)
+			.get() as { max: number | null } | undefined;
 		const prior = row?.max ?? null;
 		return prior == null || distance > prior;
 	}
@@ -848,18 +884,17 @@ async function evaluatePr(
 		if (typeof durationMin !== 'number' || !Number.isFinite(durationMin) || durationMin <= 0) {
 			return false;
 		}
-		const row = (
-			await db
-				.select({ max: sql<number | null>`MAX(${setTable.durationMin})` })
-				.from(setTable)
-				.where(
-					and(
-						eq(setTable.userId, userId),
-						eq(setTable.exerciseId, exerciseId),
-						isNull(setTable.deletedAt)
-					)
+		const row = tx
+			.select({ max: sql<number | null>`MAX(${setTable.durationMin})` })
+			.from(setTable)
+			.where(
+				and(
+					eq(setTable.userId, userId),
+					eq(setTable.exerciseId, exerciseId),
+					isNull(setTable.deletedAt)
 				)
-		)[0];
+			)
+			.get() as { max: number | null } | undefined;
 		const prior = row?.max ?? null;
 		return prior == null || durationMin > prior;
 	}
@@ -872,23 +907,22 @@ async function evaluatePr(
 		typeof extras?.bwLoadKg === 'number' && Number.isFinite(extras.bwLoadKg) ? extras.bwLoadKg : 0;
 	const effective = weight + bwLoad;
 	if (effective <= 0) return false;
-	const row = (
-		await db
-			.select({
-				max: sql<number | null>`MAX(
-					COALESCE(${setTable.weight}, 0)
-					+ COALESCE(json_extract(${setTable.extras}, '$.bwLoadKg'), 0)
-				)`
-			})
-			.from(setTable)
-			.where(
-				and(
-					eq(setTable.userId, userId),
-					eq(setTable.exerciseId, exerciseId),
-					isNull(setTable.deletedAt)
-				)
+	const row = tx
+		.select({
+			max: sql<number | null>`MAX(
+				COALESCE(${setTable.weight}, 0)
+				+ COALESCE(json_extract(${setTable.extras}, '$.bwLoadKg'), 0)
+			)`
+		})
+		.from(setTable)
+		.where(
+			and(
+				eq(setTable.userId, userId),
+				eq(setTable.exerciseId, exerciseId),
+				isNull(setTable.deletedAt)
 			)
-	)[0];
+		)
+		.get() as { max: number | null } | undefined;
 	const prior = row?.max ?? null;
 	return prior == null || effective > prior;
 }
@@ -1067,11 +1101,6 @@ async function setCreate(
 		}
 	}
 
-	// PR evaluation per inputMode. Strict greater-than only — ties don't
-	// count. Computed inside the transaction below so a concurrent set.create
-	// from the same user can't both see the same prior max and both flag PR.
-	const isPr = await evaluatePr(userId, payload.exerciseId, mode, weight, durationMin, extras);
-
 	// Resolve session + insert the set in one transaction. Two concurrent
 	// set.create calls from the same user (e.g. queue drain firing twice)
 	// would otherwise each see "no open session" and create duplicates.
@@ -1080,6 +1109,13 @@ async function setCreate(
 	// Sync body required by better-sqlite3 12.x.
 	const { session, row } = db.transaction((tx) => {
 		const session = resolveSession(tx, userId, eqRow.gymId, ts);
+
+		// PR evaluation per inputMode. Strict greater-than only — ties don't
+		// count. Inside the transaction so the prior-max read and the insert
+		// are atomic: a concurrent set.create for the same exercise can't read
+		// the same prior max and also flag PR.
+		const isPr = evaluatePr(tx, userId, payload.exerciseId, mode, weight, durationMin, extras);
+
 		tx.insert(setTable)
 			.values({
 				id: payload.id,
@@ -1422,45 +1458,57 @@ export async function applyMutation(
 		return { replayed: true, result: null };
 	}
 
+	// The log row is committed before the handler runs (so two concurrent
+	// duplicates serialise — the second sees the conflict and replays). But
+	// that means a handler error would otherwise leave the mutation marked
+	// "applied" forever: the client's retry replays as a no-op and the write
+	// is silently lost. Roll the marker back on any throw so the retry
+	// genuinely re-applies. Handlers are idempotent (ULID PKs +
+	// onConflictDoNothing), so re-applying after a partial failure is safe.
 	const op = envelope.op as MutationOp['op'];
 	const payload = envelope.payload as never;
-	switch (op) {
-		case 'gym.create':
-			return { replayed: false, result: await gymCreate(payload, userId) };
-		case 'gym.update':
-			return { replayed: false, result: await gymUpdate(payload, userId) };
-		case 'gym.delete':
-			return { replayed: false, result: await gymDelete(payload, userId) };
-		case 'equipment.create':
-			return { replayed: false, result: await equipmentCreate(payload, userId) };
-		case 'equipment.update':
-			return { replayed: false, result: await equipmentUpdate(payload, userId) };
-		case 'equipment.delete':
-			return { replayed: false, result: await equipmentDelete(payload, userId) };
-		case 'exercise.create':
-			return { replayed: false, result: await exerciseCreate(payload, userId) };
-		case 'exercise.update':
-			return { replayed: false, result: await exerciseUpdate(payload, userId) };
-		case 'exercise.delete':
-			return { replayed: false, result: await exerciseDelete(payload, userId) };
-		case 'set.create':
-			return { replayed: false, result: await setCreate(payload, userId) };
-		case 'set.update':
-			return { replayed: false, result: await setUpdate(payload, userId) };
-		case 'set.delete':
-			return { replayed: false, result: await setDelete(payload, userId) };
-		case 'session.start':
-			return { replayed: false, result: await sessionStart(payload, userId) };
-		case 'session.end':
-			return { replayed: false, result: await sessionEnd(payload, userId) };
-		case 'session.endUndo':
-			return { replayed: false, result: await sessionEndUndo(payload, userId) };
-		case 'session.delete':
-			return { replayed: false, result: await sessionDelete(payload, userId) };
-		case 'user.update':
-			return { replayed: false, result: await userUpdate(payload, userId) };
-		default:
-			badRequest(`unknown op: ${op}`);
+	try {
+		switch (op) {
+			case 'gym.create':
+				return { replayed: false, result: await gymCreate(payload, userId) };
+			case 'gym.update':
+				return { replayed: false, result: await gymUpdate(payload, userId) };
+			case 'gym.delete':
+				return { replayed: false, result: await gymDelete(payload, userId) };
+			case 'equipment.create':
+				return { replayed: false, result: await equipmentCreate(payload, userId) };
+			case 'equipment.update':
+				return { replayed: false, result: await equipmentUpdate(payload, userId) };
+			case 'equipment.delete':
+				return { replayed: false, result: await equipmentDelete(payload, userId) };
+			case 'exercise.create':
+				return { replayed: false, result: await exerciseCreate(payload, userId) };
+			case 'exercise.update':
+				return { replayed: false, result: await exerciseUpdate(payload, userId) };
+			case 'exercise.delete':
+				return { replayed: false, result: await exerciseDelete(payload, userId) };
+			case 'set.create':
+				return { replayed: false, result: await setCreate(payload, userId) };
+			case 'set.update':
+				return { replayed: false, result: await setUpdate(payload, userId) };
+			case 'set.delete':
+				return { replayed: false, result: await setDelete(payload, userId) };
+			case 'session.start':
+				return { replayed: false, result: await sessionStart(payload, userId) };
+			case 'session.end':
+				return { replayed: false, result: await sessionEnd(payload, userId) };
+			case 'session.endUndo':
+				return { replayed: false, result: await sessionEndUndo(payload, userId) };
+			case 'session.delete':
+				return { replayed: false, result: await sessionDelete(payload, userId) };
+			case 'user.update':
+				return { replayed: false, result: await userUpdate(payload, userId) };
+			default:
+				badRequest(`unknown op: ${op}`);
+		}
+	} catch (err) {
+		unlogMutation(envelope.clientId, envelope.mutationId);
+		throw err;
 	}
 }
 

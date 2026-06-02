@@ -10,7 +10,7 @@ import {
 	type Equipment,
 	type Gym
 } from '$lib/server/db/schema';
-import { isNull, isNotNull, eq, and, desc, asc, gte, lt } from 'drizzle-orm';
+import { isNull, isNotNull, eq, and, desc, asc, gte, lt, sql } from 'drizzle-orm';
 import { resolveActiveGym } from '$lib/server/active-gym';
 import { parseAsOfTs, startOfUtcDay, endOfUtcDay } from '$lib/dateMode';
 import { SESSION_EXTEND_MS } from '$lib/server/mutations';
@@ -67,46 +67,68 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 		.where(and(isNull(equipment.deletedAt), eq(equipment.gymId, activeGym.id)))
 		.orderBy(asc(equipment.sortOrder), asc(equipment.createdAt));
 
-	// Last-set-per-equipment for the current user, scoped to ts ≤ referenceTs
-	// when in date-mode. Without that filter, backdating would prefill a
-	// past entry with newer data — silently rewriting the past.
+	// Last-set-per-equipment for the current user, scoped to the active gym's
+	// equipment (the only tiles this page renders) and to ts ≤ referenceTs when
+	// in date-mode — without that filter, backdating would prefill a past entry
+	// with newer data, silently rewriting the past. A row_number() window picks
+	// the latest set per equipment in SQL so we transfer one row per tile rather
+	// than the user's entire set history.
 	const setFilters = [
 		eq(setTable.userId, locals.user.id),
 		isNull(setTable.deletedAt),
-		isNull(exercise.deletedAt)
+		isNull(exercise.deletedAt),
+		isNull(equipment.deletedAt),
+		eq(equipment.gymId, activeGym.id)
 	];
 	if (asOfTs != null) {
 		setFilters.push(lt(setTable.ts, new Date(endOfUtcDay(asOfTs))));
 	}
 
-	const lastSetsRaw = equipments.length
-		? ((await db
-				.select({
-					equipmentId: exercise.equipmentId,
-					weight: setTable.weight,
-					reps: setTable.reps,
-					durationMin: setTable.durationMin,
-					extras: setTable.extras,
-					ts: setTable.ts
-				})
-				.from(setTable)
-				.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
-				.where(and(...setFilters))
-				.orderBy(desc(setTable.ts))) as {
-				equipmentId: string;
-				weight: number | null;
-				reps: number | null;
-				durationMin: number | null;
-				extras: Record<string, number> | null;
-				ts: Date;
-			}[])
-		: [];
+	type LastSetRow = {
+		equipmentId: string;
+		weight: number | null;
+		reps: number | null;
+		durationMin: number | null;
+		extras: Record<string, number> | null;
+		ts: Date;
+	};
 
-	const lastByEquipment = new Map<string, (typeof lastSetsRaw)[number]>();
+	let lastSetsRaw: LastSetRow[] = [];
+	if (equipments.length) {
+		const ranked = db
+			.select({
+				equipmentId: exercise.equipmentId,
+				weight: setTable.weight,
+				reps: setTable.reps,
+				durationMin: setTable.durationMin,
+				extras: setTable.extras,
+				ts: setTable.ts,
+				rn: sql<number>`row_number() over (partition by ${exercise.equipmentId} order by ${setTable.ts} desc)`.as(
+					'rn'
+				)
+			})
+			.from(setTable)
+			.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
+			.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
+			.where(and(...setFilters))
+			.as('ranked');
+
+		lastSetsRaw = (await db
+			.select({
+				equipmentId: ranked.equipmentId,
+				weight: ranked.weight,
+				reps: ranked.reps,
+				durationMin: ranked.durationMin,
+				extras: ranked.extras,
+				ts: ranked.ts
+			})
+			.from(ranked)
+			.where(eq(ranked.rn, 1))) as LastSetRow[];
+	}
+
+	const lastByEquipment = new Map<string, LastSetRow>();
 	for (const row of lastSetsRaw) {
-		if (!lastByEquipment.has(row.equipmentId)) {
-			lastByEquipment.set(row.equipmentId, row);
-		}
+		lastByEquipment.set(row.equipmentId, row);
 	}
 
 	const dayMs = 24 * 60 * 60 * 1000;
