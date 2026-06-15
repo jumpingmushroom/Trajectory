@@ -63,6 +63,11 @@
 		mode === 'edit' ? ((editTarget!.inputMode as InputMode) ?? 'weighted') : 'weighted'
 	);
 	let notes = $state<string>(mode === 'edit' ? (editTarget!.notes ?? '') : '');
+	// Rest target in seconds. null = inherit the user's global default;
+	// 0 = no timer on this machine; >0 = explicit per-equipment rest.
+	let restTargetSec = $state<number | null>(
+		mode === 'edit' ? (editTarget!.restTargetSec ?? null) : null
+	);
 	let photoFile = $state<File | null>(null);
 	let photoPreview = $state<string | null>(initialPhotoSrc);
 	let removePhoto = $state(false);
@@ -86,7 +91,8 @@
 		cardioKind: mode === 'edit' ? (editTarget!.cardioKind as CardioKind | null) : null,
 		inputMode: mode === 'edit' ? ((editTarget!.inputMode as InputMode) ?? 'weighted') : 'weighted',
 		notes: mode === 'edit' ? (editTarget!.notes ?? '') : '',
-		photoPath: mode === 'edit' ? editTarget!.photoPath : null
+		photoPath: mode === 'edit' ? editTarget!.photoPath : null,
+		restTargetSec: mode === 'edit' ? (editTarget!.restTargetSec ?? null) : null
 	};
 
 	// When search is non-empty, render a flat filtered list. When empty,
@@ -222,7 +228,8 @@
 				glyph,
 				cardioKind: type === 'cardio' ? cardioKind : null,
 				bodyweightPct: defaultBwPct ?? null,
-				inputMode
+				inputMode,
+				restTargetSec
 			});
 			if (photoFile) {
 				const form = new FormData();
@@ -264,6 +271,7 @@
 			cardioKind?: CardioKind | null;
 			notes?: string | null;
 			inputMode?: InputMode;
+			restTargetSec?: number | null;
 		};
 		const diff: DiffPayload = { id: editTarget.id };
 		let hasFieldDiff = false;
@@ -295,6 +303,10 @@
 		}
 		if (inputMode !== initial.inputMode) {
 			diff.inputMode = inputMode;
+			hasFieldDiff = true;
+		}
+		if (restTargetSec !== (initial.restTargetSec ?? null)) {
+			diff.restTargetSec = restTargetSec;
 			hasFieldDiff = true;
 		}
 
@@ -688,6 +700,38 @@
 				How sets are logged on this equipment.
 			</span>
 		</div>
+
+		<label class="flex flex-col gap-1">
+			<span class="text-[10px] font-bold tracking-[0.16em] uppercase" style="color: var(--color-text-dim-2);">
+				Rest timer
+			</span>
+			<select
+				value={restTargetSec === null ? 'inherit' : restTargetSec === 0 ? 'off' : 'custom'}
+				onchange={(e) => {
+					const v = (e.currentTarget as HTMLSelectElement).value;
+					restTargetSec = v === 'inherit' ? null : v === 'off' ? 0 : Math.max(1, restTargetSec ?? 90);
+				}}
+				class="rounded-xl border px-3 py-2"
+				style="background: var(--color-surface); border-color: var(--color-line); color: var(--color-text);"
+			>
+				<option value="inherit">Use default</option>
+				<option value="off">Off</option>
+				<option value="custom">Custom…</option>
+			</select>
+			{#if restTargetSec !== null && restTargetSec !== 0}
+				<input
+					type="number"
+					min="1"
+					max="3600"
+					step="5"
+					value={restTargetSec}
+					oninput={(e) => (restTargetSec = Math.min(3600, Math.max(1, Number((e.currentTarget as HTMLInputElement).value) || 1)))}
+					class="rounded-xl border px-3 py-2 tabular-nums"
+					style="background: var(--color-surface); border-color: var(--color-line); color: var(--color-text);"
+					aria-label="Rest seconds"
+				/>
+			{/if}
+		</label>
 	</div>
 {/snippet}
 
