@@ -770,6 +770,79 @@ async function main() {
 		`clearing weight on a strength set rejected with 4xx (got ${badEdit.status})`
 	);
 
+	// 26. Rest timer fields: equipment.restTargetSec round-trip + user rest settings.
+	console.log('step 26 — rest timer server-contract assertions');
+
+	// Set restTargetSec to 120 on the main smoke equipment and read it back.
+	const setRest = await mutate('equipment.update', { id: equipmentId, restTargetSec: 120 });
+	assert(
+		setRest?.result?.restTargetSec === 120,
+		`equipment.update stores restTargetSec=120 (got ${setRest?.result?.restTargetSec})`
+	);
+
+	// Clear restTargetSec → null means "inherit from user default".
+	const clearRest = await mutate('equipment.update', { id: equipmentId, restTargetSec: null });
+	assert(
+		clearRest?.result?.restTargetSec === null,
+		`equipment.update clears restTargetSec to null (got ${clearRest?.result?.restTargetSec})`
+	);
+
+	// Negative value must be rejected (below the 0–3600 range).
+	const badRestEq = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: ulid(),
+			op: 'equipment.update',
+			payload: { id: equipmentId, restTargetSec: -1 }
+		})
+	});
+	assert(!badRestEq.ok, 'equipment.update with restTargetSec=-1 rejected');
+	assert(
+		badRestEq.status >= 400 && badRestEq.status < 500,
+		`restTargetSec=-1 rejected with 4xx (got ${badRestEq.status})`
+	);
+
+	// user.update rest settings round-trip.
+	const setUserRest = await mutate('user.update', {
+		restDefaultSec: 75,
+		restTimerEnabled: false,
+		restSoundEnabled: false,
+		restVibrateEnabled: true
+	});
+	assert(
+		setUserRest?.result?.restDefaultSec === 75,
+		`user.update stores restDefaultSec=75 (got ${setUserRest?.result?.restDefaultSec})`
+	);
+	assert(
+		setUserRest?.result?.restTimerEnabled === false,
+		'user.update stores restTimerEnabled=false'
+	);
+	assert(
+		setUserRest?.result?.restSoundEnabled === false,
+		'user.update stores restSoundEnabled=false'
+	);
+	assert(
+		setUserRest?.result?.restVibrateEnabled === true,
+		'user.update stores restVibrateEnabled=true'
+	);
+
+	// Out-of-range restDefaultSec (> 3600 ceiling) must be rejected.
+	const badUserRest = await callJson('/api/mutate', {
+		method: 'POST',
+		body: JSON.stringify({
+			clientId,
+			mutationId: ulid(),
+			op: 'user.update',
+			payload: { restDefaultSec: 99999 }
+		})
+	});
+	assert(!badUserRest.ok, 'user.update with restDefaultSec=99999 rejected');
+	assert(
+		badUserRest.status >= 400 && badUserRest.status < 500,
+		`restDefaultSec=99999 rejected with 4xx (got ${badUserRest.status})`
+	);
+
 	// 25. Admin recompute endpoint reconciles every user (idempotent backfill).
 	// Last so its global reconcile can't perturb earlier assertions.
 	console.log('step 25 — admin recompute endpoint');
