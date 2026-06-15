@@ -4,6 +4,7 @@
 	import PhotoCropper from '$lib/components/PhotoCropper.svelte';
 	import Stepper from '$lib/components/Stepper.svelte';
 	import { mutate } from '$lib/mutate';
+	import { skipRest } from '$lib/rest/timer';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -24,6 +25,15 @@
 	let bwValue = $state<number>(data.bodyWeightKg ?? 80);
 	let bwSaving = $state(false);
 	let bwError = $state<string | null>(null);
+
+	let restDefaultSec = $state(data.restDefaultSec);
+	let restTimerEnabled = $state(data.restTimerEnabled);
+	let restSoundEnabled = $state(data.restSoundEnabled);
+	let restVibrateEnabled = $state(data.restVibrateEnabled);
+
+	async function saveRest(patch: Record<string, number | boolean>) {
+		await mutate('user.update', patch);
+	}
 
 	async function saveBodyWeight(next: number | null) {
 		bwError = null;
@@ -365,6 +375,77 @@
 		>
 			{signingOut ? 'Signing out…' : 'Sign out'}
 		</button>
+	</div>
+
+	<div
+		class="flex flex-col gap-3 rounded-2xl border p-4"
+		style="background: var(--color-surface); border-color: var(--color-line);"
+	>
+		<div
+			class="text-[10px] font-bold tracking-[0.14em] uppercase"
+			style="color: var(--color-text-dim-2);"
+		>
+			Rest timer
+		</div>
+
+		<label class="flex items-center justify-between">
+			<span style="color: var(--color-text);">Enabled</span>
+			<input
+				type="checkbox"
+				checked={restTimerEnabled}
+				onchange={(e) => {
+					restTimerEnabled = (e.currentTarget as HTMLInputElement).checked;
+					// Clear any in-flight overlay immediately when disabling, so the
+					// master toggle hides a running timer (not just future ones).
+					if (!restTimerEnabled) skipRest();
+					saveRest({ restTimerEnabled });
+				}}
+			/>
+		</label>
+
+		<label class="flex items-center justify-between">
+			<span style="color: var(--color-text);">Default rest (seconds)</span>
+			<input
+				type="number"
+				min="0"
+				max="3600"
+				step="5"
+				value={restDefaultSec}
+				onchange={(e) => {
+					restDefaultSec = Math.min(
+						3600,
+						Math.max(0, Number((e.currentTarget as HTMLInputElement).value) || 0)
+					);
+					saveRest({ restDefaultSec });
+				}}
+				class="w-24 rounded-xl border px-3 py-2 text-right tabular-nums"
+				style="background: var(--color-surface); border-color: var(--color-line); color: var(--color-text);"
+			/>
+		</label>
+
+		<label class="flex items-center justify-between">
+			<span style="color: var(--color-text);">Sound</span>
+			<input
+				type="checkbox"
+				checked={restSoundEnabled}
+				onchange={(e) => {
+					restSoundEnabled = (e.currentTarget as HTMLInputElement).checked;
+					saveRest({ restSoundEnabled });
+				}}
+			/>
+		</label>
+
+		<label class="flex items-center justify-between">
+			<span style="color: var(--color-text);">Vibration</span>
+			<input
+				type="checkbox"
+				checked={restVibrateEnabled}
+				onchange={(e) => {
+					restVibrateEnabled = (e.currentTarget as HTMLInputElement).checked;
+					saveRest({ restVibrateEnabled });
+				}}
+			/>
+		</label>
 	</div>
 
 	<div

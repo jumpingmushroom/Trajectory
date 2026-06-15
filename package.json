@@ -13,6 +13,7 @@
 		"lint": "prettier --check . && eslint .",
 		"format": "prettier --write .",
 		"gen:icons": "node scripts/gen-icons.mjs",
+		"test:unit": "vitest run",
 		"test:smoke": "node tests/smoke.mjs",
 		"test:e2e": "playwright test"
 	},
@@ -42,6 +43,7 @@
 		"typescript": "^6.0.2",
 		"typescript-eslint": "^8.58.1",
 		"vite": "^8.0.7",
+		"vitest": "^4.1.8",
 		"workbox-window": "^7.4.0"
 	},
 	"dependencies": {

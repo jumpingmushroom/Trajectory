@@ -62,6 +62,7 @@ export const load: PageServerLoad = async ({ locals, params, url }) => {
 				notes: equipment.notes,
 				bodyweightPct: equipment.bodyweightPct,
 				inputMode: equipment.inputMode,
+				restTargetSec: equipment.restTargetSec,
 				createdAt: equipment.createdAt,
 				updatedAt: equipment.updatedAt,
 				deletedAt: equipment.deletedAt

@@ -6,11 +6,16 @@
 	import ToastHost from '$lib/components/ToastHost.svelte';
 	import AchievementHost from '$lib/components/AchievementHost.svelte';
 	import { startSyncRuntime } from '$lib/sync/sync';
+	import RestTimer from '$lib/components/RestTimer.svelte';
+	import { hydrateRest } from '$lib/rest/timer';
 
-	let { children } = $props();
+	let { children, data } = $props();
 
 	onMount(() => {
 		startSyncRuntime();
+		if (data.restSettings) {
+			hydrateRest(data.openRest, data.restSettings, Date.now());
+		}
 		// Register the Workbox-generated service worker. injectRegister:'auto'
 		// in vite.config doesn't reliably patch SvelteKit's HTML output, so
 		// we do it explicitly here. Dynamic import keeps the virtual module
@@ -31,3 +36,4 @@
 
 <ToastHost />
 <AchievementHost />
+<RestTimer settings={data.restSettings} />

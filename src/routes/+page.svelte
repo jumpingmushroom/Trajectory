@@ -470,7 +470,6 @@
 		id={data.activeSession.id}
 		startedAt={data.activeSession.startedAt}
 		setCount={data.activeSession.setCount}
-		lastSetTs={data.activeSession.lastSetTs}
 		lastEquipmentName={data.activeSession.lastEquipmentName}
 		lastEquipmentId={data.activeSession.lastEquipmentId}
 		onStop={handleEnd}
