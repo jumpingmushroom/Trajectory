@@ -33,6 +33,15 @@ export const user = sqliteTable('user', {
 	// bar, etc.). Nullable: when null, bodyweight sets log without an
 	// effective-load snapshot.
 	bodyWeightKg: real('body_weight_kg'),
+	// Rest-timer settings. restDefaultSec is the global fallback used when an
+	// equipment's restTargetSec is null. Booleans gate the master toggle and
+	// the two alert channels (beep, vibration).
+	restDefaultSec: integer('rest_default_sec').default(90).notNull(),
+	restTimerEnabled: integer('rest_timer_enabled', { mode: 'boolean' }).default(true).notNull(),
+	restSoundEnabled: integer('rest_sound_enabled', { mode: 'boolean' }).default(true).notNull(),
+	restVibrateEnabled: integer('rest_vibrate_enabled', { mode: 'boolean' })
+		.default(true)
+		.notNull(),
 	createdAt: integer('created_at', { mode: 'timestamp_ms' })
 		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 		.notNull(),
@@ -208,6 +217,9 @@ export const equipment = sqliteTable(
 		// Defaults seeded from the glyph kind (e.g. captain's chair → 0.33,
 		// pull-up bar → 1.0); user-overridable per equipment.
 		bodyweightPct: real('bodyweight_pct'),
+		// Rest target in seconds for this machine. null = inherit the user's
+		// global default; an explicit 0 = no timer for this equipment.
+		restTargetSec: integer('rest_target_sec'),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' })
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull(),
