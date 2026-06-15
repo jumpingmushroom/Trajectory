@@ -2,3 +2,9 @@ allowBuilds:
   better-sqlite3: true
   esbuild: true
   sharp: true
+# pnpm 11 reads non-auth settings here (not .npmrc). Disable the pre-run
+# dependency check: its default ("install") auto-reinstalls node_modules in
+# the dev container, which triggers an interactive "reinstall? (Y/n)" purge
+# prompt that hangs `docker compose up` (and CI's smoke job that boots it).
+# Deps are installed at image-build time, so the check is unnecessary.
+verifyDepsBeforeRun: false
