@@ -22,6 +22,9 @@
 	import { pushToast } from '$lib/stores/toast';
 	import { tsForBackdate, withDateMode } from '$lib/dateMode';
 	import type { PageData } from './$types';
+	import { startRest } from '$lib/rest/timer';
+	import { primeAudio } from '$lib/rest/alert';
+	import { resolveRestSec } from '$lib/rest/resolve';
 
 	let { data }: { data: PageData } = $props();
 
@@ -43,6 +46,26 @@
 			return maxTs + 60_000;
 		}
 		return tsForBackdate(asOfTs);
+	}
+
+	// Start the rest timer after a live set is logged. Backdated edits to a
+	// closed session (asOfTs != null) never start a timer. No-op when the
+	// resolved rest is 0 (master off, or this equipment set to 0).
+	function afterSetLogged(setId: string) {
+		if (asOfTs != null) return;
+		const target = (eq as { restTargetSec?: number | null }).restTargetSec ?? null;
+		const baseSec = resolveRestSec(
+			target,
+			data.restSettings ?? { enabled: true, defaultSec: 90, sound: true, vibrate: true }
+		);
+		if (baseSec <= 0) return;
+		startRest({
+			setId,
+			startTs: Date.now(),
+			baseSec,
+			equipmentId: eq.id,
+			equipmentName: eq.name
+		});
 	}
 
 	const eq = $derived(data.equipment);
@@ -269,6 +292,7 @@
 		error = null;
 		logging = true;
 		try {
+			primeAudio();
 			const id = ulid();
 			let prValue: number | null = null;
 			let prUnit = '';
@@ -379,6 +403,7 @@
 				if (setsDone + 1 > targetSets) targetSets = setsDone + 1;
 			}
 			justSaved = true;
+			afterSetLogged(id);
 			justPr = didPr;
 			lastLogAt = Date.now();
 			if (didPr && prValue != null) {
@@ -413,10 +438,12 @@
 	}) {
 		markSwipeHintSeen();
 		try {
+			const cloneId = ulid();
+			primeAudio();
 			if (mode === 'timed') {
 				if (s.durationMin == null) return;
 				await mutate('set.create', {
-					id: ulid(),
+					id: cloneId,
 					exerciseId: selectedExerciseId,
 					durationMin: s.durationMin,
 					ts: setTs()
@@ -424,7 +451,7 @@
 			} else if (mode === 'timed_weighted') {
 				if (s.weight == null || s.durationMin == null) return;
 				await mutate('set.create', {
-					id: ulid(),
+					id: cloneId,
 					exerciseId: selectedExerciseId,
 					weight: s.weight,
 					durationMin: s.durationMin,
@@ -434,7 +461,7 @@
 				const d = typeof s.extras?.distance === 'number' ? s.extras.distance : null;
 				if (s.weight == null || d == null) return;
 				await mutate('set.create', {
-					id: ulid(),
+					id: cloneId,
 					exerciseId: selectedExerciseId,
 					weight: s.weight,
 					extras: { distance: d },
@@ -446,7 +473,7 @@
 				// body weight + pct, not the cloned set's old snapshot. Saves a
 				// tap when the user's weight has drifted between sessions.
 				await mutate('set.create', {
-					id: ulid(),
+					id: cloneId,
 					exerciseId: selectedExerciseId,
 					weight: s.weight,
 					reps: s.reps,
@@ -455,6 +482,7 @@
 				});
 			}
 			lastLogAt = Date.now();
+			afterSetLogged(cloneId);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Could not clone set.';
 		}
