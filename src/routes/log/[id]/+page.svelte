@@ -53,7 +53,7 @@
 	// resolved rest is 0 (master off, or this equipment set to 0).
 	function afterSetLogged(setId: string) {
 		if (asOfTs != null) return;
-		const target = (eq as { restTargetSec?: number | null }).restTargetSec ?? null;
+		const target = eq.restTargetSec ?? null;
 		const baseSec = resolveRestSec(
 			target,
 			data.restSettings ?? { enabled: true, defaultSec: 90, sound: true, vibrate: true }

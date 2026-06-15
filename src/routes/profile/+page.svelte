@@ -4,6 +4,7 @@
 	import PhotoCropper from '$lib/components/PhotoCropper.svelte';
 	import Stepper from '$lib/components/Stepper.svelte';
 	import { mutate } from '$lib/mutate';
+	import { skipRest } from '$lib/rest/timer';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -394,6 +395,9 @@
 				checked={restTimerEnabled}
 				onchange={(e) => {
 					restTimerEnabled = (e.currentTarget as HTMLInputElement).checked;
+					// Clear any in-flight overlay immediately when disabling, so the
+					// master toggle hides a running timer (not just future ones).
+					if (!restTimerEnabled) skipRest();
 					saveRest({ restTimerEnabled });
 				}}
 			/>
