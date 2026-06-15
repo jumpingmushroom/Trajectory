@@ -10,7 +10,6 @@
 		id,
 		startedAt,
 		setCount,
-		lastSetTs,
 		lastEquipmentName,
 		lastEquipmentId,
 		onStop,
@@ -19,7 +18,6 @@
 		id: string;
 		startedAt: number;
 		setCount: number;
-		lastSetTs: number | null;
 		lastEquipmentName: string | null;
 		lastEquipmentId: string | null;
 		onStop: () => void;
@@ -38,16 +36,6 @@
 		if (h > 0) return `${h}h ${m % 60}m`;
 		return `${m}:${String(s).padStart(2, '0')}`;
 	});
-
-	const restRemaining = $derived(
-		lastSetTs == null ? null : Math.max(0, 90 - Math.floor((now - lastSetTs) / 1000))
-	);
-
-	function fmtRest(s: number): string {
-		const m = Math.floor(s / 60);
-		const r = s % 60;
-		return `${m}:${String(r).padStart(2, '0')}`;
-	}
 
 	// With sets: jump back to the last-equipment Log screen. Without sets
 	// (manual start, no sets logged yet): land on SessionDetail so the user
@@ -103,15 +91,6 @@
 					{/if}
 				</div>
 			</div>
-			{#if restRemaining != null && restRemaining > 0}
-				<div
-					class="flex flex-shrink-0 flex-col items-end text-[11px] font-bold tabular-nums"
-					style="color: var(--color-amber);"
-				>
-					<span>rest</span>
-					<span class="text-[14px]">{fmtRest(restRemaining)}</span>
-				</div>
-			{/if}
 		</a>
 		<button
 			type="button"
