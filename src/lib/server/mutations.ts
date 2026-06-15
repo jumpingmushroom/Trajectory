@@ -311,7 +311,8 @@ async function userUpdate(payload: UserUpdate, userId: string): Promise<User> {
 		updates.restTimerEnabled = payload.restTimerEnabled;
 	}
 	if (payload.restSoundEnabled !== undefined) {
-		if (typeof payload.restSoundEnabled !== 'boolean') badRequest('restSoundEnabled must be a boolean');
+		if (typeof payload.restSoundEnabled !== 'boolean')
+			badRequest('restSoundEnabled must be a boolean');
 		updates.restSoundEnabled = payload.restSoundEnabled;
 	}
 	if (payload.restVibrateEnabled !== undefined) {
@@ -617,9 +618,7 @@ async function equipmentUpdate(payload: EquipmentUpdate, userId: string): Promis
 	}
 	if (payload.restTargetSec !== undefined) {
 		updates.restTargetSec =
-			payload.restTargetSec === null
-				? null
-				: assertRestSec(payload.restTargetSec, 'restTargetSec');
+			payload.restTargetSec === null ? null : assertRestSec(payload.restTargetSec, 'restTargetSec');
 		hasUserField = true;
 	}
 	if (payload.inputMode !== undefined) {

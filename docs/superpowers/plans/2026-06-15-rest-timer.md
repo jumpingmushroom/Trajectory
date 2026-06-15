@@ -4,7 +4,7 @@
 
 **Goal:** Replace the hardcoded 90s rest readout with a configurable, per-equipment rest timer shown as a global overlay that beeps/vibrates/flashes when rest is up.
 
-**Architecture:** Approach A — the countdown is a pure function of data. A module store holds a descriptor of the *triggering set* plus ephemeral overrides; `remaining()` is derived each tick from `Date.now()`. Per-equipment `restTargetSec` (nullable) resolves against user-level settings. All persistence rides existing `equipment.*`/`user.update` mutation ops through `/api/mutate`, so it's offline-safe for free.
+**Architecture:** Approach A — the countdown is a pure function of data. A module store holds a descriptor of the _triggering set_ plus ephemeral overrides; `remaining()` is derived each tick from `Date.now()`. Per-equipment `restTargetSec` (nullable) resolves against user-level settings. All persistence rides existing `equipment.*`/`user.update` mutation ops through `/api/mutate`, so it's offline-safe for free.
 
 **Tech Stack:** SvelteKit 2 + Svelte 5 runes, Drizzle ORM + better-sqlite3, Vitest (added here for pure-logic unit tests), Web Audio + Vibration APIs.
 
@@ -15,6 +15,7 @@
 ## File structure
 
 **New files:**
+
 - `src/lib/rest/resolve.ts` — `RestSettings` type + `resolveRestSec()` pure function.
 - `src/lib/rest/resolve.test.ts` — unit tests for resolution.
 - `src/lib/rest/timer.ts` — the `restTimer` store + start/adjust/skip/remaining/fire-once/hydrate.
@@ -23,6 +24,7 @@
 - `src/lib/components/RestTimer.svelte` — the global overlay pill.
 
 **Modified files:**
+
 - `src/lib/server/db/schema.ts` — new columns on `user` + `equipment`.
 - `drizzle/` — generated migration(s).
 - `src/lib/server/mutations.ts` — validators for the new fields.
@@ -41,6 +43,7 @@
 ## Task 1: Add Vitest for pure-logic unit tests
 
 **Files:**
+
 - Modify: `package.json`
 - Modify: `vite.config.ts`
 - Create: `src/lib/rest/smoke.test.ts` (temporary sanity test, deleted at end of task)
@@ -107,6 +110,7 @@ git commit -m "chore: add vitest for unit tests"
 ## Task 2: `resolveRestSec` pure function (TDD)
 
 **Files:**
+
 - Create: `src/lib/rest/resolve.ts`
 - Test: `src/lib/rest/resolve.test.ts`
 
@@ -191,6 +195,7 @@ git commit -m "feat: rest duration resolution function"
 ## Task 3: Timer store with fire-once + hydrate (TDD)
 
 **Files:**
+
 - Create: `src/lib/rest/timer.ts`
 - Test: `src/lib/rest/timer.test.ts`
 
@@ -417,6 +422,7 @@ git commit -m "feat: rest timer store with fire-once and rehydrate"
 ## Task 4: Alert helpers (beep + vibrate)
 
 **Files:**
+
 - Create: `src/lib/rest/alert.ts`
 
 Audio output can't be unit-tested meaningfully (no Web Audio in node); this is verified in the browser at Task 13. Keep the module side-effect-free on import.
@@ -471,11 +477,7 @@ export function playRestDone(opts: { sound: boolean; vibrate: boolean }): void {
 			beep(c, 1175, 0.2, 0.22);
 		}
 	}
-	if (
-		opts.vibrate &&
-		typeof navigator !== 'undefined' &&
-		typeof navigator.vibrate === 'function'
-	) {
+	if (opts.vibrate && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
 		navigator.vibrate([200, 100, 200]);
 	}
 }
@@ -498,6 +500,7 @@ git commit -m "feat: rest-done audio + vibration alert helpers"
 ## Task 5: Schema columns + migration
 
 **Files:**
+
 - Modify: `src/lib/server/db/schema.ts`
 - Create: `drizzle/<generated>.sql` (via `pnpm db:generate`)
 
@@ -549,6 +552,7 @@ git commit -m "feat: rest timer schema columns + migration"
 ## Task 6: Server validators for the new fields
 
 **Files:**
+
 - Modify: `src/lib/server/mutations.ts`
 
 - [ ] **Step 1: Add a rest-seconds validator helper**
@@ -598,25 +602,26 @@ interface UserUpdate {
 In `userUpdate()`, after the `bodyWeightKg` block and before the `if (Object.keys(updates).length === 1)` guard, add:
 
 ```ts
-	if (payload.restDefaultSec !== undefined) {
-		updates.restDefaultSec = assertRestSec(payload.restDefaultSec, 'restDefaultSec');
+if (payload.restDefaultSec !== undefined) {
+	updates.restDefaultSec = assertRestSec(payload.restDefaultSec, 'restDefaultSec');
+}
+if (payload.restTimerEnabled !== undefined) {
+	if (typeof payload.restTimerEnabled !== 'boolean') {
+		badRequest('restTimerEnabled must be a boolean');
 	}
-	if (payload.restTimerEnabled !== undefined) {
-		if (typeof payload.restTimerEnabled !== 'boolean') {
-			badRequest('restTimerEnabled must be a boolean');
-		}
-		updates.restTimerEnabled = payload.restTimerEnabled;
+	updates.restTimerEnabled = payload.restTimerEnabled;
+}
+if (payload.restSoundEnabled !== undefined) {
+	if (typeof payload.restSoundEnabled !== 'boolean')
+		badRequest('restSoundEnabled must be a boolean');
+	updates.restSoundEnabled = payload.restSoundEnabled;
+}
+if (payload.restVibrateEnabled !== undefined) {
+	if (typeof payload.restVibrateEnabled !== 'boolean') {
+		badRequest('restVibrateEnabled must be a boolean');
 	}
-	if (payload.restSoundEnabled !== undefined) {
-		if (typeof payload.restSoundEnabled !== 'boolean') badRequest('restSoundEnabled must be a boolean');
-		updates.restSoundEnabled = payload.restSoundEnabled;
-	}
-	if (payload.restVibrateEnabled !== undefined) {
-		if (typeof payload.restVibrateEnabled !== 'boolean') {
-			badRequest('restVibrateEnabled must be a boolean');
-		}
-		updates.restVibrateEnabled = payload.restVibrateEnabled;
-	}
+	updates.restVibrateEnabled = payload.restVibrateEnabled;
+}
 ```
 
 - [ ] **Step 4: Handle `restTargetSec` in `equipmentCreate`**
@@ -624,8 +629,8 @@ In `userUpdate()`, after the `bodyWeightKg` block and before the `if (Object.key
 In `equipmentCreate()`, after the `bodyweightPct` const (ends ~line 383) add:
 
 ```ts
-	const restTargetSec =
-		payload.restTargetSec == null ? null : assertRestSec(payload.restTargetSec, 'restTargetSec');
+const restTargetSec =
+	payload.restTargetSec == null ? null : assertRestSec(payload.restTargetSec, 'restTargetSec');
 ```
 
 Then add `restTargetSec` to the `.values({...})` insert object (alongside `bodyweightPct`).
@@ -635,13 +640,11 @@ Then add `restTargetSec` to the `.values({...})` insert object (alongside `bodyw
 In `equipmentUpdate()`, after the `bodyweightPct` block (ends ~line 579) add:
 
 ```ts
-	if (payload.restTargetSec !== undefined) {
-		updates.restTargetSec =
-			payload.restTargetSec === null
-				? null
-				: assertRestSec(payload.restTargetSec, 'restTargetSec');
-		hasUserField = true;
-	}
+if (payload.restTargetSec !== undefined) {
+	updates.restTargetSec =
+		payload.restTargetSec === null ? null : assertRestSec(payload.restTargetSec, 'restTargetSec');
+	hasUserField = true;
+}
 ```
 
 - [ ] **Step 6: Type-check**
@@ -661,6 +664,7 @@ git commit -m "feat: validate rest timer fields in mutations"
 ## Task 7: Ship rest settings + open-rest descriptor from the layout loader
 
 **Files:**
+
 - Modify: `src/routes/+layout.server.ts`
 
 - [ ] **Step 1: Add imports**
@@ -684,89 +688,89 @@ import { and, eq, isNull, asc, desc } from 'drizzle-orm';
 Replace the body after `depends('app:achievements');` and the `if (!locals.user) { return ... }` early-return so the early return also includes the new keys:
 
 ```ts
-	if (!locals.user) {
-		return { achievementQueue: [], isAdmin: false, restSettings: null, openRest: null };
-	}
+if (!locals.user) {
+	return { achievementQueue: [], isAdmin: false, restSettings: null, openRest: null };
+}
 ```
 
 Then, before the final `return`, add:
 
 ```ts
-	const urow = (
+const urow = (
+	await db
+		.select({
+			restDefaultSec: user.restDefaultSec,
+			restTimerEnabled: user.restTimerEnabled,
+			restSoundEnabled: user.restSoundEnabled,
+			restVibrateEnabled: user.restVibrateEnabled
+		})
+		.from(user)
+		.where(eq(user.id, locals.user.id))
+		.limit(1)
+)[0];
+const restSettings = {
+	enabled: urow?.restTimerEnabled ?? true,
+	defaultSec: urow?.restDefaultSec ?? 90,
+	sound: urow?.restSoundEnabled ?? true,
+	vibrate: urow?.restVibrateEnabled ?? true
+};
+
+// Open session's last set → descriptor used to rehydrate the rest timer
+// after a reload. Cheap, single-indexed; mirrors the achievements query
+// that already runs on every navigation.
+const openSession = (
+	await db
+		.select({ id: workoutSession.id })
+		.from(workoutSession)
+		.where(and(eq(workoutSession.userId, locals.user.id), isNull(workoutSession.endedAt)))
+		.orderBy(desc(workoutSession.startedAt))
+		.limit(1)
+)[0];
+let openRest: {
+	setId: string;
+	ts: number;
+	equipmentId: string;
+	equipmentName: string;
+	restTargetSec: number | null;
+} | null = null;
+if (openSession) {
+	const last = (
 		await db
 			.select({
-				restDefaultSec: user.restDefaultSec,
-				restTimerEnabled: user.restTimerEnabled,
-				restSoundEnabled: user.restSoundEnabled,
-				restVibrateEnabled: user.restVibrateEnabled
+				setId: setTable.id,
+				ts: setTable.ts,
+				equipmentId: equipment.id,
+				equipmentName: equipment.name,
+				restTargetSec: equipment.restTargetSec
 			})
-			.from(user)
-			.where(eq(user.id, locals.user.id))
+			.from(setTable)
+			.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
+			.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
+			.where(and(eq(setTable.workoutSessionId, openSession.id), isNull(setTable.deletedAt)))
+			.orderBy(desc(setTable.ts))
 			.limit(1)
 	)[0];
-	const restSettings = {
-		enabled: urow?.restTimerEnabled ?? true,
-		defaultSec: urow?.restDefaultSec ?? 90,
-		sound: urow?.restSoundEnabled ?? true,
-		vibrate: urow?.restVibrateEnabled ?? true
-	};
-
-	// Open session's last set → descriptor used to rehydrate the rest timer
-	// after a reload. Cheap, single-indexed; mirrors the achievements query
-	// that already runs on every navigation.
-	const openSession = (
-		await db
-			.select({ id: workoutSession.id })
-			.from(workoutSession)
-			.where(and(eq(workoutSession.userId, locals.user.id), isNull(workoutSession.endedAt)))
-			.orderBy(desc(workoutSession.startedAt))
-			.limit(1)
-	)[0];
-	let openRest: {
-		setId: string;
-		ts: number;
-		equipmentId: string;
-		equipmentName: string;
-		restTargetSec: number | null;
-	} | null = null;
-	if (openSession) {
-		const last = (
-			await db
-				.select({
-					setId: setTable.id,
-					ts: setTable.ts,
-					equipmentId: equipment.id,
-					equipmentName: equipment.name,
-					restTargetSec: equipment.restTargetSec
-				})
-				.from(setTable)
-				.innerJoin(exercise, eq(exercise.id, setTable.exerciseId))
-				.innerJoin(equipment, eq(equipment.id, exercise.equipmentId))
-				.where(and(eq(setTable.workoutSessionId, openSession.id), isNull(setTable.deletedAt)))
-				.orderBy(desc(setTable.ts))
-				.limit(1)
-		)[0];
-		if (last) {
-			openRest = {
-				setId: last.setId,
-				ts: last.ts.getTime(),
-				equipmentId: last.equipmentId,
-				equipmentName: last.equipmentName,
-				restTargetSec: last.restTargetSec
-			};
-		}
+	if (last) {
+		openRest = {
+			setId: last.setId,
+			ts: last.ts.getTime(),
+			equipmentId: last.equipmentId,
+			equipmentName: last.equipmentName,
+			restTargetSec: last.restTargetSec
+		};
 	}
+}
 ```
 
 Update the final return to include them:
 
 ```ts
-	return {
-		achievementQueue: rows,
-		isAdmin: locals.user.role === 'admin',
-		restSettings,
-		openRest
-	};
+return {
+	achievementQueue: rows,
+	isAdmin: locals.user.role === 'admin',
+	restSettings,
+	openRest
+};
 ```
 
 - [ ] **Step 3: Type-check**
@@ -786,6 +790,7 @@ git commit -m "feat: ship rest settings and open-rest descriptor from layout"
 ## Task 8: RestTimer overlay component + mount in layout
 
 **Files:**
+
 - Create: `src/lib/components/RestTimer.svelte`
 - Modify: `src/routes/+layout.svelte`
 
@@ -801,13 +806,7 @@ Create `src/lib/components/RestTimer.svelte`:
 	// fires exactly once via shouldFireAlert().
 
 	import { onDestroy } from 'svelte';
-	import {
-		restTimer,
-		remainingSec,
-		adjustRest,
-		skipRest,
-		shouldFireAlert
-	} from '$lib/rest/timer';
+	import { restTimer, remainingSec, adjustRest, skipRest, shouldFireAlert } from '$lib/rest/timer';
 	import { playRestDone } from '$lib/rest/alert';
 	import type { RestSettings } from '$lib/rest/resolve';
 
@@ -880,7 +879,15 @@ Create `src/lib/components/RestTimer.svelte`:
 				style="border-color: var(--color-line-2); color: var(--color-text-dim);"
 				aria-label="Skip rest"
 			>
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+				<svg
+					width="16"
+					height="16"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+				>
 					<path d="M18 6 6 18M6 6l12 12" />
 				</svg>
 			</button>
@@ -905,7 +912,7 @@ Create `src/lib/components/RestTimer.svelte`:
 </style>
 ```
 
-> Note on placement: the `122px` bottom offset stacks this pill *above* the `SessionBar` (which sits at `65px` + safe area). If the theme has no `--color-green` token, the `#4ade80` fallback in `color-mix`/`border-color` is used; if a green token exists in `src/lib/theme.css`, drop the fallback.
+> Note on placement: the `122px` bottom offset stacks this pill _above_ the `SessionBar` (which sits at `65px` + safe area). If the theme has no `--color-green` token, the `#4ade80` fallback in `color-mix`/`border-color` is used; if a green token exists in `src/lib/theme.css`, drop the fallback.
 
 - [ ] **Step 2: Mount it in `+layout.svelte`**
 
@@ -914,22 +921,22 @@ In `src/routes/+layout.svelte`:
 Change the props line:
 
 ```ts
-	let { children, data } = $props();
+let { children, data } = $props();
 ```
 
 Add the imports near the other component imports:
 
 ```ts
-	import RestTimer from '$lib/components/RestTimer.svelte';
-	import { hydrateRest } from '$lib/rest/timer';
+import RestTimer from '$lib/components/RestTimer.svelte';
+import { hydrateRest } from '$lib/rest/timer';
 ```
 
 Inside the existing `onMount(() => { ... })`, after `startSyncRuntime();`, add:
 
 ```ts
-		if (data.restSettings) {
-			hydrateRest(data.openRest, data.restSettings, Date.now());
-		}
+if (data.restSettings) {
+	hydrateRest(data.openRest, data.restSettings, Date.now());
+}
 ```
 
 Add the component to the markup, after `<AchievementHost />`:
@@ -955,6 +962,7 @@ git commit -m "feat: global rest timer overlay + rehydrate on load"
 ## Task 9: Start the timer when a set is logged
 
 **Files:**
+
 - Modify: `src/routes/log/[id]/+page.server.ts`
 - Modify: `src/routes/log/[id]/+page.svelte`
 
@@ -971,9 +979,9 @@ In `src/routes/log/[id]/+page.server.ts`, in the `.select({...})` for equipment 
 In `src/routes/log/[id]/+page.svelte`, in the existing import block add:
 
 ```ts
-	import { startRest } from '$lib/rest/timer';
-	import { primeAudio } from '$lib/rest/alert';
-	import { resolveRestSec } from '$lib/rest/resolve';
+import { startRest } from '$lib/rest/timer';
+import { primeAudio } from '$lib/rest/alert';
+import { resolveRestSec } from '$lib/rest/resolve';
 ```
 
 - [ ] **Step 3: Add the `afterSetLogged` funnel + `fmtRest` is already present**
@@ -981,27 +989,30 @@ In `src/routes/log/[id]/+page.svelte`, in the existing import block add:
 Below the `setTs()` function definition (near the top of `<script>`), add:
 
 ```ts
-	// Start the rest timer after a live set is logged. Backdated edits to a
-	// closed session (asOfTs != null) never start a timer. No-op when the
-	// resolved rest is 0 (master off, or this equipment set to 0).
-	function afterSetLogged(setId: string) {
-		if (asOfTs != null) return;
-		const target = (eq as { restTargetSec?: number | null }).restTargetSec ?? null;
-		const baseSec = resolveRestSec(target, data.restSettings ?? {
+// Start the rest timer after a live set is logged. Backdated edits to a
+// closed session (asOfTs != null) never start a timer. No-op when the
+// resolved rest is 0 (master off, or this equipment set to 0).
+function afterSetLogged(setId: string) {
+	if (asOfTs != null) return;
+	const target = (eq as { restTargetSec?: number | null }).restTargetSec ?? null;
+	const baseSec = resolveRestSec(
+		target,
+		data.restSettings ?? {
 			enabled: true,
 			defaultSec: 90,
 			sound: true,
 			vibrate: true
-		});
-		if (baseSec <= 0) return;
-		startRest({
-			setId,
-			startTs: Date.now(),
-			baseSec,
-			equipmentId: eq.id,
-			equipmentName: eq.name
-		});
-	}
+		}
+	);
+	if (baseSec <= 0) return;
+	startRest({
+		setId,
+		startTs: Date.now(),
+		baseSec,
+		equipmentId: eq.id,
+		equipmentName: eq.name
+	});
+}
 ```
 
 - [ ] **Step 4: Prime audio + start the timer in `logSet`**
@@ -1009,13 +1020,13 @@ Below the `setTs()` function definition (near the top of `<script>`), add:
 In the main set-logging handler (`logSet`), at the very start of the `try` block (before the mode branching), add the audio unlock — this runs inside the button-click gesture:
 
 ```ts
-			primeAudio();
+primeAudio();
 ```
 
 Then, at the convergence point after all mode branches — immediately after the line `justSaved = true;` (~line 381) — add:
 
 ```ts
-			afterSetLogged(id);
+afterSetLogged(id);
 ```
 
 (`id` is the const minted at the top of `logSet` for the new set.)
@@ -1025,14 +1036,14 @@ Then, at the convergence point after all mode branches — immediately after the
 In `handleClone`, the cloned set id is currently minted inline as `ulid()` in each branch. Capture it once at the top of the function instead. Add as the first line of the `try`:
 
 ```ts
-			const cloneId = ulid();
-			primeAudio();
+const cloneId = ulid();
+primeAudio();
 ```
 
 Replace each `id: ulid(),` inside `handleClone` with `id: cloneId,` (there are four branches: `timed`, `timed_weighted`, `weight_distance`, and the `else`). Then, immediately after `lastLogAt = Date.now();` near the end of the function, add:
 
 ```ts
-			afterSetLogged(cloneId);
+afterSetLogged(cloneId);
 ```
 
 - [ ] **Step 6: Type-check**
@@ -1052,6 +1063,7 @@ git commit -m "feat: start rest timer on logged and cloned sets"
 ## Task 10: Per-equipment rest target field in AddEquipmentSheet
 
 **Files:**
+
 - Modify: `src/lib/components/AddEquipmentSheet.svelte`
 
 The sheet handles both create (`mode !== 'edit'`) and edit (`mode === 'edit'`), builds a create payload (~line 220) and an edit diff (~line 290+). Add a rest field to both.
@@ -1061,11 +1073,11 @@ The sheet handles both create (`mode !== 'edit'`) and edit (`mode === 'edit'`), 
 Near the other `$state` declarations (e.g. by `inputMode` ~line 62), add:
 
 ```ts
-	// Rest target in seconds. null = inherit the user's global default;
-	// 0 = no timer on this machine; >0 = explicit per-equipment rest.
-	let restTargetSec = $state<number | null>(
-		mode === 'edit' ? ((editTarget!.restTargetSec as number | null) ?? null) : null
-	);
+// Rest target in seconds. null = inherit the user's global default;
+// 0 = no timer on this machine; >0 = explicit per-equipment rest.
+let restTargetSec = $state<number | null>(
+	mode === 'edit' ? ((editTarget!.restTargetSec as number | null) ?? null) : null
+);
 ```
 
 (`editTarget` is the existing edit-source object in this component; if the prop is named `equipment`, use that — match the existing `editTarget!.inputMode` references in the file.)
@@ -1121,9 +1133,9 @@ In the create payload object (the `mutate('equipment.create', {...})` call, ~lin
 In the edit branch where the `diff` object is built (~line 296, alongside `if (inputMode !== initial.inputMode) diff.inputMode = inputMode;`), add:
 
 ```ts
-		if (restTargetSec !== (initial.restTargetSec ?? null)) {
-			diff.restTargetSec = restTargetSec;
-		}
+if (restTargetSec !== (initial.restTargetSec ?? null)) {
+	diff.restTargetSec = restTargetSec;
+}
 ```
 
 Also add `restTargetSec` to the `initial` snapshot object (the one with `inputMode`, ~line 86–87), reading from the edit source:
@@ -1149,6 +1161,7 @@ git commit -m "feat: per-equipment rest target field"
 ## Task 11: Global rest settings on the Profile screen
 
 **Files:**
+
 - Modify: `src/routes/profile/+page.server.ts`
 - Modify: `src/routes/profile/+page.svelte`
 
@@ -1182,14 +1195,14 @@ In `src/routes/profile/+page.svelte`:
 Ensure `mutate` is imported (it is used for the body-weight save; reuse it). Add reactive state seeded from `data`:
 
 ```ts
-	let restDefaultSec = $state(data.restDefaultSec);
-	let restTimerEnabled = $state(data.restTimerEnabled);
-	let restSoundEnabled = $state(data.restSoundEnabled);
-	let restVibrateEnabled = $state(data.restVibrateEnabled);
+let restDefaultSec = $state(data.restDefaultSec);
+let restTimerEnabled = $state(data.restTimerEnabled);
+let restSoundEnabled = $state(data.restSoundEnabled);
+let restVibrateEnabled = $state(data.restVibrateEnabled);
 
-	async function saveRest(patch: Record<string, number | boolean>) {
-		await mutate('user.update', patch);
-	}
+async function saveRest(patch: Record<string, number | boolean>) {
+	await mutate('user.update', patch);
+}
 ```
 
 Add a "Rest timer" section to the markup (place it near the body-weight editor), following the screen's existing label/control styling:
@@ -1272,6 +1285,7 @@ git commit -m "feat: rest timer settings on profile screen"
 ## Task 12: Remove the duplicate rest readout from SessionBar
 
 **Files:**
+
 - Modify: `src/lib/components/SessionBar.svelte`
 
 The global overlay now owns rest display. Strip SessionBar's inline 90s math so there aren't two competing timers.
@@ -1308,6 +1322,7 @@ git commit -m "refactor: drop SessionBar's inline rest readout"
 ## Task 13: Server-contract smoke test + full browser verification
 
 **Files:**
+
 - Modify: `tests/smoke.mjs`
 
 - [ ] **Step 1: Read the existing smoke test to match its style**
@@ -1333,6 +1348,7 @@ Expected: all assertions pass (the harness boots/points at a running server per 
 ```bash
 pnpm test:unit && pnpm check && pnpm lint
 ```
+
 Expected: all green.
 
 - [ ] **Step 6: Browser verification (per CLAUDE.md)**
@@ -1344,7 +1360,7 @@ Boot in Docker (`docker compose up`), then drive via chrome-devtools MCP as `adm
 3. Start a session, log a set on that machine → overlay appears counting down from 0:04.
 4. Confirm `−15`/`+15` adjust the count and `✕` clears it.
 5. Let it reach 0 → green pulse + audible beep; confirm console is clean.
-6. Navigate Home mid-rest on a *different* machine's 5s default → overlay persists and keeps counting.
+6. Navigate Home mid-rest on a _different_ machine's 5s default → overlay persists and keeps counting.
 7. Reload mid-rest → timer resumes (rehydrate); reload after it finished → no beep.
 8. Profile → toggle "Enabled" off → log a set → no timer.
 

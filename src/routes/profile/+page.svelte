@@ -408,7 +408,10 @@
 				step="5"
 				value={restDefaultSec}
 				onchange={(e) => {
-					restDefaultSec = Math.min(3600, Math.max(0, Number((e.currentTarget as HTMLInputElement).value) || 0));
+					restDefaultSec = Math.min(
+						3600,
+						Math.max(0, Number((e.currentTarget as HTMLInputElement).value) || 0)
+					);
 					saveRest({ restDefaultSec });
 				}}
 				class="w-24 rounded-xl border px-3 py-2 text-right tabular-nums"

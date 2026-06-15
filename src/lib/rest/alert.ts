@@ -43,11 +43,7 @@ export function playRestDone(opts: { sound: boolean; vibrate: boolean }): void {
 			beep(c, 1175, 0.2, 0.22);
 		}
 	}
-	if (
-		opts.vibrate &&
-		typeof navigator !== 'undefined' &&
-		typeof navigator.vibrate === 'function'
-	) {
+	if (opts.vibrate && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
 		navigator.vibrate([200, 100, 200]);
 	}
 }

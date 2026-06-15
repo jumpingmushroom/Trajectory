@@ -702,14 +702,18 @@
 		</div>
 
 		<label class="flex flex-col gap-1">
-			<span class="text-[10px] font-bold tracking-[0.16em] uppercase" style="color: var(--color-text-dim-2);">
+			<span
+				class="text-[10px] font-bold tracking-[0.16em] uppercase"
+				style="color: var(--color-text-dim-2);"
+			>
 				Rest timer
 			</span>
 			<select
 				value={restTargetSec === null ? 'inherit' : restTargetSec === 0 ? 'off' : 'custom'}
 				onchange={(e) => {
 					const v = (e.currentTarget as HTMLSelectElement).value;
-					restTargetSec = v === 'inherit' ? null : v === 'off' ? 0 : Math.max(1, restTargetSec ?? 90);
+					restTargetSec =
+						v === 'inherit' ? null : v === 'off' ? 0 : Math.max(1, restTargetSec ?? 90);
 				}}
 				class="rounded-xl border px-3 py-2"
 				style="background: var(--color-surface); border-color: var(--color-line); color: var(--color-text);"
@@ -725,7 +729,11 @@
 					max="3600"
 					step="5"
 					value={restTargetSec}
-					oninput={(e) => (restTargetSec = Math.min(3600, Math.max(1, Number((e.currentTarget as HTMLInputElement).value) || 1)))}
+					oninput={(e) =>
+						(restTargetSec = Math.min(
+							3600,
+							Math.max(1, Number((e.currentTarget as HTMLInputElement).value) || 1)
+						))}
 					class="rounded-xl border px-3 py-2 tabular-nums"
 					style="background: var(--color-surface); border-color: var(--color-line); color: var(--color-text);"
 					aria-label="Rest seconds"

@@ -34,13 +34,13 @@ New persisted fields. Both `equipment.update`/`equipment.create` and `user.updat
 mutation ops already exist and flow through `/api/mutate`, so the new fields ride
 the offline-safe sync path for free.
 
-| Field | Table | Type / default | Via | Meaning |
-|---|---|---|---|---|
-| `restTargetSec` | `equipment` | `integer`, nullable | `equipment.create` / `.update` | This machine's rest target. `null` = inherit global. `0` = explicitly no timer. |
-| `restDefaultSec` | `user` | `integer`, default `90` | `user.update` | Global fallback when equipment's value is null. |
-| `restTimerEnabled` | `user` | `boolean`, default `true` | `user.update` | Master on/off. |
-| `restSoundEnabled` | `user` | `boolean`, default `true` | `user.update` | Beep toggle. |
-| `restVibrateEnabled` | `user` | `boolean`, default `true` | `user.update` | Vibration toggle. |
+| Field                | Table       | Type / default            | Via                            | Meaning                                                                         |
+| -------------------- | ----------- | ------------------------- | ------------------------------ | ------------------------------------------------------------------------------- |
+| `restTargetSec`      | `equipment` | `integer`, nullable       | `equipment.create` / `.update` | This machine's rest target. `null` = inherit global. `0` = explicitly no timer. |
+| `restDefaultSec`     | `user`      | `integer`, default `90`   | `user.update`                  | Global fallback when equipment's value is null.                                 |
+| `restTimerEnabled`   | `user`      | `boolean`, default `true` | `user.update`                  | Master on/off.                                                                  |
+| `restSoundEnabled`   | `user`      | `boolean`, default `true` | `user.update`                  | Beep toggle.                                                                    |
+| `restVibrateEnabled` | `user`      | `boolean`, default `true` | `user.update`                  | Vibration toggle.                                                               |
 
 App columns on the Better Auth `user` table follow the existing `bodyWeightKg`
 precedent. Two Drizzle migrations (one per table), generated via
@@ -64,17 +64,18 @@ machine where rest is meaningless (e.g. a treadmill) is setting that equipment's
 ## Timer engine (Approach A)
 
 Store module `src/lib/rest/timer.ts`. The store holds a descriptor of the
-*triggering set*, not a ticking counter:
+_triggering set_, not a ticking counter:
 
 ```ts
-restTimer = {
-  setId: string,
-  startTs: number,        // = the set's ts (ms)
-  baseSec: number,        // resolveRestSec() snapshot at log time
-  adjustSec: number,      // ephemeral ±15 accumulator
-  equipmentId: string,
-  equipmentName: string
-} | null
+restTimer =
+	{
+		setId: string,
+		startTs: number, // = the set's ts (ms)
+		baseSec: number, // resolveRestSec() snapshot at log time
+		adjustSec: number, // ephemeral ±15 accumulator
+		equipmentId: string,
+		equipmentName: string
+	} | null;
 ```
 
 - `remaining(now) = max(0, startTs/1000 + baseSec + adjustSec − now/1000)` —

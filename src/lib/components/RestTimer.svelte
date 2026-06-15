@@ -5,13 +5,7 @@
 	// fires exactly once via shouldFireAlert().
 
 	import { onDestroy } from 'svelte';
-	import {
-		restTimer,
-		remainingSec,
-		adjustRest,
-		skipRest,
-		shouldFireAlert
-	} from '$lib/rest/timer';
+	import { restTimer, remainingSec, adjustRest, skipRest, shouldFireAlert } from '$lib/rest/timer';
 	import { playRestDone } from '$lib/rest/alert';
 	import type { RestSettings } from '$lib/rest/resolve';
 
@@ -84,7 +78,15 @@
 				style="border-color: var(--color-line-2); color: var(--color-text-dim);"
 				aria-label="Skip rest"
 			>
-				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+				<svg
+					width="16"
+					height="16"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+				>
 					<path d="M18 6 6 18M6 6l12 12" />
 				</svg>
 			</button>

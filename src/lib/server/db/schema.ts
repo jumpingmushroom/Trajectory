@@ -39,9 +39,7 @@ export const user = sqliteTable('user', {
 	restDefaultSec: integer('rest_default_sec').default(90).notNull(),
 	restTimerEnabled: integer('rest_timer_enabled', { mode: 'boolean' }).default(true).notNull(),
 	restSoundEnabled: integer('rest_sound_enabled', { mode: 'boolean' }).default(true).notNull(),
-	restVibrateEnabled: integer('rest_vibrate_enabled', { mode: 'boolean' })
-		.default(true)
-		.notNull(),
+	restVibrateEnabled: integer('rest_vibrate_enabled', { mode: 'boolean' }).default(true).notNull(),
 	createdAt: integer('created_at', { mode: 'timestamp_ms' })
 		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 		.notNull(),
