@@ -14,7 +14,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// auth.ts). Read the row directly for non-auth fields.
 	const profile = (
 		await db
-			.select({ bodyWeightKg: user.bodyWeightKg })
+			.select({
+				bodyWeightKg: user.bodyWeightKg,
+				restDefaultSec: user.restDefaultSec,
+				restTimerEnabled: user.restTimerEnabled,
+				restSoundEnabled: user.restSoundEnabled,
+				restVibrateEnabled: user.restVibrateEnabled
+			})
 			.from(user)
 			.where(eq(user.id, locals.user.id))
 			.limit(1)
@@ -25,6 +31,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		userImage: locals.user.image ?? null,
 		userRole: locals.user.role ?? 'user',
 		bodyWeightKg: profile?.bodyWeightKg ?? null,
+		restDefaultSec: profile?.restDefaultSec ?? 90,
+		restTimerEnabled: profile?.restTimerEnabled ?? true,
+		restSoundEnabled: profile?.restSoundEnabled ?? true,
+		restVibrateEnabled: profile?.restVibrateEnabled ?? true,
 		version: pkg.version,
 		buildSha: process.env.TRAJECTORY_BUILD_SHA ?? 'dev'
 	};
