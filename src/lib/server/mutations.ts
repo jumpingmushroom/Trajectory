@@ -80,6 +80,7 @@ interface EquipmentCreate {
 	cardioKind?: string | null;
 	sortOrder?: number;
 	bodyweightPct?: number | null;
+	restTargetSec?: number | null;
 	inputMode?: string;
 }
 interface EquipmentUpdate {
@@ -93,11 +94,16 @@ interface EquipmentUpdate {
 	sortOrder?: number;
 	notes?: string | null;
 	bodyweightPct?: number | null;
+	restTargetSec?: number | null;
 	inputMode?: string;
 }
 
 interface UserUpdate {
 	bodyWeightKg?: number | null;
+	restDefaultSec?: number;
+	restTimerEnabled?: boolean;
+	restSoundEnabled?: boolean;
+	restVibrateEnabled?: boolean;
 }
 
 interface ExerciseCreate {
@@ -214,6 +220,16 @@ function assertBodyweightPct(value: unknown, label: string): number {
 	return Math.round(value * 10000) / 10000;
 }
 
+// Rest duration in whole seconds, 0..3600 (1 hour ceiling). 0 means "no
+// timer" for that equipment; null is handled by the caller as "inherit".
+function assertRestSec(value: unknown, label: string): number {
+	if (typeof value !== 'number' || !Number.isInteger(value)) {
+		badRequest(`${label} must be an integer number of seconds`);
+	}
+	if (value < 0 || value > 3600) badRequest(`${label} must be between 0 and 3600`);
+	return value;
+}
+
 function logMutation(clientId: string, mutationId: string, userId: string): boolean {
 	// Returns true if this is a fresh mutation, false if it's a replay.
 	try {
@@ -284,6 +300,25 @@ async function userUpdate(payload: UserUpdate, userId: string): Promise<User> {
 			}
 			updates.bodyWeightKg = Math.round(payload.bodyWeightKg * 10) / 10;
 		}
+	}
+	if (payload.restDefaultSec !== undefined) {
+		updates.restDefaultSec = assertRestSec(payload.restDefaultSec, 'restDefaultSec');
+	}
+	if (payload.restTimerEnabled !== undefined) {
+		if (typeof payload.restTimerEnabled !== 'boolean') {
+			badRequest('restTimerEnabled must be a boolean');
+		}
+		updates.restTimerEnabled = payload.restTimerEnabled;
+	}
+	if (payload.restSoundEnabled !== undefined) {
+		if (typeof payload.restSoundEnabled !== 'boolean') badRequest('restSoundEnabled must be a boolean');
+		updates.restSoundEnabled = payload.restSoundEnabled;
+	}
+	if (payload.restVibrateEnabled !== undefined) {
+		if (typeof payload.restVibrateEnabled !== 'boolean') {
+			badRequest('restVibrateEnabled must be a boolean');
+		}
+		updates.restVibrateEnabled = payload.restVibrateEnabled;
 	}
 	if (Object.keys(updates).length === 1) badRequest('user.update needs at least one field');
 
@@ -381,6 +416,8 @@ async function equipmentCreate(
 		payload.bodyweightPct == null
 			? null
 			: assertBodyweightPct(payload.bodyweightPct, 'bodyweightPct');
+	const restTargetSec =
+		payload.restTargetSec == null ? null : assertRestSec(payload.restTargetSec, 'restTargetSec');
 	// inputMode falls back to a derivation when the client doesn't send it
 	// (older clients, the smoke test). Cardio → distance_time; bodyweight pct
 	// set → bodyweight; everything else → weighted.
@@ -408,6 +445,7 @@ async function equipmentCreate(
 			cardioKind,
 			sortOrder,
 			bodyweightPct,
+			restTargetSec,
 			inputMode
 		})
 		.onConflictDoNothing();
@@ -575,6 +613,13 @@ async function equipmentUpdate(payload: EquipmentUpdate, userId: string): Promis
 			payload.bodyweightPct === null
 				? null
 				: assertBodyweightPct(payload.bodyweightPct, 'bodyweightPct');
+		hasUserField = true;
+	}
+	if (payload.restTargetSec !== undefined) {
+		updates.restTargetSec =
+			payload.restTargetSec === null
+				? null
+				: assertRestSec(payload.restTargetSec, 'restTargetSec');
 		hasUserField = true;
 	}
 	if (payload.inputMode !== undefined) {
