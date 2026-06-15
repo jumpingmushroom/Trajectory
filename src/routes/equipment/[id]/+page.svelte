@@ -26,7 +26,10 @@
 	);
 	const lastSparkline = $derived(data.series.slice(-10));
 
-	let notesDraft = $state('');
+	// Writable $derived: re-hydrates from server notes when the equipment row
+	// changes (navigation / invalidateAll after save), while still letting the
+	// user type into the textarea (a local write holds until the source moves).
+	let notesDraft = $derived(eq.notes ?? '');
 	let savingNotes = $state(false);
 	let notesError = $state<string | null>(null);
 	let notesPristine = $derived(notesDraft === (eq.notes ?? ''));
@@ -62,15 +65,6 @@
 			bwSaving = false;
 		}
 	}
-
-	$effect(() => {
-		// Re-hydrate the textarea when navigating to a different equipment
-		// page (or when invalidateAll refreshes notes from the server after
-		// a save). Doesn't touch the draft if the user hasn't saved yet
-		// because the comparison would always be against the latest server
-		// notes.
-		notesDraft = eq.notes ?? '';
-	});
 
 	async function saveNotes() {
 		if (notesPristine) return;
