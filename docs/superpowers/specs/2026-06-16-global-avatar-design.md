@@ -105,6 +105,7 @@ schema change.
 ## Verification
 
 Boot in Docker, drive via chrome-devtools MCP:
+
 - Profile with an uploaded image → image appears top-right on home and on setup.
 - Profile with no image → initials badge unchanged on both.
 - Re-upload a new image → new image shows on home/setup without a hard refresh

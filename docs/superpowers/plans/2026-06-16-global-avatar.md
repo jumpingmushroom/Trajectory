@@ -25,6 +25,7 @@
 ## Task 1: Avatar component (TDD)
 
 **Files:**
+
 - Create: `src/lib/components/Avatar.svelte`
 - Test: `src/lib/components/Avatar.test.ts`
 
@@ -116,6 +117,7 @@ git commit -m "feat: add shared Avatar component (image with initials fallback)"
 ## Task 2: Expose user avatar data from the root layout
 
 **Files:**
+
 - Modify: `src/routes/+layout.server.ts`
 
 The existing load already runs one `select` against `user` (for rest settings). Extend that select to also fetch `name`, `image`, `updatedAt`, then return the three new fields. Reading from the DB (not `locals.user`) guarantees a fresh avatar after re-upload. Both return paths (the no-user early return and the main return) must include the keys so the generated `LayoutData` type is consistent.
@@ -125,21 +127,21 @@ The existing load already runs one `select` against `user` (for rest settings). 
 In `src/routes/+layout.server.ts`, find the `urow` select (currently selecting `restDefaultSec`, `restTimerEnabled`, `restSoundEnabled`, `restVibrateEnabled`) and add three fields:
 
 ```ts
-	const urow = (
-		await db
-			.select({
-				restDefaultSec: user.restDefaultSec,
-				restTimerEnabled: user.restTimerEnabled,
-				restSoundEnabled: user.restSoundEnabled,
-				restVibrateEnabled: user.restVibrateEnabled,
-				name: user.name,
-				image: user.image,
-				updatedAt: user.updatedAt
-			})
-			.from(user)
-			.where(eq(user.id, locals.user.id))
-			.limit(1)
-	)[0];
+const urow = (
+	await db
+		.select({
+			restDefaultSec: user.restDefaultSec,
+			restTimerEnabled: user.restTimerEnabled,
+			restSoundEnabled: user.restSoundEnabled,
+			restVibrateEnabled: user.restVibrateEnabled,
+			name: user.name,
+			image: user.image,
+			updatedAt: user.updatedAt
+		})
+		.from(user)
+		.where(eq(user.id, locals.user.id))
+		.limit(1)
+)[0];
 ```
 
 - [ ] **Step 2: Derive the avatar fields after `restSettings`**
@@ -147,9 +149,9 @@ In `src/routes/+layout.server.ts`, find the `urow` select (currently selecting `
 Immediately after the `restSettings` object literal, add:
 
 ```ts
-	const userName = urow?.name ?? '';
-	const userImage = urow?.image ?? null;
-	const userImageVersion = urow?.updatedAt ? urow.updatedAt.getTime() : 0;
+const userName = urow?.name ?? '';
+const userImage = urow?.image ?? null;
+const userImageVersion = urow?.updatedAt ? urow.updatedAt.getTime() : 0;
 ```
 
 - [ ] **Step 3: Add the fields to both return statements**
@@ -157,31 +159,31 @@ Immediately after the `restSettings` object literal, add:
 Update the no-user early return:
 
 ```ts
-	if (!locals.user) {
-		return {
-			achievementQueue: [],
-			isAdmin: false,
-			restSettings: null,
-			openRest: null,
-			userName: '',
-			userImage: null,
-			userImageVersion: 0
-		};
-	}
+if (!locals.user) {
+	return {
+		achievementQueue: [],
+		isAdmin: false,
+		restSettings: null,
+		openRest: null,
+		userName: '',
+		userImage: null,
+		userImageVersion: 0
+	};
+}
 ```
 
 Update the final return:
 
 ```ts
-	return {
-		achievementQueue: rows,
-		isAdmin: locals.user.role === 'admin',
-		restSettings,
-		openRest,
-		userName,
-		userImage,
-		userImageVersion
-	};
+return {
+	achievementQueue: rows,
+	isAdmin: locals.user.role === 'admin',
+	restSettings,
+	openRest,
+	userName,
+	userImage,
+	userImageVersion
+};
 ```
 
 - [ ] **Step 4: Verify types compile**
@@ -201,6 +203,7 @@ git commit -m "feat: expose userName/userImage/userImageVersion from root layout
 ## Task 3: Use Avatar on the home page
 
 **Files:**
+
 - Modify: `src/routes/+page.svelte`
 
 - [ ] **Step 1: Import the component**
@@ -208,7 +211,7 @@ git commit -m "feat: expose userName/userImage/userImageVersion from root layout
 In the `<script>` block of `src/routes/+page.svelte`, add to the imports (alongside the other `$lib/components` imports):
 
 ```ts
-	import Avatar from '$lib/components/Avatar.svelte';
+import Avatar from '$lib/components/Avatar.svelte';
 ```
 
 - [ ] **Step 2: Remove the now-unused `initial` derived**
@@ -216,7 +219,7 @@ In the `<script>` block of `src/routes/+page.svelte`, add to the imports (alongs
 Delete this line (currently ~line 270):
 
 ```ts
-	const initial = $derived(data.userName.charAt(0).toUpperCase());
+const initial = $derived(data.userName.charAt(0).toUpperCase());
 ```
 
 - [ ] **Step 3: Replace the top-right anchor markup**
@@ -224,13 +227,9 @@ Delete this line (currently ~line 270):
 Replace the existing profile anchor (the `<a href="/profile">` block that renders `{initial}`) with:
 
 ```svelte
-				<a href="/profile" class="flex-shrink-0" aria-label="Open profile">
-					<Avatar
-						name={data.userName}
-						image={data.userImage}
-						version={data.userImageVersion}
-					/>
-				</a>
+<a href="/profile" class="flex-shrink-0" aria-label="Open profile">
+	<Avatar name={data.userName} image={data.userImage} version={data.userImageVersion} />
+</a>
 ```
 
 - [ ] **Step 4: Verify types compile**
@@ -250,6 +249,7 @@ git commit -m "feat: show avatar image on home page top-right icon"
 ## Task 4: Use Avatar on the setup page
 
 **Files:**
+
 - Modify: `src/routes/setup/+page.svelte`
 
 - [ ] **Step 1: Import the component**
@@ -257,7 +257,7 @@ git commit -m "feat: show avatar image on home page top-right icon"
 In the `<script>` block of `src/routes/setup/+page.svelte`, add to the `$lib/components` imports:
 
 ```ts
-	import Avatar from '$lib/components/Avatar.svelte';
+import Avatar from '$lib/components/Avatar.svelte';
 ```
 
 - [ ] **Step 2: Replace the top-right anchor markup**
@@ -265,13 +265,9 @@ In the `<script>` block of `src/routes/setup/+page.svelte`, add to the `$lib/com
 Replace the existing profile anchor (the `<a href="/profile">` block that renders `{data.userName.charAt(0).toUpperCase()}`) with:
 
 ```svelte
-		<a href="/profile" class="flex-shrink-0" aria-label="Open profile">
-			<Avatar
-				name={data.userName}
-				image={data.userImage}
-				version={data.userImageVersion}
-			/>
-		</a>
+<a href="/profile" class="flex-shrink-0" aria-label="Open profile">
+	<Avatar name={data.userName} image={data.userImage} version={data.userImageVersion} />
+</a>
 ```
 
 - [ ] **Step 3: Verify types compile**
@@ -313,7 +309,7 @@ Expected: the amber initials badge renders on both — visually unchanged from b
 
 - [ ] **Step 5: Verify cache-bust on re-upload**
 
-Upload a *different* image on `/profile`, then navigate to `/`.
+Upload a _different_ image on `/profile`, then navigate to `/`.
 Expected: the new image shows without a hard refresh (the `?v=` value changed because `updatedAt` bumped).
 
 - [ ] **Step 6: Check the console**
