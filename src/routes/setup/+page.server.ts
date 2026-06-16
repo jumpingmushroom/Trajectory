@@ -49,7 +49,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 	for (const row of setCounts) setCountByEquipment[row.equipmentId] = row.count;
 
 	return {
-		userName: locals.user.name,
 		version: pkg.version,
 		gyms,
 		equipments,

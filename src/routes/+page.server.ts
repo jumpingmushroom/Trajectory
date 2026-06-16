@@ -318,7 +318,6 @@ export const load: PageServerLoad = async ({ locals, cookies, url }) => {
 	}
 
 	return {
-		userName: locals.user.name,
 		userId: locals.user.id,
 		gyms: switcherGyms as Gym[],
 		activeGym,
