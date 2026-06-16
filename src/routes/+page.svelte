@@ -267,7 +267,6 @@
 					.filter((t) => t.equipment.group === filter)
 					.sort((a, b) => (a.daysSince ?? 999) - (b.daysSince ?? 999))
 	);
-
 </script>
 
 <svelte:head>
@@ -293,11 +292,7 @@
 			</div>
 			<GymChip gym={data.activeGym} onClick={() => (gymSheetOpen = true)} />
 			<a href="/profile" class="flex-shrink-0" aria-label="Open profile">
-				<Avatar
-					name={data.userName}
-					image={data.userImage}
-					version={data.userImageVersion}
-				/>
+				<Avatar name={data.userName} image={data.userImage} version={data.userImageVersion} />
 			</a>
 		</div>
 

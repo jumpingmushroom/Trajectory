@@ -163,11 +163,7 @@
 			</div>
 		</div>
 		<a href="/profile" class="flex-shrink-0" aria-label="Open profile">
-			<Avatar
-				name={data.userName}
-				image={data.userImage}
-				version={data.userImageVersion}
-			/>
+			<Avatar name={data.userName} image={data.userImage} version={data.userImageVersion} />
 		</a>
 	</header>
 
