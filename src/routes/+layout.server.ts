@@ -22,7 +22,15 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 	// of an invalidateAll().
 	depends('app:achievements');
 	if (!locals.user) {
-		return { achievementQueue: [], isAdmin: false, restSettings: null, openRest: null };
+		return {
+			achievementQueue: [],
+			isAdmin: false,
+			restSettings: null,
+			openRest: null,
+			userName: '',
+			userImage: null,
+			userImageVersion: 0
+		};
 	}
 	const rows = await db
 		.select({ id: achievement.id, badgeKey: achievement.badgeKey })
@@ -36,7 +44,10 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 				restDefaultSec: user.restDefaultSec,
 				restTimerEnabled: user.restTimerEnabled,
 				restSoundEnabled: user.restSoundEnabled,
-				restVibrateEnabled: user.restVibrateEnabled
+				restVibrateEnabled: user.restVibrateEnabled,
+				name: user.name,
+				image: user.image,
+				updatedAt: user.updatedAt
 			})
 			.from(user)
 			.where(eq(user.id, locals.user.id))
@@ -48,6 +59,9 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		sound: urow?.restSoundEnabled ?? true,
 		vibrate: urow?.restVibrateEnabled ?? true
 	};
+	const userName = urow?.name ?? '';
+	const userImage = urow?.image ?? null;
+	const userImageVersion = urow?.updatedAt ? urow.updatedAt.getTime() : 0;
 
 	// Open session's last set → descriptor used to rehydrate the rest timer
 	// after a reload. Cheap, single-indexed; mirrors the achievements query
@@ -99,6 +113,9 @@ export const load: LayoutServerLoad = async ({ locals, depends }) => {
 		achievementQueue: rows,
 		isAdmin: locals.user.role === 'admin',
 		restSettings,
-		openRest
+		openRest,
+		userName,
+		userImage,
+		userImageVersion
 	};
 };

@@ -6,6 +6,7 @@
 	import AddEquipmentSheet from '$lib/components/AddEquipmentSheet.svelte';
 	import ManageExercisesSheet from '$lib/components/ManageExercisesSheet.svelte';
 	import TabBar from '$lib/components/TabBar.svelte';
+	import Avatar from '$lib/components/Avatar.svelte';
 	import type { PageData } from './$types';
 	import type { Equipment, Exercise, Gym } from '$lib/server/db/schema';
 
@@ -161,13 +162,8 @@
 				Your gyms
 			</div>
 		</div>
-		<a
-			href="/profile"
-			class="flex h-9 w-9 items-center justify-center rounded-full"
-			style="background: var(--color-amber-dim); color: var(--color-amber);"
-			aria-label="Open profile"
-		>
-			{data.userName.charAt(0).toUpperCase()}
+		<a href="/profile" class="flex-shrink-0" aria-label="Open profile">
+			<Avatar name={data.userName} image={data.userImage} version={data.userImageVersion} />
 		</a>
 	</header>
 
