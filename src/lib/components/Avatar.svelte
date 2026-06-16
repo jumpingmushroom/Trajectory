@@ -1,3 +1,4 @@
+<!-- presentational: shows the user's avatar image, or an amber initials badge as fallback -->
 <script lang="ts">
 	let {
 		name,

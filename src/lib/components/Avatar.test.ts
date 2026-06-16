@@ -16,11 +16,12 @@ describe('Avatar', () => {
 			props: { name: 'alice', image: null, version: 0 }
 		});
 		expect(body).not.toContain('<img');
-		expect(body).toContain('A');
+		expect(body).toContain('>A<');
 	});
 
 	it('renders empty initial without throwing when name is empty', () => {
 		const { body } = render(Avatar, { props: { name: '', image: null, version: 0 } });
 		expect(body).not.toContain('<img');
+		expect(body).toContain('span');
 	});
 });
