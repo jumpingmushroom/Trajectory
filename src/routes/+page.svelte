@@ -10,6 +10,7 @@
 	import DateModeSheet from '$lib/components/DateModeSheet.svelte';
 	import TabBar from '$lib/components/TabBar.svelte';
 	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
+	import Avatar from '$lib/components/Avatar.svelte';
 	import { withDateMode } from '$lib/dateMode';
 	import { mutate, ulid } from '$lib/mutate';
 	import type { PageData } from './$types';
@@ -267,7 +268,6 @@
 					.sort((a, b) => (a.daysSince ?? 999) - (b.daysSince ?? 999))
 	);
 
-	const initial = $derived(data.userName.charAt(0).toUpperCase());
 </script>
 
 <svelte:head>
@@ -292,13 +292,12 @@
 				</div>
 			</div>
 			<GymChip gym={data.activeGym} onClick={() => (gymSheetOpen = true)} />
-			<a
-				href="/profile"
-				class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
-				style="background: var(--color-amber-dim); color: var(--color-amber);"
-				aria-label="Open profile"
-			>
-				{initial}
+			<a href="/profile" class="flex-shrink-0" aria-label="Open profile">
+				<Avatar
+					name={data.userName}
+					image={data.userImage}
+					version={data.userImageVersion}
+				/>
 			</a>
 		</div>
 
